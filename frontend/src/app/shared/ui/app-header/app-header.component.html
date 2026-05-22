@@ -1,0 +1,30 @@
+<header class="header">
+  <div class="header__inner">
+    <div class="header__brand">
+      <span class="header__dot" aria-hidden="true"></span>
+      <div>
+        <p class="header__eyebrow">{{ activeModuleLabel() || 'Clinic Workspace' }}</p>
+        <h1 tuiTitle="s">{{ clinicName() }}</h1>
+      </div>
+    </div>
+
+    <div class="header__actions">
+      <span tuiBadge appearance="positive">Live</span>
+
+      @if (showModuleSwitch()) {
+        <button tuiButton appearance="primary" size="s" type="button" (click)="onModuleToggle()">
+          Switch Module
+        </button>
+      }
+
+      <div class="header__user-card">
+        <strong>{{ userName() }}</strong>
+        <span>{{ roleLabel() }}</span>
+      </div>
+
+      <button tuiButton appearance="secondary" size="s" type="button" (click)="onLogout()">
+        Logout
+      </button>
+    </div>
+  </div>
+</header>

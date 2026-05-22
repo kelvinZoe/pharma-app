@@ -1,0 +1,437 @@
+/* Unified Clinical Workspace Grid */
+.clinical-workspace {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  padding: 0.5rem;
+  min-height: calc(100vh - 120px);
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (min-width: 1024px) {
+  .clinical-workspace {
+    grid-template-columns: 380px 1fr;
+  }
+}
+
+/* Premium Panel Styling */
+.panel {
+  background: var(--app-surface-color);
+  border: 1px solid var(--app-border-color);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  transition: all 0.3s ease;
+  height: 100%;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  gap: 1rem;
+
+  h2 {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--app-text-color);
+  }
+}
+
+/* Patient Search / Queue Box */
+.queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+  max-height: 550px;
+  padding-right: 0.25rem;
+}
+
+.queue-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background-color: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--app-border-color);
+  border-radius: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: #fff;
+    border-color: var(--app-primary-color);
+    transform: translateX(4px);
+  }
+
+  &.active {
+    background-color: var(--app-primary-soft-color);
+    border-color: var(--app-primary-color);
+  }
+
+  .avatar {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background-color: var(--app-primary-color);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+  }
+}
+
+.queue-info {
+  flex: 1;
+  
+  .patient-name {
+    font-weight: 600;
+    color: var(--app-text-color);
+  }
+  
+  .queue-meta {
+    font-size: 0.75rem;
+    color: var(--app-muted-text-color);
+    margin-top: 0.2rem;
+  }
+}
+
+/* Detail view Layouts */
+.select-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  padding: 3rem;
+  color: var(--app-muted-text-color);
+
+  .pulse-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    animation: pulse 2s infinite;
+  }
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.08); opacity: 0.9; }
+  100% { transform: scale(1); opacity: 0.5; }
+}
+
+.clinical-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  animation: fadeIn 0.3s ease;
+}
+
+/* Demographics Panel */
+.demographics-banner {
+  background-color: #f7fafc;
+  border: 1px solid var(--app-border-color);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+
+  .patient-info {
+    h3 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+    
+    .meta {
+      font-size: 0.8rem;
+      color: var(--app-muted-text-color);
+      margin-top: 0.2rem;
+    }
+  }
+
+  .referral-source {
+    background-color: var(--app-primary-soft-color);
+    color: var(--app-primary-color);
+    padding: 0.35rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+}
+
+/* Grid for Actions in procedure workspace */
+.procedure-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .procedure-grid {
+    grid-template-columns: 1.3fr 1fr;
+  }
+}
+
+/* Procedure lines form */
+.procedure-sub-panel {
+  background-color: #fff;
+  border: 1px solid var(--app-border-color);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+
+  h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+}
+
+.visit-service-line {
+  border: 1px solid var(--app-border-color);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  background-color: #f8fafc;
+  transition: all 0.2s ease;
+
+  &.done {
+    border-color: rgba(31, 139, 76, 0.3);
+    background-color: rgba(31, 139, 76, 0.02);
+  }
+
+  &.not-done {
+    border-color: rgba(197, 59, 52, 0.2);
+    background-color: rgba(197, 59, 52, 0.02);
+  }
+
+  .line-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--app-border-color);
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
+
+    .service-name {
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+  }
+}
+
+/* Done/Not Done toggle pill */
+.line-status-actions {
+  display: flex;
+  gap: 0.5rem;
+
+  button {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    border: 1px solid var(--app-border-color);
+    background-color: #fff;
+    transition: all 0.15s ease;
+
+    &.btn-done-toggle {
+      &:hover, &.active {
+        background-color: var(--app-success-color);
+        color: #fff;
+        border-color: var(--app-success-color);
+      }
+    }
+
+    &.btn-notdone-toggle {
+      &:hover, &.active {
+        background-color: var(--app-danger-color);
+        color: #fff;
+        border-color: var(--app-danger-color);
+      }
+    }
+  }
+}
+
+/* Result entry template formatting */
+.result-template-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background-color: #fff;
+  border: 1px solid var(--app-border-color);
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+
+.template-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.85rem;
+
+  label {
+    font-weight: 600;
+    color: var(--app-text-color);
+  }
+  
+  .ref-range {
+    color: var(--app-muted-text-color);
+    font-size: 0.75rem;
+  }
+}
+
+.not-done-reason-container {
+  background-color: rgba(197, 59, 52, 0.05);
+  border: 1px dashed rgba(197, 59, 52, 0.3);
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  margin-top: 0.5rem;
+
+  label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--app-danger-color);
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+}
+
+/* Presets popover menu */
+.preset-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+
+  .preset-badge {
+    background-color: #fff;
+    border: 1px solid var(--app-danger-color);
+    color: var(--app-danger-color);
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background-color: var(--app-danger-color);
+      color: #fff;
+    }
+  }
+}
+
+/* Sidebar panel for Extra Service + Prescriptions */
+.sidebar-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Extra services catalog */
+.extra-services-card {
+  background-color: #fff;
+  border: 1px solid var(--app-border-color);
+  border-radius: 1rem;
+  padding: 1.25rem;
+
+  h4 {
+    margin: 0 0 0.75rem;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+}
+
+.extra-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.consent-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--app-muted-text-color);
+  cursor: pointer;
+  
+  &.active {
+    color: var(--app-text-color);
+  }
+}
+
+/* Prescriber pad */
+.prescriptions-card {
+  background-color: #fff;
+  border: 1px solid var(--app-border-color);
+  border-radius: 1rem;
+  padding: 1.25rem;
+
+  h4 {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  p {
+    font-size: 0.75rem;
+    color: var(--app-muted-text-color);
+    margin: 0 0 1rem;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 0.75rem;
+    font-size: 0.875rem;
+    font-family: inherit;
+    border: 1px solid var(--app-border-color);
+    border-radius: 0.5rem;
+    outline: none;
+    resize: vertical;
+
+    &:focus {
+      border-color: var(--app-primary-color);
+      box-shadow: 0 0 0 3px rgba(49, 145, 234, 0.1);
+    }
+  }
+}
+
+/* Form inputs styling */
+.form-control-sm {
+  padding: 0.45rem 0.75rem !important;
+  font-size: 0.85rem !important;
+  border-radius: 0.5rem !important;
+}
+
+.btn-sm {
+  padding: 0.45rem 0.75rem !important;
+  font-size: 0.8rem !important;
+  border-radius: 0.5rem !important;
+}
+
+.btn-lg {
+  padding: 1rem 1.5rem !important;
+  font-size: 1rem !important;
+  border-radius: 0.875rem !important;
+}

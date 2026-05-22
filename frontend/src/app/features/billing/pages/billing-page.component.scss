@@ -1,0 +1,43 @@
+.feature-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.feature-page__eyebrow {
+  margin: 0;
+  color: var(--app-primary-color);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.feature-page h2 {
+  margin: 0.2rem 0 0;
+}
+
+.feature-page p {
+  margin: 0.45rem 0 0;
+  color: var(--app-muted-text-color);
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid var(--app-border-color);
+  border-radius: 0.875rem;
+  padding: 1rem;
+}
+
+.panel h3 {
+  margin: 0;
+}
+
+.panel ul {
+  margin: 0.7rem 0 0;
+  padding-left: 1.25rem;
+  color: var(--app-muted-text-color);
+}
+
+.panel li + li {
+  margin-top: 0.35rem;
+}

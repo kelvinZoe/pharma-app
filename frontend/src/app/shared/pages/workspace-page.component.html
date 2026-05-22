@@ -1,0 +1,18 @@
+<section class="workspace-page">
+  <header class="workspace-page__hero">
+    <p class="workspace-page__eyebrow">{{ page.eyebrow }}</p>
+    <h1>{{ page.title }}</h1>
+    <p class="workspace-page__description">{{ page.description }}</p>
+  </header>
+
+  <section class="workspace-page__content">
+    <article class="workspace-page__panel">
+      <h2>What this page will handle</h2>
+      <ul>
+        @for (item of page.highlights; track item) {
+          <li>{{ item }}</li>
+        }
+      </ul>
+    </article>
+  </section>
+</section>

@@ -1,0 +1,626 @@
+.shell-container {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100dvh;
+  background: var(--app-bg-color);
+  color: var(--app-text-color);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}
+
+// ----------------------------------------------------
+// 1. LEFT SIDEBAR STYLE
+// ----------------------------------------------------
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--app-surface-color);
+  border-right: 1px solid var(--app-border-color);
+  padding: 1.5rem 1.2rem;
+  z-index: 50;
+  overflow-y: auto;
+  position: sticky;
+  top: 0;
+
+  // Thin scrollbar for sidebar
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--app-border-color);
+    border-radius: 99px;
+  }
+}
+
+.sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.8rem;
+  padding: 0 0.25rem;
+
+  .brand-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.3rem;
+    height: 2.3rem;
+    background: var(--app-primary-soft-color);
+    color: var(--app-primary-color);
+    border-radius: 0.65rem;
+    flex-shrink: 0;
+
+    svg {
+      width: 1.35rem;
+      height: 1.35rem;
+    }
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--app-text-color);
+    line-height: 1.1;
+  }
+
+  .brand-version {
+    font-size: 0.68rem;
+    font-weight: 750;
+    color: var(--app-primary-color);
+    background: var(--app-primary-soft-color);
+    padding: 0.1rem 0.35rem;
+    border-radius: 0.35rem;
+    letter-spacing: 0.05em;
+  }
+}
+
+// Workspace switcher selector styling
+.sidebar__module-selector {
+  margin-bottom: 1.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+
+  .selector-label {
+    font-size: 0.66rem;
+    font-weight: 850;
+    color: var(--app-muted-text-color);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding-left: 0.25rem;
+  }
+
+  .selector-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+
+    select {
+      width: 100%;
+      min-height: 2.5rem;
+      background: var(--app-bg-color);
+      border: 1px solid var(--app-border-color);
+      border-radius: 0.55rem;
+      padding: 0.5rem 2rem 0.5rem 0.75rem;
+      color: var(--app-text-color);
+      font-size: 0.88rem;
+      font-weight: 650;
+      outline: none;
+      cursor: pointer;
+      appearance: none;
+      transition: all 0.15s ease;
+
+      &:hover {
+        background: var(--app-surface-color);
+        border-color: var(--app-primary-color);
+      }
+
+      &:focus {
+        background: #ffffff;
+        border-color: var(--app-primary-color);
+        box-shadow: 0 0 0 3px rgba(13, 148, 216, 0.08);
+      }
+    }
+
+    .selector-arrow {
+      position: absolute;
+      right: 0.75rem;
+      width: 0.95rem;
+      height: 0.95rem;
+      color: var(--app-muted-text-color);
+      pointer-events: none;
+    }
+  }
+}
+
+.sidebar__module-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  background: var(--app-primary-soft-color);
+  border: 1px solid color-mix(in srgb, var(--app-primary-color), white 80%);
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.55rem;
+  margin-bottom: 1.8rem;
+
+  .banner-pulse {
+    width: 6px;
+    height: 6px;
+    background: var(--app-primary-color);
+    border-radius: 50%;
+    position: relative;
+    flex-shrink: 0;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border: 1px solid var(--app-primary-color);
+      border-radius: 50%;
+      animation: sidebar-dot-ripple 1.8s infinite ease-out;
+    }
+  }
+
+  .banner-text {
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: var(--app-primary-color);
+  }
+}
+
+.sidebar__section {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1.5rem;
+
+  .section-title {
+    font-size: 0.68rem;
+    font-weight: 850;
+    color: var(--app-muted-text-color);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.6rem;
+    padding-left: 0.5rem;
+  }
+
+  &.mt-auto {
+    margin-top: auto;
+    margin-bottom: 0;
+    padding-top: 1rem;
+    border-top: 1px solid var(--app-border-color);
+  }
+}
+
+.sidebar__nav {
+  display: grid;
+  gap: 0.3rem;
+
+  a, button {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.65rem 0.8rem;
+    border-radius: 0.55rem;
+    color: var(--app-muted-text-color);
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+    background: transparent;
+    border: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    .icon-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.25rem;
+      height: 1.25rem;
+      color: inherit;
+      transition: color 0.15s ease;
+
+      svg {
+        width: 1.15rem;
+        height: 1.15rem;
+        stroke-width: 2.2;
+      }
+    }
+
+    .link-text {
+      line-height: 1;
+    }
+
+    &:hover {
+      background: var(--app-primary-soft-color);
+      color: var(--app-primary-color);
+    }
+
+    &.is-active {
+      background: var(--app-primary-soft-color);
+      color: var(--app-primary-color);
+      font-weight: 750;
+      position: relative;
+
+      &::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.5rem;
+        bottom: 0.5rem;
+        width: 3.5px;
+        background: var(--app-primary-color);
+        border-radius: 0 4px 4px 0;
+      }
+    }
+  }
+
+  .logout-btn {
+    color: var(--app-danger-color);
+    
+    &:hover {
+      background: #fee2e2;
+      color: #dc2626;
+    }
+  }
+}
+
+// ----------------------------------------------------
+// 2. RIGHT WORKSPACE CONTENT LAYOUT
+// ----------------------------------------------------
+.workspace-main {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-width: 0;
+  overflow: hidden;
+}
+
+// ----------------------------------------------------
+// 3. TOP BAR STYLE
+// ----------------------------------------------------
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 4.4rem;
+  max-height: 4.4rem;
+  background: var(--app-surface-color);
+  border-bottom: 1px solid var(--app-border-color);
+  padding: 0 1.8rem;
+  flex-shrink: 0;
+}
+
+.mobile-toggle {
+  display: none;
+  background: transparent;
+  border: none;
+  color: var(--app-text-color);
+  cursor: pointer;
+  padding: 0.5rem;
+  margin-right: 0.5rem;
+  border-radius: 0.4rem;
+
+  svg {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+
+  &:hover {
+    background: var(--app-bg-color);
+  }
+}
+
+.topbar__left {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  flex-grow: 1;
+}
+
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--app-muted-text-color);
+
+  .module-breadcrumb {
+    color: var(--app-primary-color);
+  }
+
+  .breadcrumb-arrow {
+    width: 0.8rem;
+    height: 0.8rem;
+    color: var(--app-border-color);
+  }
+
+  .page-breadcrumb {
+    color: var(--app-text-color);
+    font-weight: 700;
+  }
+}
+
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: min(24rem, 100%);
+  margin-left: 1rem;
+
+  .search-icon {
+    position: absolute;
+    left: 0.95rem;
+    width: 1rem;
+    height: 1rem;
+    color: var(--app-muted-text-color);
+    pointer-events: none;
+  }
+
+  input {
+    width: 100%;
+    min-height: 2.3rem;
+    background: var(--app-bg-color);
+    border: 1px solid var(--app-border-color);
+    border-radius: 0.55rem;
+    padding: 0.4rem 0.9rem 0.4rem 2.3rem;
+    font-size: 0.86rem;
+    font-weight: 550;
+    outline: none;
+    color: var(--app-text-color);
+    transition: all 0.15s ease;
+
+    &::placeholder {
+      color: var(--app-muted-text-color);
+    }
+
+    &:hover {
+      border-color: #cbd5e1;
+    }
+
+    &:focus {
+      background: #ffffff;
+      border-color: var(--app-primary-color);
+      box-shadow: 0 0 0 3px rgba(13, 148, 216, 0.06);
+    }
+  }
+}
+
+.topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 1.3rem;
+  flex-shrink: 0;
+}
+
+// Live sync status badge
+.live-status {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: #f0fdf4;
+  border: 1px solid #dcfce7;
+  padding: 0.4rem 0.65rem;
+  border-radius: 0.5rem;
+
+  .live-pulse {
+    width: 6px;
+    height: 6px;
+    background: var(--app-success-color);
+    border-radius: 50%;
+    position: relative;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: -3px;
+      border: 1px solid var(--app-success-color);
+      border-radius: 50%;
+      animation: live-dot-pulsate 1.6s infinite ease-out;
+    }
+  }
+
+  .live-label {
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: #15803d;
+    letter-spacing: 0.04em;
+  }
+}
+
+// Notification bell
+.notification-btn {
+  position: relative;
+  background: transparent;
+  border: 1px solid var(--app-border-color);
+  border-radius: 0.55rem;
+  width: 2.3rem;
+  height: 2.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--app-text-color);
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  svg {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+
+  &:hover {
+    background: var(--app-bg-color);
+    border-color: #cbd5e1;
+    color: var(--app-primary-color);
+  }
+
+  .notification-badge {
+    position: absolute;
+    top: 0.45rem;
+    right: 0.45rem;
+    width: 6px;
+    height: 6px;
+    background: #3b82f6;
+    border-radius: 50%;
+  }
+}
+
+// Profile details
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid var(--app-border-color);
+}
+
+.user-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.3rem;
+  height: 2.3rem;
+  background: var(--app-primary-soft-color);
+  color: var(--app-primary-color);
+  border-radius: 50%;
+  font-size: 0.88rem;
+  font-weight: 800;
+  border: 1.5px solid color-mix(in srgb, var(--app-primary-color), white 80%);
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+
+  .user-name {
+    font-size: 0.88rem;
+    font-weight: 750;
+    color: var(--app-text-color);
+  }
+
+  .user-role {
+    font-size: 0.74rem;
+    color: var(--app-muted-text-color);
+    font-weight: 550;
+  }
+}
+
+// ----------------------------------------------------
+// 4. PORTAL VIEWPORT AREA
+// ----------------------------------------------------
+.content-portal {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 1.5rem 1.8rem;
+  min-width: 0;
+
+  // Thin scrollbar for content
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 99px;
+  }
+}
+
+.content-viewport {
+  width: min(100%, 1560px);
+  margin: 0 auto;
+}
+
+// ----------------------------------------------------
+// KEYFRAME ANIMATIONS
+// ----------------------------------------------------
+@keyframes sidebar-dot-ripple {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+@keyframes live-dot-pulsate {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+.sidebar-overlay {
+  display: none;
+}
+
+// ----------------------------------------------------
+// 5. RESPONSIVE MEDIA STYLES
+// ----------------------------------------------------
+@media (max-width: 1024px) {
+  .shell-container {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 260px;
+    transform: translateX(-100%);
+    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.3);
+    z-index: 45;
+  }
+
+  .mobile-toggle {
+    display: inline-flex;
+  }
+
+  .topbar {
+    padding: 0 1rem;
+  }
+
+  .topbar__left {
+    gap: 0.5rem;
+    
+    .breadcrumbs {
+      display: none; // Hide breadcrumbs on small screen to fit search
+    }
+  }
+
+  .search-box {
+    margin-left: 0.5rem;
+    width: 100%;
+  }
+
+  .live-status {
+    display: none; // Hide telemetry state to fit details
+  }
+
+  .content-portal {
+    padding: 1rem;
+  }
+
+  // Active Mobile Sidebar State
+  .mobile-sidebar-active {
+    .sidebar {
+      transform: translateX(0);
+    }
+    .sidebar-overlay {
+      display: block;
+    }
+  }
+}

@@ -1,0 +1,62 @@
+A. Clinic operations and policy
+    1. It is for one clinic
+    2. Cedis
+    3. Cash or mobile money
+    4. Full payments
+    5. No credit allowed
+    6. Walk-in only
+B. Patient identity and duplicates
+    1. Yes
+    2. Checking by fullname and phone number, they may never be duplicates, howevere there may be returning patients. Lets add to their records, this means the frontdesk must search through patients table for possible returning customers.
+    3. Yes 
+    4. Yes minors can be allowed and they do not need guardian details
+C. Frontdesk fields (mininum dataset)
+    1. Names: Surname , middle and first name,  sex, age, tel number, referral center, kind of investigation or reason for visit. 
+    2. Insurance is needed : insured or uninsured. We can ignore emails and occupation
+    3. Yes, lets take emergency contanct
+    4. No
+D. Services and departments
+    1. Laboratory and Scanning department, but more can be added later
+    2. No, one is to one
+    3. No
+    4. No, however a service can be done twice if neccessary which when keyed in will constitute to price increase
+    5. Yes
+E. Department execution
+    1. Labs/Scans can add and supervisiors too
+    2. No
+    3. Preset list or free text if reason not present
+    4. Yes
+    5. No
+F. Result templates (your custom field idea)
+    1. Yes, when admin is adding a service he will add fields needed for results of that service.
+    2. I would prefere a table builder with columns( sample-result.jpeg) thats a sample. Can that be done. Every service has a similar template design. The templates for all of the servies are available though if making the admin build it is too difficult. Can we upload the template and let the system build it? which approach is the easiest? I would prefer the admin build it with a word-like interface where they can add collumns and cell data where neccessary and leave empty cells for filling. 
+        We can also settle with a form-like approach but when being printed comes out as a table. Which appraoch is the easiest
+    3. Both required and optional
+    4. 2 decimal places
+    5. Yes
+G. Prescription and pharmacy flow
+    1. No leave dosage for physicians
+    2. No, they should just type out the name of the medicine they will prescribe. I dont thingk there is a need to search through pharmacy items.
+    3. Because of above decision, the pharmacist will just recieve a note of prescrbtions and they may give alternates per their own decretions
+    4. Yes
+    5. Yes, payment from clinic is different from payment from pharmacy
+H. Billing and receipts
+    1. Seperate invoices, although both are in the same system, they are run independently
+    2. No
+    3. no
+    4. No
+    5. A4, so we can get summary
+    6. Leave space for stamps for now, we will add that later
+J. Security, roles, and compliance
+    1. Yes, all role are needed plus add custom roles
+    2. Yes
+    3. No
+    4. 6 years
+    5. no not that I know of
+K. Reporting and financials
+    1. all needed reports for a robust system.
+    2. Yes also add by pharmacy or clinic
+    3. Yes
+    4. Yes
+    5. both 
+

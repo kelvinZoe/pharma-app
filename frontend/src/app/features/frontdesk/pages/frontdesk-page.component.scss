@@ -1,0 +1,1121 @@
+/* Premium Layout Grids */
+.clients-workspace,
+.visits-workspace,
+.registration-workspace,
+.billing-workspace {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  padding: 0.5rem;
+  min-height: calc(100vh - 120px);
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (min-width: 1024px) {
+  .clients-workspace {
+    grid-template-columns: 420px 1fr;
+  }
+  .billing-workspace {
+    grid-template-columns: 480px 1fr;
+  }
+}
+
+/* Premium Panel Styling */
+.panel {
+  background: var(--app-surface-color);
+  border: 1px solid var(--app-border-color);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  transition: all 0.3s ease;
+  height: 100%;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  gap: 1rem;
+
+  h2 {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--app-text-color);
+    letter-spacing: -0.02em;
+  }
+}
+
+/* Inputs & Form Controls */
+.form-group {
+  margin-bottom: 1.25rem;
+
+  label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--app-muted-text-color);
+  }
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  color: var(--app-text-color);
+  background-color: #f7fafc;
+  border: 1px solid var(--app-border-color);
+  border-radius: 0.75rem;
+  transition: all 0.2s ease;
+  outline: none;
+
+  &:focus {
+    background-color: #fff;
+    border-color: var(--app-primary-color);
+    box-shadow: 0 0 0 3px rgba(49, 145, 234, 0.15);
+  }
+
+  &.search-input {
+    padding-left: 2.5rem;
+  }
+}
+
+/* Search Box Container */
+.search-box {
+  position: relative;
+  margin-bottom: 1.25rem;
+
+  .search-icon {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--app-muted-text-color);
+    pointer-events: none;
+  }
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 0.75rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+
+  .icon {
+    font-size: 1.1rem;
+  }
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(15, 39, 66, 0.08);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+.btn-primary {
+  background-color: var(--app-primary-color);
+  color: #fff;
+
+  &:hover {
+    background-color: #1b7cd5;
+  }
+}
+
+.btn-success {
+  background-color: var(--app-success-color);
+  color: #fff;
+
+  &:hover {
+    background-color: #18723e;
+  }
+}
+
+.btn-danger {
+  background-color: var(--app-danger-color);
+  color: #fff;
+
+  &:hover {
+    background-color: #a42e28;
+  }
+}
+
+.btn-secondary {
+  background-color: var(--app-primary-soft-color);
+  color: var(--app-primary-color);
+
+  &:hover {
+    background-color: #d1e7fc;
+  }
+}
+
+.btn-block {
+  width: 100%;
+}
+
+/* Badges & Tags */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  
+  &.code {
+    background-color: #edf2f7;
+    color: var(--app-text-color);
+  }
+
+  &.sex {
+    &.male {
+      background-color: #e3f2fd;
+      color: #0d47a1;
+    }
+    &.female {
+      background-color: #fce4ec;
+      color: #880e4f;
+    }
+  }
+
+  &.age {
+    background-color: #f7fafc;
+    color: var(--app-muted-text-color);
+  }
+}
+
+/* Patient Card Item list */
+.results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+  max-height: 550px;
+  padding-right: 0.25rem;
+}
+
+.patient-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background-color: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--app-border-color);
+  border-radius: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+
+  &:hover {
+    background-color: #fff;
+    border-color: var(--app-primary-color);
+    transform: translateX(4px);
+    box-shadow: 0 4px 15px -5px rgba(49, 145, 234, 0.15);
+  }
+
+  &.active {
+    background-color: var(--app-primary-soft-color);
+    border-color: var(--app-primary-color);
+    box-shadow: 0 4px 15px -5px rgba(49, 145, 234, 0.25);
+  }
+}
+
+.avatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  background-color: var(--app-primary-color);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.05rem;
+  box-shadow: 0 4px 10px rgba(49, 145, 234, 0.25);
+}
+
+.patient-info {
+  flex: 1;
+
+  .patient-name {
+    font-weight: 600;
+    color: var(--app-text-color);
+    margin-bottom: 0.25rem;
+  }
+
+  .patient-meta {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .patient-phone {
+    font-size: 0.8rem;
+    color: var(--app-muted-text-color);
+  }
+}
+
+.arrow-indicator {
+  color: var(--app-muted-text-color);
+  opacity: 0.5;
+  font-size: 0.95rem;
+}
+
+/* Detail view Layouts */
+.detail-panel {
+  display: none;
+  
+  &.visible {
+    display: flex;
+  }
+}
+
+@media (min-width: 1024px) {
+  .detail-panel {
+    display: flex !important;
+  }
+}
+
+.select-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  padding: 3rem;
+  color: var(--app-muted-text-color);
+
+  .pulse-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    animation: pulse 2s infinite;
+  }
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.08); opacity: 0.9; }
+  100% { transform: scale(1); opacity: 0.5; }
+}
+
+.detail-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  animation: fadeIn 0.3s ease;
+}
+
+.patient-header-card {
+  background: linear-gradient(135deg, var(--app-primary-color) 0%, #1a71c5 100%);
+  color: #fff;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 8px 20px -8px rgba(49, 145, 234, 0.4);
+
+  .patient-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+
+    h3 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+  }
+
+  .insurance-badge {
+    background-color: rgba(255, 255, 255, 0.2);
+    padding: 0.35rem 0.75rem;
+    border-radius: 2rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+
+    &.insured {
+      background-color: rgba(31, 139, 76, 0.4);
+      border-color: rgba(46, 204, 113, 0.4);
+    }
+  }
+}
+
+.demographics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1.25rem;
+
+  .demo-item {
+    label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      opacity: 0.8;
+      display: block;
+      margin-bottom: 0.25rem;
+    }
+
+    .value {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+  }
+}
+
+/* Actions grid (History & Checkout) */
+.actions-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 960px) {
+  .actions-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.sub-panel {
+  background-color: #fff;
+  border: 1px solid var(--app-border-color);
+  border-radius: 1rem;
+  padding: 1.25rem;
+
+  h4 {
+    margin: 0 0 0.5rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--app-text-color);
+  }
+
+  .section-desc {
+    font-size: 0.825rem;
+    color: var(--app-muted-text-color);
+    margin: 0 0 1rem;
+  }
+}
+
+/* Visit History Timeline */
+.history-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+  max-height: 280px;
+  padding-left: 0.5rem;
+}
+
+.history-item {
+  display: flex;
+  gap: 1rem;
+  position: relative;
+  
+  &:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 14px;
+    bottom: -15px;
+    width: 2px;
+    background-color: var(--app-border-color);
+  }
+}
+
+.timeline-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #cbd5e0;
+  margin-top: 4px;
+  flex-shrink: 0;
+
+  &.completed {
+    background-color: var(--app-success-color);
+    box-shadow: 0 0 0 3px rgba(31, 139, 76, 0.2);
+  }
+}
+
+.history-content {
+  flex: 1;
+  padding-bottom: 0.5rem;
+
+  .history-date {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--app-text-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.35rem;
+  }
+
+  .history-services {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+}
+
+.mini-service-tag {
+  background-color: #f7fafc;
+  border: 1px solid var(--app-border-color);
+  color: var(--app-muted-text-color);
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.35rem;
+  font-size: 0.725rem;
+}
+
+.sub-empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--app-muted-text-color);
+  font-size: 0.85rem;
+  border: 2px dashed var(--app-border-color);
+  border-radius: 0.75rem;
+}
+
+/* Service catalog inside checkin builder */
+.service-selector {
+  border: 1px solid var(--app-border-color);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+}
+
+.catalog-search {
+  padding: 0.5rem;
+  background-color: #f7fafc;
+  border-bottom: 1px solid var(--app-border-color);
+}
+
+.catalog-list {
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.service-row {
+  display: flex;
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  border-bottom: 1px solid #edf2f7;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background-color: #f7fafc;
+  }
+
+  &.selected {
+    background-color: var(--app-primary-soft-color);
+  }
+
+  .checkbox-box {
+    margin-right: 0.75rem;
+    pointer-events: none;
+  }
+
+  .service-details {
+    flex: 1;
+
+    .service-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--app-text-color);
+    }
+    
+    .service-dept {
+      font-size: 0.7rem;
+      color: var(--app-muted-text-color);
+    }
+  }
+
+  .service-price {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--app-text-color);
+  }
+}
+
+/* Checkout summary card */
+.checkout-summary {
+  background-color: var(--app-primary-soft-color);
+  border: 1px solid rgba(49, 145, 234, 0.2);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  animation: slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.summary-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--app-muted-text-color);
+
+  &.total {
+    border-top: 1px solid rgba(49, 145, 234, 0.15);
+    padding-top: 0.5rem;
+    margin-top: 0.25rem;
+    font-size: 1.1rem;
+    color: var(--app-primary-color);
+  }
+}
+
+.checkout-empty {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--app-muted-text-color);
+  background-color: #f7fafc;
+  border-radius: 0.75rem;
+  font-size: 0.825rem;
+  border: 1px dashed var(--app-border-color);
+}
+
+.checkin-actions {
+  margin-top: 0.5rem;
+}
+
+/* Active Visits Queue layout */
+.visits-workspace {
+  .visits-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.25rem;
+  }
+}
+
+.visit-card {
+  background: #fff;
+  border: 1px solid var(--app-border-color);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: 0 4px 15px -8px rgba(15, 39, 66, 0.05);
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -10px rgba(15, 39, 66, 0.08);
+  }
+}
+
+.visit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+
+  .patient-name {
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--app-text-color);
+    margin-bottom: 0.15rem;
+  }
+
+  .patient-code {
+    font-size: 0.75rem;
+    color: var(--app-muted-text-color);
+  }
+}
+
+.status-pill {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+
+  &.registered {
+    background-color: #e3f2fd;
+    color: #0d47a1;
+  }
+  &.sent_to_department {
+    background-color: #fff3e0;
+    color: #e65100;
+  }
+  &.in_progress {
+    background-color: #fffde7;
+    color: #f57f17;
+  }
+  &.completed {
+    background-color: #e8f5e9;
+    color: #1b5e20;
+  }
+  &.awaiting_payment {
+    background-color: #f3e5f5;
+    color: #4a148c;
+  }
+  &.paid {
+    background-color: #e8f5e9;
+    color: var(--app-success-color);
+  }
+}
+
+.visit-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+
+  .meta-row {
+    font-size: 0.8rem;
+    color: var(--app-muted-text-color);
+    
+    strong {
+      color: var(--app-text-color);
+    }
+  }
+
+  .services-list-visit {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    background-color: #f7fafc;
+    border-radius: 0.5rem;
+    padding: 0.6rem;
+
+    .service-item-visit {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+      
+      .svc-name {
+        color: var(--app-text-color);
+        font-weight: 500;
+      }
+      .svc-status {
+        font-size: 0.675rem;
+        padding: 0.05rem 0.25rem;
+        border-radius: 0.25rem;
+        font-weight: 600;
+        
+        &.done {
+          background-color: rgba(31, 139, 76, 0.1);
+          color: var(--app-success-color);
+        }
+        &.not_done {
+          background-color: rgba(197, 59, 52, 0.1);
+          color: var(--app-danger-color);
+        }
+        &.pending {
+          background-color: #edf2f7;
+          color: var(--app-muted-text-color);
+        }
+      }
+    }
+  }
+}
+
+.visit-footer {
+  border-top: 1px solid var(--app-border-color);
+  padding-top: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  .billing-total {
+    font-size: 0.75rem;
+    color: var(--app-muted-text-color);
+
+    strong {
+      display: block;
+      font-size: 1.1rem;
+      color: var(--app-text-color);
+    }
+  }
+}
+
+/* Empty queues states */
+.empty-queue {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--app-muted-text-color);
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--app-border-color);
+  border-radius: 1.25rem;
+  width: 100%;
+
+  .queue-icon {
+    font-size: 3.5rem;
+    margin-bottom: 1rem;
+  }
+  
+  h3 {
+    margin: 0;
+    color: var(--app-text-color);
+  }
+
+  p {
+    margin: 0.5rem 0 0;
+  }
+}
+
+/* Registration Form styles */
+.registration-container {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .registration-container {
+    grid-template-columns: 1.2fr 1fr;
+  }
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 600px) {
+  .form-row {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+}
+
+/* Billing Desk checkout workspace */
+.billing-checkout-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.billing-card {
+  border: 1px solid var(--app-border-color);
+  border-radius: 1rem;
+  background-color: #fff;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: 0 4px 15px -8px rgba(15, 39, 66, 0.05);
+
+  .patient-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--app-border-color);
+    padding-bottom: 0.75rem;
+
+    .name {
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+    
+    .code {
+      font-size: 0.75rem;
+      background-color: #f7fafc;
+      padding: 0.2rem 0.5rem;
+      border-radius: 0.35rem;
+      font-weight: 600;
+    }
+  }
+}
+
+.billing-services-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.billing-service-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px dashed #edf2f7;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  .svc-info {
+    flex: 1;
+
+    .name {
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    
+    .dept {
+      font-size: 0.7rem;
+      color: var(--app-muted-text-color);
+    }
+  }
+
+  .svc-status-val {
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-right: 1.5rem;
+
+    &.done {
+      color: var(--app-success-color);
+    }
+    &.not-done {
+      color: var(--app-danger-color);
+      text-decoration: line-through;
+      opacity: 0.65;
+    }
+  }
+
+  .svc-price {
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+}
+
+.billing-not-done-alert {
+  background-color: rgba(197, 59, 52, 0.08);
+  border: 1px solid rgba(197, 59, 52, 0.15);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--app-danger-color);
+  
+  strong {
+    display: block;
+    margin-bottom: 0.15rem;
+  }
+}
+
+.invoice-summary-card {
+  background-color: var(--app-primary-soft-color);
+  border: 1px solid rgba(49, 145, 234, 0.2);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  .invoice-line {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: var(--app-muted-text-color);
+
+    &.total {
+      border-top: 1px solid rgba(49, 145, 234, 0.15);
+      padding-top: 0.5rem;
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--app-primary-color);
+    }
+  }
+}
+
+.payment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.payment-method-selector {
+  display: flex;
+  gap: 1rem;
+
+  .method-option {
+    flex: 1;
+    border: 2px solid var(--app-border-color);
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    text-align: center;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background-color: #f7fafc;
+    }
+
+    &.selected {
+      border-color: var(--app-primary-color);
+      background-color: var(--app-primary-soft-color);
+      color: var(--app-primary-color);
+    }
+  }
+}
+
+/* Receipt Print Preview Styling */
+.invoice-print-container {
+  background-color: #fff;
+  border: 2px solid var(--app-border-color);
+  border-radius: 1rem;
+  padding: 2rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+}
+
+.receipt-header {
+  text-align: center;
+  border-bottom: 2px solid var(--app-text-color);
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+
+  h1 {
+    margin: 0;
+    font-size: 1.5rem;
+  }
+  
+  p {
+    margin: 0.25rem 0 0;
+    font-size: 0.85rem;
+    color: var(--app-muted-text-color);
+  }
+}
+
+.receipt-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.85rem;
+}
+
+.receipt-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1.5rem;
+
+  th, td {
+    padding: 0.6rem;
+    text-align: left;
+    border-bottom: 1px solid var(--app-border-color);
+    font-size: 0.85rem;
+  }
+
+  th {
+    font-weight: 700;
+    background-color: #f7fafc;
+  }
+
+  .num-col {
+    text-align: right;
+  }
+}
+
+.receipt-totals {
+  width: 50%;
+  margin-left: auto;
+  font-size: 0.85rem;
+  
+  .total-line {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.4rem 0;
+    
+    &.grand {
+      font-weight: 800;
+      border-top: 2px solid var(--app-text-color);
+      font-size: 1.05rem;
+    }
+  }
+}
+
+.receipt-footer {
+  text-align: center;
+  margin-top: 3rem;
+  font-size: 0.75rem;
+  color: var(--app-muted-text-color);
+  border-top: 1px solid var(--app-border-color);
+  padding-top: 1rem;
+}
+
+/* Printable media styles */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  
+  .invoice-print-container,
+  .invoice-print-container * {
+    visibility: visible;
+  }
+  
+  .invoice-print-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  /* Compact receipt formatting */
+  .receipt-thermal {
+    width: 80mm;
+    padding: 2mm;
+    font-size: 11px;
+    
+    .receipt-header h1 {
+      font-size: 16px;
+    }
+    
+    .receipt-meta-grid {
+      grid-template-columns: 1fr;
+      gap: 0.25rem;
+    }
+    
+    .receipt-table th, 
+    .receipt-table td {
+      padding: 0.25rem;
+      font-size: 10px;
+    }
+    
+    .receipt-totals {
+      width: 100%;
+    }
+  }
+}

@@ -1,0 +1,30 @@
+.stat-card {
+  background: #fff;
+  border: 1px solid var(--app-border-color);
+  border-radius: 0.875rem;
+  padding: 1rem;
+  box-shadow: 0 6px 18px rgba(12, 33, 61, 0.05);
+}
+
+.stat-card__label {
+  margin: 0;
+  color: var(--app-muted-text-color);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.stat-card__value {
+  margin: 0.45rem 0 0;
+  color: var(--app-text-color);
+  font-size: clamp(1.35rem, 2.5vw, 1.85rem);
+  line-height: 1.15;
+}
+
+.stat-card__hint {
+  margin: 0.4rem 0 0;
+  color: var(--app-primary-color);
+  font-size: 0.85rem;
+  font-weight: 600;
+}

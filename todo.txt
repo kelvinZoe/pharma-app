@@ -1,0 +1,27 @@
+I want t build a system for a radiography clinic. Basically its supposed to be a simple system to track user records, financials and pharmacy stock. 
+This is the entire flow is like this.
+1. User comes to the clinic.
+    - When user or patient gets to the clinic, they are met by front-desk which takes a log of the user. They take user data, reason for visit and and the type of scan they are in for. I do not have all the fields that will be taken so feel free to recommend fields to be taken. There will not be any upload of documents. Everything has to be keyed in
+    - Now the receptionist selects pre programed services for the user based on what the user wants to do. Example, a user comes for an ultrasound, frontdesk selects ultrasound from a list of services in the system added by the admin.
+    - After front desk keys in data, the info goes to needed department for the scan. Every service goes with what department to provide the service. There are two main departments, Labs and Scans department.
+    - Note that the frontdesk should see and inform the user the cost of their desired scan. Give a quick way for the frontdesk to check the cost of any service for enquiries.
+2. The Labs and Scans
+    - After frontdesk saves the info, the labs, will also get a new request or whatever we name it. 
+    - The patient will go to the needed department and the labs personnel will have the person's info in their section.
+    - The labs read the the profile and knows what the person is there to do, now the labs can make more than what the patient requested so allow the labs to add more services to the user. Each service comes with a cost thus as more services are being added the more the services go up.
+    - The labs can also direct the customer to go for medicine from the pharmacy. The labs must be able to precribe medicine through the system as all the medicine in the pharmacy should be accessible to the labs or scans. If the needed medicine is not in the system, add a way to add a prescription to the user so they can by out.
+    - After all of the prcedure is done, the labs finishes with the patient and the patient goes back to the frontdesk to make payment. It is important that the labs sees the amount it will cost especially when they added new services that the frontend did not add. Example, customer comes for xray, frontdesk tells them its 200 dollars, the customer goes to take the scan and the scans realize they need to take an
+      extra scan of something else, thus the price will go up. The scans tell the customer and the customer agrees to take the scan. SO the scans need to see hw much it will cost to add the new scan. Also, they must see the price of the medicine they prescribe too, just incase the customer wants to know before they make the purchase. 
+    - If the labs or scans recommend an extra scan and the customer does not do it, lets keep track of all of it, the labs must key it in and mark as "not done" or something, with a reason.
+    - Also by way of research, add any neccessary things that should be added in this flow to make the process standard.
+    -Once the user goes though everything and is done, they will cme back to the frontdesk to make payment. The frontdesk should have billing where they can go an generate bill for the user based on the services that was provided to the user. after successful payment, he marks as paid and prints user reciepts and records, detailing all that the customer came to do, the test results from the labs, the prescrbtions and any notes from the labs and scans. leave a space for stamps from the frontdest or it can come out already stamped. 
+3. pharmacy
+    - This side of the system is a full fledged stock, inventory and pos system for a pharmacy. Add all neccessary modules
+    - the extra modules is that they should be able to check prescrbtions from labs of a user who is comming from the clinic
+    - All of them should be added as a sale. Lets find a way to differenciate a walk-in from a clinic recommended customer
+4. System admin
+    - The ystem admin is one who has access to all phases, he sets the prices of services and see financials of the clinic. 
+    - ON initial setup of the clinic, he will add all service that the clinic provides, he will add new user to any department.
+    - When adding services, he will also add fields that the labs and scan must fill after providing the service. Is this posible?
+    - Once a user is given any department, the user can do everything in that department. 
+    - Once frontdesk marks a customer as paid, then the it should be added to account. 

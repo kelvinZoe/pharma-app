@@ -1,0 +1,177 @@
+<section class="dashboard-container">
+  <!-- WELCOME HEADER HERO -->
+  <header class="dashboard-hero">
+    <div class="hero-left">
+      <p class="hero-eyebrow">{{ page.eyebrow }}</p>
+      <h1>Welcome back, {{ clinicianName() }}</h1>
+      <p class="hero-subtitle">{{ page.title }}</p>
+    </div>
+    <div class="hero-right">
+      <div class="hero-date">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+        <span>{{ currentDate() }}</span>
+      </div>
+      <div class="telemetry-badge">
+        <span class="telemetry-dot"></span>
+        <span class="telemetry-label">SYSTEM RESPONSIVE</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- STATS CARDS GRID -->
+  <section class="stats-grid">
+    @for (card of statCards(); track card.label; let first = $first; let last = $last) {
+      <article class="stat-card" [class.stat-card--accent]="first" [class.stat-card--danger]="last && card.value !== '0' && card.value !== '0.00'">
+        <div class="stat-card__head">
+          <span class="stat-card__label">{{ card.label }}</span>
+          <span class="trend-badge" [class.trend-badge--positive]="card.trendPositive">
+            @if (card.trendPositive) {
+              <svg class="trend-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                <polyline points="17 6 23 6 23 12" />
+              </svg>
+            } @else {
+              <svg class="trend-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="23 18 13.5 8.5 8.5 13.5 1 6" />
+                <polyline points="17 18 23 18 23 12" />
+              </svg>
+            }
+            {{ card.trend }}
+          </span>
+        </div>
+        <h2 class="stat-card__value">{{ card.value }}</h2>
+        <p class="stat-card__hint">{{ card.hint }}</p>
+      </article>
+    }
+  </section>
+
+  <!-- ANALYTICS PANEL ROW -->
+  <section class="analytics-row">
+    <!-- SVG Chart Widget -->
+    <article class="analytics-card chart-widget">
+      <div class="card-header">
+        <div>
+          <h3>Activity Analytics</h3>
+          <p class="card-subtitle">Diagnostics workload/transactions completed this week</p>
+        </div>
+        <div class="chart-legend">
+          <span class="legend-dot"></span>
+          <span>Volume count</span>
+        </div>
+      </div>
+      
+      <!-- Pure SVG & CSS Bar Chart -->
+      <div class="chart-container">
+        <div class="y-axis">
+          <span>Max</span>
+          <span>50%</span>
+          <span>0</span>
+        </div>
+        <div class="chart-bars">
+          @for (bar of weeklyChart(); track bar.label) {
+            <div class="chart-column">
+              <div class="bar-wrapper">
+                <div class="bar-value-tooltip">{{ bar.count }}</div>
+                <div class="bar-fill" [style.height.%]="bar.heightPercent"></div>
+              </div>
+              <span class="bar-label">{{ bar.label }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    </article>
+
+    <!-- Completion Gauge Widget -->
+    <article class="analytics-card gauge-widget">
+      <div class="card-header">
+        <h3>Visit Fulfillment Rate</h3>
+        <p class="card-subtitle">Successful checkout closures</p>
+      </div>
+
+      <div class="gauge-container">
+        <div class="circular-gauge">
+          <svg class="gauge-svg" viewBox="0 0 120 120">
+            <circle class="gauge-bg" cx="60" cy="60" r="54" />
+            <circle
+              class="gauge-progress"
+              cx="60"
+              cy="60"
+              r="54"
+              [style.strokeDashoffset]="strokeDashOffset()"
+            />
+          </svg>
+          <div class="gauge-content">
+            <span class="percentage">{{ completionPercent() }}%</span>
+            <span class="label">Fulfilled</span>
+          </div>
+        </div>
+
+        <div class="gauge-stats">
+          <div class="stat-item">
+            <span class="label">Total Closed</span>
+            <span class="val color-green">High Rate</span>
+          </div>
+          <div class="stat-item">
+            <span class="label">Outstanding</span>
+            <span class="val">In Progress</span>
+          </div>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <!-- QUICK ACTIONS & ACTIVITY LEDGER GRID -->
+  <section class="details-grid">
+    <!-- Quick Actions -->
+    <article class="details-card actions-panel">
+      <div class="card-header">
+        <h3>Quick Actions</h3>
+        <p class="card-subtitle">Direct routing shortcuts for this workspace</p>
+      </div>
+
+      <div class="actions-grid">
+        @for (action of page.actions; track action.route) {
+          <a class="action-item" [routerLink]="action.route">
+            <div class="action-item__icon">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </div>
+            <div class="action-item__details">
+              <h4>{{ action.title }}</h4>
+              <p>{{ action.description }}</p>
+            </div>
+          </a>
+        }
+      </div>
+    </article>
+
+    <!-- Activity Log Ledger -->
+    <article class="details-card activity-panel">
+      <div class="card-header">
+        <h3>Workspace Activity Ledger</h3>
+        <p class="card-subtitle">Real-time clinical telemetry & log history</p>
+      </div>
+
+      <div class="activity-ledger">
+        @for (log of activities(); track log.title) {
+          <div class="activity-item">
+            <div class="activity-badge-col">
+              <span class="status-pill status-pill--{{ log.status }}">{{ log.statusLabel }}</span>
+            </div>
+            <div class="activity-desc-col">
+              <p class="activity-title">{{ log.title }}</p>
+              <span class="activity-time">{{ log.time }}</span>
+            </div>
+          </div>
+        }
+      </div>
+    </article>
+  </section>
+</section>

@@ -1,0 +1,29 @@
+<section class="dashboard">
+  <header class="dashboard__hero">
+    <p class="dashboard__eyebrow">Radiography Clinic</p>
+    <h2>Operations Dashboard</h2>
+    <p class="dashboard__subtext">
+      Start by creating reusable feature modules for Frontdesk, Department Workflow, Pharmacy, and Billing.
+    </p>
+  </header>
+
+  <div class="dashboard__grid">
+    @for (stat of stats; track stat.label) {
+      <app-stat-card [label]="stat.label" [value]="stat.value" [hint]="stat.hint" />
+    }
+  </div>
+
+  <section class="sequence">
+    <h3>Next Recommended Build Sequence</h3>
+
+    <div class="sequence__grid">
+      @for (step of steps; track step.title) {
+        <article class="sequence-card">
+          <h4>{{ step.title }}</h4>
+          <p>{{ step.description }}</p>
+          <a [routerLink]="step.route">Open module</a>
+        </article>
+      }
+    </div>
+  </section>
+</section>
