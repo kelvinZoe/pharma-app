@@ -1,9 +1,22 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt';
 
-const adapter = new PrismaBetterSqlite3({ url: 'file:./dev.db' });
-const prisma = new PrismaClient({ adapter });
+const getPrismaClient = () => {
+  const isProduction = process.env.DATABASE_URL && !process.env.DATABASE_URL.startsWith('file:');
+  if (isProduction) {
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    const adapter = new PrismaPg(pool);
+    return new PrismaClient({ adapter });
+  } else {
+    const adapter = new PrismaBetterSqlite3({ url: 'file:./dev.db' });
+    return new PrismaClient({ adapter });
+  }
+};
+
+const prisma = getPrismaClient();
 
 async function main() {
   console.log('Seeding database...');
