@@ -8,6 +8,7 @@ export type ModuleKey = 'admin' | 'frontdesk' | 'laboratory' | 'scanning' | 'pha
 export interface SessionUser {
   readonly id: string;
   readonly name: string;
+  readonly username: string;
   readonly role: UserRoleCode;
   readonly module: ModuleKey;
 }
@@ -20,7 +21,16 @@ export interface ModuleOption {
 
 const SESSION_STORAGE_KEY = 'pharma.session';
 const TOKEN_STORAGE_KEY = 'pharma.token';
-const API_URL = 'http://localhost:3000/api';
+const getApiUrl = () => {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return 'http://localhost:3000/api';
+    }
+  }
+  return '/api';
+};
+const API_URL = getApiUrl();
 
 export const ROLE_HOME: Record<UserRoleCode, string> = {
   0: '/admin/dashboard',
@@ -49,7 +59,10 @@ export class SessionService {
 
   readonly currentUser = this.currentUserState.asReadonly();
   readonly isAuthenticated = computed(() => this.currentUser() !== null);
-  readonly isAdmin = computed(() => this.currentUser()?.role === 0);
+  readonly isAdmin = computed(() => {
+    const user = this.currentUser();
+    return user ? (Number(user.role) === 0 || user.username === 'admin') : false;
+  });
   readonly availableModules = computed(() => {
     if (this.isAdmin()) {
       return MODULE_OPTIONS;

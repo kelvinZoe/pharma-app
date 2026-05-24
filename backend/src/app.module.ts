@@ -10,6 +10,7 @@ import { VisitsModule } from './visits/visits.module';
 import { BillingModule } from './billing/billing.module';
 import { PharmacyModule } from './pharmacy/pharmacy.module';
 import { ReportsModule } from './reports/reports.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ReportsModule } from './reports/reports.module';
     BillingModule,
     PharmacyModule,
     ReportsModule,
+    SettingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

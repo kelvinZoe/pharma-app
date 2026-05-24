@@ -1,256 +1,193 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
-
-// ----------------------------------------------------
-// 1. Reference / Identity / Access Control
-// ----------------------------------------------------
 
 model Department {
   id        String    @id @default(uuid())
-  name      String    @unique // e.g., "Laboratory", "Scanning"
+  name      String    @unique
   code      String?
   isActive  Boolean   @default(true)
-  services  Service[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  services  Service[]
 }
 
 model User {
-  id                      String                  @id @default(uuid())
-  fullName                String
-  username                String                  @unique
-  passwordHash            String
-  phone                   String?
-  email                   String?
-  role                    Int                     @default(1) // 0 = Admin, 1 = Frontdesk, 2 = Lab, 3 = Scan, 4 = Pharmacy, 5 = Accountant
-  module                  String                  @default("frontdesk") // admin, frontdesk, laboratory, scanning, pharmacy, accounting
-  isActive                Boolean                 @default(true)
-  createdAt               DateTime                @default(now())
-  updatedAt               DateTime                @updatedAt
-  
-  // Relations
-  visitsCreated           Visit[]                 @relation("FrontdeskUser")
-  resultsEntered          VisitResult[]           @relation("ResultEnteredBy")
-  prescriptionsCreated    Prescription[]          @relation("PrescriptionCreatedBy")
-  paymentsReceived        ClinicPayment[]         @relation("CashierUser")
-  stockMovementsCreated   PharmacyStockMovement[] @relation("StockMovementCreatedBy")
-  pharmacySales           PharmacySale[]          @relation("PharmacySoldBy")
-  pharmacyClosures        PharmacyDailyClosure[]  @relation("PharmacyClosedBy")
-  auditLogs               AuditLog[]              @relation("AuditActor")
+  id                    String                  @id @default(uuid())
+  fullName              String
+  username              String                  @unique
+  passwordHash          String
+  phone                 String?
+  email                 String?
+  role                  Int                     @default(1)
+  module                String                  @default("frontdesk")
+  isActive              Boolean                 @default(true)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  auditLogs             AuditLog[]              @relation("AuditActor")
+  paymentsReceived      ClinicPayment[]         @relation("CashierUser")
+  pharmacyClosures      PharmacyDailyClosure[]  @relation("PharmacyClosedBy")
+  pharmacySales         PharmacySale[]          @relation("PharmacySoldBy")
+  stockMovementsCreated PharmacyStockMovement[] @relation("StockMovementCreatedBy")
+  prescriptionsCreated  Prescription[]          @relation("PrescriptionCreatedBy")
+  visitsCreated         Visit[]                 @relation("FrontdeskUser")
+  resultsEntered        VisitResult[]           @relation("ResultEnteredBy")
 }
 
-// ----------------------------------------------------
-// 2. Patient / Visit Management
-// ----------------------------------------------------
-
 model Patient {
-  id                    String    @id @default(uuid())
-  patientCode           String    @unique // Generated, e.g., CL-10001
+  id                    String   @id @default(uuid())
+  patientCode           String   @unique
   surname               String
   firstName             String
   middleName            String?
-  sex                   String    // male, female, other
+  sex                   String
   age                   Int
   phone                 String
   referralCenter        String
-  insuranceStatus       String    // insured, uninsured
+  insuranceStatus       String
   reasonForVisit        String
   emergencyContactName  String
   emergencyContactPhone String
   emergencyContactRel   String?
-  isMinor               Boolean   @default(false)
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-  
+  isMinor               Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
   visits                Visit[]
 }
 
 model Visit {
   id              String         @id @default(uuid())
-  visitNumber     String         @unique // Generated, e.g., V-10001
+  visitNumber     String         @unique
   visitDate       DateTime       @default(now())
-  status          String         @default("registered") // registered, sent_to_department, in_progress, completed, awaiting_payment, paid, closed
+  status          String         @default("registered")
   notes           String?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
-  
-  // Relations
   patientId       String
-  patient         Patient        @relation(fields: [patientId], references: [id])
-  
   frontdeskUserId String
-  frontdeskUser   User           @relation("FrontdeskUser", fields: [frontdeskUserId], references: [id])
-  
-  visitServices   VisitService[]
-  prescriptions   Prescription[]
   invoice         ClinicInvoice?
   pharmacySales   PharmacySale[]
+  prescriptions   Prescription[]
+  frontdeskUser   User           @relation("FrontdeskUser", fields: [frontdeskUserId], references: [id])
+  patient         Patient        @relation(fields: [patientId], references: [id])
+  visitServices   VisitService[]
 }
-
-// ----------------------------------------------------
-// 3. Service Catalog & Department Workflow
-// ----------------------------------------------------
 
 model Service {
   id            String                  @id @default(uuid())
   name          String
-  price         Decimal                 // Decimal is fully supported by Prisma in SQLite/Postgres
+  price         Decimal
   isActive      Boolean                 @default(true)
   createdAt     DateTime                @default(now())
   updatedAt     DateTime                @updatedAt
-  
-  // Relations
   departmentId  String
   department    Department              @relation(fields: [departmentId], references: [id])
-  
-  visitServices VisitService[]
   templates     ServiceResultTemplate[]
+  visitServices VisitService[]
 }
 
 model VisitService {
-  id                 String       @id @default(uuid())
-  source             String       @default("frontdesk") // frontdesk, department_added
-  unitPrice          Decimal
-  quantity           Int          @default(1)
-  lineTotal          Decimal
-  status             String       @default("pending") // pending, in_progress, done, not_done
-  notDoneReason      String?
-  approvedByPatient  Boolean      @default(true)
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
-  
-  // Relations
-  visitId            String
-  visit              Visit        @relation(fields: [visitId], references: [id], onDelete: Cascade)
-  
-  serviceId          String
-  service            Service      @relation(fields: [serviceId], references: [id])
-  
-  results            VisitResult[]
+  id                String        @id @default(uuid())
+  source            String        @default("frontdesk")
+  unitPrice         Decimal
+  quantity          Int           @default(1)
+  lineTotal         Decimal
+  status            String        @default("pending")
+  notDoneReason     String?
+  approvedByPatient Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  visitId           String
+  serviceId         String
+  results           VisitResult[]
+  service           Service       @relation(fields: [serviceId], references: [id])
+  visit             Visit         @relation(fields: [visitId], references: [id], onDelete: Cascade)
 }
 
-// ----------------------------------------------------
-// 4. Result templates (Dynamic customizable columns)
-// ----------------------------------------------------
-
 model ServiceResultTemplate {
-  id              String        @id @default(uuid())
-  templateName    String?
-  layoutJson      String        // JSON configuration representing tables, columns, rows (SQLite compatibility using string-encoded JSON or prisma Json type. Let's use Prisma Json type!)
-  isActive        Boolean       @default(true)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  
-  // Relations
-  serviceId       String
-  service         Service       @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  
-  results         VisitResult[]
+  id           String        @id @default(uuid())
+  templateName String?
+  layoutJson   String
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  serviceId    String
+  service      Service       @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  results      VisitResult[]
 }
 
 model VisitResult {
-  id             String                @id @default(uuid())
-  resultDataJson String                // JSON with actual input values entered by clinical staff
-  narrativeNotes String?
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
-  
-  // Relations
-  visitServiceId String
-  visitService   VisitService          @relation(fields: [visitServiceId], references: [id], onDelete: Cascade)
-  
-  templateId     String
-  template       ServiceResultTemplate @relation(fields: [templateId], references: [id])
-  
+  id              String                @id @default(uuid())
+  resultDataJson  String
+  narrativeNotes  String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  visitServiceId  String
+  templateId      String
   enteredByUserId String
-  enteredByUser   User                 @relation("ResultEnteredBy", fields: [enteredByUserId], references: [id])
+  enteredByUser   User                  @relation("ResultEnteredBy", fields: [enteredByUserId], references: [id])
+  template        ServiceResultTemplate @relation(fields: [templateId], references: [id])
+  visitService    VisitService          @relation(fields: [visitServiceId], references: [id], onDelete: Cascade)
 }
-
-// ----------------------------------------------------
-// 5. Prescriptions
-// ----------------------------------------------------
 
 model Prescription {
-  id               String           @id @default(uuid())
-  prescriptionText String           // Free-text prescriptions
-  status           String           @default("active") // active, dispensed, cancelled
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  
-  // Relations
+  id               String         @id @default(uuid())
+  prescriptionText String
+  status           String         @default("active")
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
   visitId          String
-  visit            Visit            @relation(fields: [visitId], references: [id], onDelete: Cascade)
-  
   createdByUserId  String
-  createdBy        User             @relation("PrescriptionCreatedBy", fields: [createdByUserId], references: [id])
-  
   pharmacySales    PharmacySale[]
+  createdBy        User           @relation("PrescriptionCreatedBy", fields: [createdByUserId], references: [id])
+  visit            Visit          @relation(fields: [visitId], references: [id], onDelete: Cascade)
 }
-
-// ----------------------------------------------------
-// 6. Clinic Billing & Payments
-// ----------------------------------------------------
 
 model ClinicInvoice {
   id            String          @id @default(uuid())
-  invoiceNumber String          @unique // Generated, e.g. INV-10001
+  invoiceNumber String          @unique
   subtotal      Decimal
   total         Decimal
   amountPaid    Decimal         @default(0.0)
   balanceDue    Decimal
-  status        String          @default("draft") // draft, issued, paid, cancelled
+  status        String          @default("draft")
   paidAt        DateTime?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
-  
-  // Relations
   visitId       String          @unique
   visit         Visit           @relation(fields: [visitId], references: [id], onDelete: Cascade)
-  
   payments      ClinicPayment[]
 }
 
 model ClinicPayment {
   id               String        @id @default(uuid())
-  paymentMethod    String        // cash, mobile_money
+  paymentMethod    String
   amount           Decimal
   referenceNumber  String?
   paidAt           DateTime      @default(now())
   createdAt        DateTime      @default(now())
-  
-  // Relations
   invoiceId        String
-  invoice          ClinicInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  
   receivedByUserId String
   receivedByUser   User          @relation("CashierUser", fields: [receivedByUserId], references: [id])
+  invoice          ClinicInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 }
-
-// ----------------------------------------------------
-// 7. Pharmacy Inventory & POS Sales
-// ----------------------------------------------------
 
 model PharmacyProduct {
   id             String                  @id @default(uuid())
   productCode    String?                 @unique
   name           String
-  unitOfMeasure  String                  // tablet, bottle, vial, etc.
+  unitOfMeasure  String
   isActive       Boolean                 @default(true)
   reorderLevel   Float                   @default(10.0)
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
-  
   batches        PharmacyBatch[]
-  stockMovements PharmacyStockMovement[]
   saleItems      PharmacySaleItem[]
+  stockMovements PharmacyStockMovement[]
 }
 
 model PharmacyBatch {
@@ -263,118 +200,89 @@ model PharmacyBatch {
   quantityRemaining Float
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @updatedAt
-  
-  // Relations
   productId         String
   product           PharmacyProduct         @relation(fields: [productId], references: [id], onDelete: Cascade)
-  
-  stockMovements    PharmacyStockMovement[]
   saleItems         PharmacySaleItem[]
+  stockMovements    PharmacyStockMovement[]
 }
 
 model PharmacyStockMovement {
-  id              String           @id @default(uuid())
-  movementType    String           // purchase, sale, adjustment, write_off
-  quantity        Float            // positive or negative
+  id              String          @id @default(uuid())
+  movementType    String
+  quantity        Float
   unitCost        Decimal?
-  referenceId     String?          // Links to saleId or purchaseId if relevant
-  createdAt       DateTime         @default(now())
-  
-  // Relations
+  referenceId     String?
+  createdAt       DateTime        @default(now())
   productId       String
-  product         PharmacyProduct  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  
   batchId         String?
-  batch           PharmacyBatch?   @relation(fields: [batchId], references: [id])
-  
   createdByUserId String
-  createdByUser   User             @relation("StockMovementCreatedBy", fields: [createdByUserId], references: [id])
+  createdByUser   User            @relation("StockMovementCreatedBy", fields: [createdByUserId], references: [id])
+  batch           PharmacyBatch?  @relation(fields: [batchId], references: [id])
+  product         PharmacyProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
 model PharmacySale {
-  id              String             @id @default(uuid())
-  saleNumber      String             @unique // Generated, e.g. PH-10001
-  saleSource      String             @default("walk_in") // walk_in, clinic_referred
-  subtotal        Decimal
-  total           Decimal
-  paymentMethod   String             // cash, mobile_money
-  status          String             @default("paid") // draft, paid, cancelled
-  paidAt          DateTime           @default(now())
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  
-  // Relations
-  visitId         String?
-  visit           Visit?             @relation(fields: [visitId], references: [id])
-  
-  prescriptionId  String?
-  prescription    Prescription?      @relation(fields: [prescriptionId], references: [id])
-  
-  soldByUserId    String
-  soldByUser      User               @relation("PharmacySoldBy", fields: [soldByUserId], references: [id])
-  
-  closureId       String?
-  closure         PharmacyDailyClosure? @relation("PharmacyClosureSales", fields: [closureId], references: [id])
-  
-  items           PharmacySaleItem[]
+  id             String                @id @default(uuid())
+  saleNumber     String                @unique
+  saleSource     String                @default("walk_in")
+  subtotal       Decimal
+  total          Decimal
+  paymentMethod  String
+  status         String                @default("paid")
+  paidAt         DateTime              @default(now())
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  visitId        String?
+  prescriptionId String?
+  soldByUserId   String
+  closureId      String?
+  closure        PharmacyDailyClosure? @relation("PharmacyClosureSales", fields: [closureId], references: [id])
+  soldByUser     User                  @relation("PharmacySoldBy", fields: [soldByUserId], references: [id])
+  prescription   Prescription?         @relation(fields: [prescriptionId], references: [id])
+  visit          Visit?                @relation(fields: [visitId], references: [id])
+  items          PharmacySaleItem[]
 }
 
 model PharmacySaleItem {
-  id           String          @id @default(uuid())
-  itemName     String          // snapshot
-  quantity     Float
-  unitPrice    Decimal
-  lineTotal    Decimal
-  createdAt    DateTime        @default(now())
-  
-  // Relations
-  saleId       String
-  sale         PharmacySale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  
-  productId    String
-  product      PharmacyProduct @relation(fields: [productId], references: [id])
-  
-  batchId      String?
-  batch        PharmacyBatch?  @relation(fields: [batchId], references: [id])
+  id        String          @id @default(uuid())
+  itemName  String
+  quantity  Float
+  unitPrice Decimal
+  lineTotal Decimal
+  createdAt DateTime        @default(now())
+  saleId    String
+  productId String
+  batchId   String?
+  batch     PharmacyBatch?  @relation(fields: [batchId], references: [id])
+  product   PharmacyProduct @relation(fields: [productId], references: [id])
+  sale      PharmacySale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
 }
-
-// ----------------------------------------------------
-// 8. Auditing
-// ----------------------------------------------------
 
 model AuditLog {
   id          String   @id @default(uuid())
-  actionType  String   // create, update, delete, approve, payment, stock_move
-  entityType  String   // patient, visit, service, invoice, sale, product
+  actionType  String
+  entityType  String
   entityId    String
-  beforeData  String?  // stringified JSON
-  afterData   String?  // stringified JSON
+  beforeData  String?
+  afterData   String?
   createdAt   DateTime @default(now())
-  
-  // Relations
   actorUserId String
   actorUser   User     @relation("AuditActor", fields: [actorUserId], references: [id])
 }
 
-// ----------------------------------------------------
-// 9. Pharmacy End-of-Day Closures
-// ----------------------------------------------------
-
 model PharmacyDailyClosure {
-  id                 String         @id @default(uuid())
-  closedByUserId     String
-  closedByUser       User           @relation("PharmacyClosedBy", fields: [closedByUserId], references: [id])
-  closureDate        DateTime       @default(now())
-  totalSalesCount    Int
-  totalSalesAmount   Decimal
-  cashCounted        Decimal
-  momoCounted        Decimal
-  totalCounted       Decimal
-  discrepancy        Decimal
-  notes              String?
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
-  
-  sales              PharmacySale[] @relation("PharmacyClosureSales")
+  id               String         @id @default(uuid())
+  closedByUserId   String
+  closureDate      DateTime       @default(now())
+  totalSalesCount  Int
+  totalSalesAmount Decimal
+  cashCounted      Decimal
+  momoCounted      Decimal
+  totalCounted     Decimal
+  discrepancy      Decimal
+  notes            String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  closedByUser     User           @relation("PharmacyClosedBy", fields: [closedByUserId], references: [id])
+  sales            PharmacySale[] @relation("PharmacyClosureSales")
 }
-

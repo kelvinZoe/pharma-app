@@ -16,14 +16,7 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-@media (min-width: 1024px) {
-  .clients-workspace {
-    grid-template-columns: 420px 1fr;
-  }
-  .billing-workspace {
-    grid-template-columns: 480px 1fr;
-  }
-}
+/* Workspace panels are 1fr (full-width) by default for improved table layout navigation */
 
 /* Premium Panel Styling */
 .panel {
@@ -990,10 +983,14 @@
 
 /* Receipt Print Preview Styling */
 .invoice-print-container {
+  grid-column: 1 / -1; /* Span full width of the parent grid */
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
   background-color: #fff;
-  border: 2px solid var(--app-border-color);
+  border: 1px solid var(--app-border-color);
   border-radius: 1rem;
-  padding: 2rem;
+  padding: 2.5rem;
   box-shadow: 0 10px 30px rgba(0,0,0,0.05);
 }
 
@@ -1046,7 +1043,8 @@
 }
 
 .receipt-totals {
-  width: 50%;
+  width: 100%;
+  max-width: 320px;
   margin-left: auto;
   font-size: 0.85rem;
   
@@ -1118,4 +1116,187 @@
       width: 100%;
     }
   }
+}
+
+/* Premium Table Styles for Frontdesk Workspace */
+.frontdesk-table-card {
+  background-color: var(--app-surface-color);
+  border: 1px solid var(--app-border-color);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.frontdesk-table-responsive {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.frontdesk-premium-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  
+  th, td {
+    padding: 0.95rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--app-border-color);
+    font-size: 0.85rem;
+    vertical-align: middle;
+    color: var(--app-text-color);
+  }
+
+  th {
+    font-weight: 700;
+    color: var(--app-muted-text-color);
+    background-color: #f8fafc;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    border-bottom: 2px solid var(--app-border-color);
+  }
+
+  tbody tr {
+    transition: background-color 0.15s ease;
+    
+    &:hover td {
+      background-color: #f8fafc;
+      cursor: pointer;
+    }
+  }
+}
+
+.table-header-filters {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+  
+  .filter-search-group {
+    position: relative;
+    flex: 1;
+    max-width: 360px;
+    min-width: 240px;
+    
+    .search-input-control {
+      width: 100%;
+      padding: 0.55rem 0.75rem 0.55rem 2.25rem;
+      font-size: 0.875rem;
+      color: var(--app-text-color);
+      background-color: #f8fafc;
+      border: 1px solid var(--app-border-color);
+      border-radius: 0.5rem;
+      outline: none;
+      transition: all 0.2s ease;
+      
+      &:focus {
+        background-color: #fff;
+        border-color: var(--app-primary-color);
+        box-shadow: 0 0 0 3px rgba(49, 145, 234, 0.15);
+      }
+    }
+    
+    .search-icon-svg {
+      position: absolute;
+      left: 0.75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 1rem;
+      height: 1rem;
+      color: var(--app-muted-text-color);
+      pointer-events: none;
+    }
+  }
+}
+
+/* Modal Overlay Styling for Frontdesk */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background-color: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  animation: fadeInModal 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.modal-card {
+  background-color: #ffffff;
+  border: 1px solid var(--app-border-color);
+  border-radius: 1rem;
+  width: 100%;
+  max-width: 640px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  animation: slideUpModal 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  
+  &.wide-modal {
+    max-width: 1024px;
+    width: 90vw;
+  }
+}
+
+@keyframes fadeInModal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUpModal {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--app-border-color);
+  background-color: #f8fafc;
+
+  h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--app-text-color);
+  }
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--app-muted-text-color);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  border-radius: 0.375rem;
+  transition: all 0.15s ease;
+
+  &:hover {
+    color: var(--app-text-color);
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+
+  svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2.25;
+  }
+}
+
+.modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  max-height: calc(85vh - 80px);
 }

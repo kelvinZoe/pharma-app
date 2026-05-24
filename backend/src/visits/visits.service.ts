@@ -8,7 +8,10 @@ export class VisitsService {
   // --- Patients ---
   async searchPatients(query: string) {
     if (!query) {
-      return [];
+      return this.prisma.patient.findMany({
+        take: 100,
+        orderBy: { surname: 'asc' },
+      });
     }
 
     const cleanQuery = query.trim().toLowerCase();
@@ -20,11 +23,13 @@ export class VisitsService {
           { firstName: { contains: cleanQuery } },
           { middleName: { contains: cleanQuery } },
           { phone: { contains: cleanQuery } },
+          { patientCode: { contains: cleanQuery } },
         ],
       },
       orderBy: { surname: 'asc' },
     });
   }
+
 
   async createPatient(data: any) {
     if (!data.surname || !data.firstName || !data.phone || !data.referralCenter || !data.reasonForVisit || !data.emergencyContactName || !data.emergencyContactPhone) {
@@ -106,12 +111,15 @@ export class VisitsService {
   }
 
   // --- Visits ---
-  async getActiveVisits(departmentCode?: string) {
-    const whereClause: any = {
-      status: {
+  async getActiveVisits(departmentCode?: string, includeAll?: boolean) {
+    const whereClause: any = {};
+
+    if (!includeAll) {
+      whereClause.status = {
         in: ['registered', 'sent_to_department', 'in_progress', 'completed', 'awaiting_payment'],
-      },
-    };
+      };
+    }
+
 
     if (departmentCode) {
       whereClause.visitServices = {
@@ -346,6 +354,52 @@ export class VisitsService {
       }
 
       return line;
+    });
+  }
+
+  async removeExtraService(visitId: string, visitServiceId: string) {
+    const visit = await this.prisma.visit.findUnique({
+      where: { id: visitId },
+      include: { visitServices: true, invoice: true },
+    });
+
+    if (!visit) {
+      throw new NotFoundException('Visit not found');
+    }
+
+    const line = visit.visitServices.find((s) => s.id === visitServiceId);
+    if (!line) {
+      throw new NotFoundException('Visit service line not found');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Delete visit service line
+      await tx.visitService.delete({
+        where: { id: visitServiceId },
+      });
+
+      // Recalculate and update the draft invoice
+      if (visit.invoice) {
+        const allRemainingServices = await tx.visitService.findMany({
+          where: { visitId, id: { not: visitServiceId }, status: { not: 'not_done' } },
+        });
+
+        const newSubtotal = allRemainingServices.reduce(
+          (sum, s) => sum + Number(s.lineTotal),
+          0,
+        );
+
+        await tx.clinicInvoice.update({
+          where: { id: visit.invoice.id },
+          data: {
+            subtotal: newSubtotal,
+            total: newSubtotal,
+            balanceDue: newSubtotal - Number(visit.invoice.amountPaid),
+          },
+        });
+      }
+
+      return { success: true };
     });
   }
 

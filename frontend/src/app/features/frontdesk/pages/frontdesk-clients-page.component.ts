@@ -3,7 +3,6 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
-import { AppTableComponent, TableColumn } from '../../../shared/ui/app-table/app-table.component';
 
 interface ServiceItem {
   id: string;
@@ -21,12 +20,28 @@ interface ServiceItem {
   standalone: true,
   imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterLink],
   template: `
-    <div class="clients-workspace">
-      <!-- Search & Results Panel -->
-      <div class="panel list-panel">
-        <div class="panel-header">
-          <h2>Client Directory</h2>
-          <button class="btn btn-primary" routerLink="/frontdesk/new-registration">
+    <div class="clients-workspace" style="display: flex; flex-direction: column; gap: 1rem; width: 100%;">
+      <div class="panel full-width">
+        <!-- Table Header and Registration trigger -->
+        <div class="table-header-filters">
+          <div style="display: flex; align-items: center; gap: 1.5rem;">
+            <h2>Client Directory</h2>
+            <div class="filter-search-group">
+              <input
+                type="text"
+                placeholder="Search name, phone or code..."
+                [ngModel]="searchQuery()"
+                (ngModelChange)="searchQuery.set($event); onSearchChange()"
+                class="search-input-control"
+              />
+              <svg class="search-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </div>
+          </div>
+          
+          <button class="btn btn-primary" routerLink="/frontdesk/new-registration" style="display: flex; align-items: center; gap: 0.5rem;">
             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;">
               <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
               <circle cx="8.5" cy="7" r="4"></circle>
@@ -37,214 +52,200 @@ interface ServiceItem {
           </button>
         </div>
 
-        <div class="search-box">
-          <input
-            type="text"
-            placeholder="Search by surname, first name or phone..."
-            [(ngModel)]="searchQuery"
-            (ngModelChange)="onSearchChange()"
-            class="form-control search-input"
-          />
-          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-        </div>
-
-        <div class="results-list" *ngIf="patients().length > 0; else noResults">
-          <div
-            *ngFor="let p of patients()"
-            class="patient-card"
-            [class.active]="selectedPatient()?.id === p.id"
-            (click)="selectPatient(p)"
-          >
-            <div class="avatar">{{ p.surname[0] }}{{ p.firstName[0] }}</div>
-            <div class="patient-info">
-              <div class="patient-name">{{ p.surname }}, {{ p.firstName }} {{ p.middleName || '' }}</div>
-              <div class="patient-meta">
-                <span class="tag code">{{ p.patientCode || p.code || 'N/A' }}</span>
-                <span class="tag sex" [class.male]="p.sex === 'male'" [class.female]="p.sex === 'female'">
-                  {{ p.sex === 'male' ? 'Male' : (p.sex === 'female' ? 'Female' : 'Other') }}
-                </span>
-                <span class="tag age">{{ p.age }} yrs</span>
-              </div>
-              <div class="patient-phone">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 12px; height: 12px; margin-right: 4px; vertical-align: middle;">
-                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                </svg>
-                {{ p.phone }}
-              </div>
-            </div>
-            <div class="arrow-indicator">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;">
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-                <polyline points="12 5 19 12 12 19"></polyline>
-              </svg>
-            </div>
+        <!-- Table Container -->
+        <div class="frontdesk-table-card">
+          <div class="frontdesk-table-responsive">
+            <table class="frontdesk-premium-table">
+              <thead>
+                <tr>
+                  <th>Patient ID</th>
+                  <th>Full Name</th>
+                  <th>Sex/Age</th>
+                  <th>Phone Number</th>
+                  <th>Emergency Contact</th>
+                  <th style="width: 180px; text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let p of patients()" (click)="selectPatient(p)">
+                  <td><code class="tag code" style="font-weight: 700; font-family: monospace;">{{ p.patientCode || p.code || 'N/A' }}</code></td>
+                  <td><strong style="color: var(--app-text-color); font-weight: 600;">{{ p.surname }}, {{ p.firstName }} {{ p.middleName || '' }}</strong></td>
+                  <td>
+                    <span class="tag sex" [class.male]="p.sex === 'male'" [class.female]="p.sex === 'female'">
+                      {{ p.sex === 'male' ? 'Male' : (p.sex === 'female' ? 'Female' : 'Other') }}
+                    </span>
+                    <span class="tag age" style="margin-left: 0.25rem;">{{ p.age }} yrs</span>
+                  </td>
+                  <td>{{ p.phone }}</td>
+                  <td>{{ p.emergencyContactName || 'N/A' }} ({{ p.emergencyContactPhone || 'N/A' }})</td>
+                  <td style="text-align: right;" (click)="$event.stopPropagation()">
+                    <button class="btn btn-secondary btn-sm" (click)="selectPatient(p)" style="display: inline-flex; align-items: center; gap: 0.25rem; font-weight: 700;">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M12 8v8"></path>
+                        <path d="M8 12h8"></path>
+                      </svg>
+                      <span>Manage & Route</span>
+                    </button>
+                  </td>
+                </tr>
+                <tr *ngIf="patients().length === 0">
+                  <td colspan="6" style="text-align: center; padding: 4rem 2rem; color: var(--app-muted-text-color);">
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem;">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 48px; height: 48px; color: var(--slate-300);">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="8" y1="12" x2="16" y2="12"></line>
+                      </svg>
+                      <p style="margin: 0; font-size: 0.95rem; font-weight: 500;">No patient records match the filter criteria.</p>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
-
-        <ng-template #noResults>
-          <div class="empty-state">
-            <div class="empty-icon-wrap" style="color: var(--slate-300); margin-bottom: 1rem;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 48px; height: 48px;">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-              </svg>
-            </div>
-            <p *ngIf="searchQuery().trim() === ''">Enter a patient's name or phone to search.</p>
-            <p *ngIf="searchQuery().trim() !== ''">No patients found matching "{{ searchQuery() }}".</p>
-          </div>
-        </ng-template>
       </div>
 
-      <!-- Detail & Visit Checklist Panel -->
-      <div class="panel detail-panel" [class.visible]="selectedPatient() !== null">
-        <div *ngIf="selectedPatient() as p; else selectPlaceholder" class="detail-container">
-          
-          <!-- Demographics Card -->
-          <div class="patient-header-card">
-            <div class="patient-title">
-              <h3>{{ p.surname }}, {{ p.firstName }} {{ p.middleName || '' }}</h3>
-              <span class="insurance-badge" [class.insured]="p.insuranceStatus === 'insured'">
-                {{ p.insuranceStatus === 'insured' ? 'Insured (GHS)' : 'Self-Pay (GHS)' }}
-              </span>
-            </div>
-            
-            <div class="demographics-grid">
-              <div class="demo-item">
-                <label>Patient ID</label>
-                <div class="value">{{ p.patientCode || p.code || 'N/A' }}</div>
-              </div>
-              <div class="demo-item">
-                <label>Gender & Age</label>
-                <div class="value">{{ p.sex === 'male' ? 'Male' : (p.sex === 'female' ? 'Female' : 'Other') }}, {{ p.age }} yrs</div>
-              </div>
-              <div class="demo-item">
-                <label>Phone Number</label>
-                <div class="value">{{ p.phone }}</div>
-              </div>
-              <div class="demo-item">
-                <label>Emergency Contact</label>
-                <div class="value">{{ p.emergencyContactName || 'N/A' }} ({{ p.emergencyContactPhone || 'N/A' }})</div>
-              </div>
-            </div>
+      <!-- Overlay Detail & Visit Checklist Modal -->
+      <div class="modal-backdrop" *ngIf="selectedPatient() !== null" (click)="closeModal()">
+        <div class="modal-card wide-modal" (click)="$event.stopPropagation()">
+          <div class="modal-card-header">
+            <h3>Client Management Hub</h3>
+            <button class="modal-close-btn" (click)="closeModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
           </div>
 
-          <!-- Actions Grid: Split into History and New Checkin -->
-          <div class="actions-grid">
-            
-            <!-- History Section -->
-            <div class="sub-panel history-section">
-              <h4>Visit History</h4>
-              <div class="history-timeline" *ngIf="history().length > 0; else noHistory">
-                <div *ngFor="let h of history()" class="history-item">
-                  <div class="timeline-dot" [class.completed]="h.status === 'completed' || h.status === 'paid'"></div>
-                  <div class="history-content">
-                    <div class="history-date">
-                      {{ h.createdAt | date:'MMM d, y, h:mm a' }}
-                      <span class="status-pill" [class]="h.status">{{ h.status | uppercase }}</span>
-                    </div>
-                    <div class="history-services">
-                      <span *ngFor="let s of h.visitServices" class="mini-service-tag">
-                        {{ s.service?.name }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <ng-template #noHistory>
-                <div class="sub-empty">
-                  <p>No past visits recorded for this client.</p>
-                </div>
-              </ng-template>
-            </div>
-
-            <!-- New Visit Creation Section -->
-            <div class="sub-panel checkin-section">
-              <h4>Quick Check-in / Visit Builder</h4>
-              <p class="section-desc">Select clinic radiography scans or laboratory services below to route this patient.</p>
-
-              <!-- Services Catalog Selection -->
-              <div class="service-selector">
-                <div class="catalog-search">
-                  <input
-                    type="text"
-                    placeholder="Filter services..."
-                    [(ngModel)]="serviceFilter"
-                    class="form-control form-control-sm"
-                  />
-                </div>
-                
-                <div class="catalog-list">
-                  <div
-                    *ngFor="let s of filteredServices()"
-                    class="service-row"
-                    [class.selected]="s.selected"
-                    (click)="toggleService(s)"
-                  >
-                    <div class="checkbox-box">
-                      <input type="checkbox" [checked]="s.selected" readonly />
-                    </div>
-                    <div class="service-details">
-                      <div class="service-name">{{ s.name }}</div>
-                      <div class="service-dept">{{ s.department.name }}</div>
-                    </div>
-                    <div class="service-price">₵{{ s.price.toFixed(2) }}</div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Running Total & Checkout -->
-              <div class="checkout-summary" *ngIf="selectedServicesCount() > 0">
-                <div class="summary-line">
-                  <span>Selected Services:</span>
-                  <strong>{{ selectedServicesCount() }} item(s)</strong>
-                </div>
-                <div class="summary-line total">
-                  <span>Running Total:</span>
-                  <strong>₵{{ runningTotal().toFixed(2) }}</strong>
-                </div>
-
-                <div class="checkin-actions">
-                  <button class="btn btn-success btn-block" [disabled]="isSubmitting()" (click)="createVisit()">
-                    <span *ngIf="!isSubmitting()" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;">
-                        <path d="M22 2L11 13"></path>
-                        <path d="M22 2l-7 20-4-9-9-4 20-7z"></path>
-                      </svg>
-                      Check-in & Route Patient
-                    </span>
-                    <span *ngIf="isSubmitting()">Checking in...</span>
-                  </button>
-                </div>
+          <div class="modal-body" *ngIf="selectedPatient() as p">
+            <!-- Demographics Card -->
+            <div class="patient-header-card" style="margin-bottom: 1.5rem;">
+              <div class="patient-title">
+                <h3>{{ p.surname }}, {{ p.firstName }} {{ p.middleName || '' }}</h3>
+                <span class="insurance-badge" [class.insured]="p.insuranceStatus === 'insured'">
+                  {{ p.insuranceStatus === 'insured' ? 'Insured (GHS)' : 'Self-Pay (GHS)' }}
+                </span>
               </div>
               
-              <div class="checkout-empty" *ngIf="selectedServicesCount() === 0">
-                <p>Select one or more services to generate a visit check-in.</p>
+              <div class="demographics-grid">
+                <div class="demo-item">
+                  <label>Patient ID</label>
+                  <div class="value">{{ p.patientCode || p.code || 'N/A' }}</div>
+                </div>
+                <div class="demo-item">
+                  <label>Gender & Age</label>
+                  <div class="value">{{ p.sex === 'male' ? 'Male' : (p.sex === 'female' ? 'Female' : 'Other') }}, {{ p.age }} yrs</div>
+                </div>
+                <div class="demo-item">
+                  <label>Phone Number</label>
+                  <div class="value">{{ p.phone }}</div>
+                </div>
+                <div class="demo-item">
+                  <label>Emergency Contact</label>
+                  <div class="value">{{ p.emergencyContactName || 'N/A' }} ({{ p.emergencyContactPhone || 'N/A' }})</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Side-by-side Layout inside Modal -->
+            <div class="actions-grid">
+              <!-- History Section -->
+              <div class="sub-panel history-section" style="max-height: 480px; display: flex; flex-direction: column;">
+                <h4>Visit History</h4>
+                <div class="history-timeline" style="flex: 1; max-height: 380px;" *ngIf="history().length > 0; else noHistory">
+                  <div *ngFor="let h of history()" class="history-item">
+                    <div class="timeline-dot" [class.completed]="h.status === 'completed' || h.status === 'paid'"></div>
+                    <div class="history-content">
+                      <div class="history-date">
+                        {{ h.createdAt | date:'MMM d, y, h:mm a' }}
+                        <span class="status-pill" [class]="h.status" style="font-size: 0.65rem; padding: 0.1rem 0.3rem;">{{ h.status | uppercase }}</span>
+                      </div>
+                      <div class="history-services">
+                        <span *ngFor="let s of h.visitServices" class="mini-service-tag" style="font-size: 0.725rem; background-color: var(--slate-100); color: var(--app-text-color); border: 1px solid var(--app-border-color); padding: 0.15rem 0.35rem; border-radius: 0.375rem; margin-right: 0.25rem; display: inline-block;">
+                          {{ s.service?.name }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <ng-template #noHistory>
+                  <div class="sub-empty" style="text-align: center; padding: 3rem 1rem; color: var(--app-muted-text-color);">
+                    <p>No past visits recorded for this client.</p>
+                  </div>
+                </ng-template>
               </div>
 
+              <!-- New Visit Creation Section -->
+              <div class="sub-panel checkin-section" style="max-height: 480px; display: flex; flex-direction: column;">
+                <h4>Quick Check-in / Visit Builder</h4>
+                <p class="section-desc">Select scans or laboratory tests to route this patient.</p>
+
+                <!-- Services Catalog Selection -->
+                <div class="service-selector" style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1; overflow: hidden; min-height: 180px;">
+                  <div class="catalog-search" style="margin-bottom: 0.25rem;">
+                    <input
+                      type="text"
+                      placeholder="Filter services..."
+                      [ngModel]="serviceFilter()"
+                      (ngModelChange)="serviceFilter.set($event)"
+                      class="form-control form-control-sm"
+                    />
+                  </div>
+                  
+                  <div class="catalog-list" style="flex: 1; overflow-y: auto; max-height: 200px; display: flex; flex-direction: column; gap: 0.35rem;">
+                    <div
+                      *ngFor="let s of filteredServices()"
+                      class="service-row"
+                      [class.selected]="s.selected"
+                      (click)="toggleService(s)"
+                      style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; border: 1px solid var(--app-border-color); border-radius: 0.5rem; cursor: pointer; transition: all 0.15s ease;"
+                    >
+                      <div class="checkbox-box" style="display: flex; align-items: center;">
+                        <input type="checkbox" [checked]="s.selected" readonly style="pointer-events: none;" />
+                      </div>
+                      <div class="service-details" style="flex: 1; display: flex; flex-direction: column;">
+                        <div class="service-name" style="font-size: 0.85rem; font-weight: 600; color: var(--app-text-color);">{{ s.name }}</div>
+                        <div class="service-dept" style="font-size: 0.725rem; color: var(--app-muted-text-color);">{{ s.department.name }}</div>
+                      </div>
+                      <div class="service-price" style="font-size: 0.85rem; font-weight: 700; color: var(--app-primary-color);">₵{{ s.price.toFixed(2) }}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Running Total & Checkout -->
+                <div class="checkout-summary" *ngIf="selectedServicesCount() > 0" style="border-top: 1px solid var(--app-border-color); padding-top: 0.75rem; margin-top: 0.5rem;">
+                  <div class="summary-line" style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.25rem;">
+                    <span>Selected Services:</span>
+                    <strong>{{ selectedServicesCount() }} item(s)</strong>
+                  </div>
+                  <div class="summary-line total" style="display: flex; justify-content: space-between; font-size: 1rem; margin-bottom: 0.75rem;">
+                    <span>Running Total:</span>
+                    <strong style="color: var(--app-success-color);">₵{{ runningTotal().toFixed(2) }}</strong>
+                  </div>
+
+                  <div class="checkin-actions">
+                    <button class="btn btn-success btn-block" [disabled]="isSubmitting()" (click)="createVisit()" style="display: flex; width: 100%; align-items: center; justify-content: center; gap: 0.5rem; font-weight: 700;">
+                      <span *ngIf="!isSubmitting()" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;">
+                          <path d="M22 2L11 13"></path>
+                          <path d="M22 2l-7 20-4-9-9-4 20-7z"></path>
+                        </svg>
+                        Check-in & Route Patient
+                      </span>
+                      <span *ngIf="isSubmitting()">Checking in...</span>
+                    </button>
+                  </div>
+                </div>
+                
+                <div class="checkout-empty" *ngIf="selectedServicesCount() === 0" style="text-align: center; padding: 1rem 0; color: var(--app-muted-text-color); font-size: 0.8rem; border-top: 1px dashed var(--app-border-color); margin-top: 0.5rem;">
+                  <p>Select one or more services to generate a visit check-in.</p>
+                </div>
+              </div>
             </div>
-
           </div>
-
         </div>
-        
-        <ng-template #selectPlaceholder>
-          <div class="select-placeholder">
-            <div class="pulse-icon-wrap" style="color: var(--slate-300); margin-bottom: 1rem;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 48px; height: 48px;">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M12 8v8"></path>
-                <path d="M8 12h8"></path>
-              </svg>
-            </div>
-            <h3>Select a Client</h3>
-            <p>Choose a patient from the list on the left to view demographics, history, or execute a new clinic visit routing.</p>
-          </div>
-        </ng-template>
       </div>
     </div>
   `,
@@ -315,6 +316,12 @@ export class FrontdeskClientsPageComponent implements OnInit {
       },
       error: (err) => console.error('Error fetching history', err)
     });
+  }
+
+  closeModal(): void {
+    this.selectedPatient.set(null);
+    this.services.update(list => list.map(s => ({ ...s, selected: false })));
+    this.serviceFilter.set('');
   }
 
   toggleService(s: ServiceItem): void {

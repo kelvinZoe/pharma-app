@@ -1,0 +1,40 @@
+# Implementation Plan: Laboratory Visual Overhaul
+
+Our goal is to refactor the **Department Worklist** (specifically the Laboratory Queue and Results Capture views) to match the new premium clinical aesthetic. This will align it with the overhauled Frontdesk and Admin Financials, ensuring a cohesive experience for the laboratory technicians.
+
+## User Review Required
+
+> [!IMPORTANT]
+> The dynamic result builder (with columns, rows, formulas, and boundary checks) is structurally sound and working beautifully in the code. I have drafted a **User Manual** artifact for you to read on how the builder features should be used.
+>
+> Please review this implementation plan for the Lab module's visual overhaul. Once approved, I will immediately execute it.
+
+## Proposed Changes
+
+### [MODIFY] `department-worklist-page.component.ts` & `.html`
+- Replace the legacy "Step 3" generic header with the reusable `<app-page-header>` component.
+- Remove emojis and integrate the native SVG icon set.
+- Implement the premium capsule-style segmented tab controls (similar to Admin Financials) for toggling between "Active Queue" and "Past Results".
+
+### [MODIFY] `worklist-queue-page.component.ts`
+- **Emoji Removal**: Eliminate all inline emojis (🔄, 📋, ➔, 🔬, ➕, 💊) and replace them with precise stroke SVGs.
+- **Queue Panel Layout**: Refactor the `.queue-list` to use clinical `.premium-stat-card` stylings with desaturated patient initials instead of plain colored circles.
+- **Results Capture Table**: 
+  - Restyle the generated WYSIWYG results capture table to use crisp `1px solid var(--slate-200)` borders.
+  - Apply monospaced, aligned inputs for decimal/number fields to ensure high readability.
+  - Enhance the visual feedback for `isAbnormal` alerts with a pulsing red border and soft red backdrop instead of a harsh solid red background.
+- **Sidebar Integration**: Clean up the "Add Extra Procedure" and "Prescriber Notepad" sections into separated, bordered `.panel` widgets to reduce clutter.
+
+### [MODIFY] `department-worklist-page.component.scss`
+- Wipe old styles and introduce the design system's CSS variables (`--slate-XXX`, `--teal-XXX`).
+- Add smooth transitions (`transform: scale(0.97)`) for queue card selections and done/not-done toggles.
+
+## Verification Plan
+
+### Automated Tests
+- Run `npm run build` after the refactoring to ensure no unused templates or syntax errors are introduced.
+
+### Manual Verification
+- Render the Worklist Queue page.
+- Verify that a dynamically constructed template accurately formats inputs without breaking the new table styles.
+- Verify that abnormal inputs instantly trigger the new subtle red alert styles.

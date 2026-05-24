@@ -803,6 +803,8 @@ export class AdminTemplatesPageComponent implements OnInit {
   onColTypeChange(col: ColumnConfig): void {
     if (col.dataType === 'readonly') {
       col.isReadonly = true;
+    } else {
+      col.isReadonly = false;
     }
     if (col.dataType === 'number' || col.dataType === 'decimal') {
       col.alignment = 'right';

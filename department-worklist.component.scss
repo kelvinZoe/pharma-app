@@ -1,0 +1,238 @@
+.lab-workspace {
+  padding: 32px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Page Header & Segmented Controls --- */
+.workspace-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+
+  .page-title {
+    font-size: 24px;
+    color: var(--app-text-color);
+    margin: 0 0 4px 0;
+  }
+  .text-muted {
+    color: var(--app-muted-text-color);
+    margin: 0;
+    font-size: 14px;
+  }
+}
+
+.segmented-control {
+  display: inline-flex;
+  background: var(--slate-200);
+  padding: 4px;
+  border-radius: 8px;
+
+  .segment {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--slate-600);
+    font-size: 14px;
+    transition: all 0.2s ease;
+
+    &.active {
+      background: var(--app-surface-color);
+      color: var(--app-text-color);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+  }
+}
+
+/* --- Main Layout --- */
+.workspace-layout {
+  display: flex;
+  gap: 24px;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* --- Left Side: Queue List Panel --- */
+.queue-panel {
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  .search-box .form-control {
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--app-border-color);
+    background: var(--app-surface-color);
+  }
+
+  .queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+    padding-right: 8px;
+    
+    &::-webkit-scrollbar { width: 4px; }
+    &::-webkit-scrollbar-thumb { background: var(--slate-300); border-radius: 4px; }
+  }
+}
+
+.premium-stat-card {
+  background: var(--app-surface-color);
+  border: 1px solid var(--app-border-color);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+
+  &:hover {
+    transform: scale(0.98);
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+  }
+
+  &.active {
+    border-color: var(--teal-500);
+    background: var(--teal-50);
+  }
+
+  .patient-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--slate-200);
+    color: var(--slate-600);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .patient-info {
+    flex: 1;
+    h4 { margin: 0; font-size: 15px; color: var(--app-text-color); }
+    .patient-id { font-size: 12px; color: var(--slate-500); }
+  }
+
+  .status-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 12px;
+    &.pending { background: var(--slate-100); color: var(--slate-600); }
+    &.in-progress { background: #e0f2fe; color: #b91c1c; } /* Adjust as needed */
+  }
+}
+
+/* --- Right Side: Diagnostics Processing Suite --- */
+.processing-suite {
+  flex: 1;
+  background: var(--app-surface-color);
+  border: 1px solid var(--app-border-color);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.suite-header {
+  padding: 24px;
+  border-bottom: 1px solid var(--app-border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  .patient-context {
+    h2 { margin: 0 0 8px 0; font-size: 20px; }
+    .tags { display: flex; gap: 8px; }
+    .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+    .primary-badge { background: var(--teal-100); color: var(--teal-700); }
+    .neutral-badge { background: var(--slate-100); color: var(--slate-600); }
+  }
+  
+  .suite-actions button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    background: transparent;
+    margin-left: 8px;
+  }
+  .btn-outline-danger { border: 1px solid #fca5a5; color: var(--app-danger-color); }
+  .btn-outline-primary { border: 1px solid var(--teal-300); color: var(--teal-600); }
+}
+
+/* --- Results Capture Table --- */
+.results-capture-section, .prescriber-section {
+  padding: 24px;
+  border-bottom: 1px solid var(--app-border-color);
+}
+
+.section-title-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  h3 { margin: 0; font-size: 16px; color: var(--slate-800); }
+  .btn-text { background: none; border: none; color: var(--teal-600); font-weight: 500; cursor: pointer; }
+}
+
+.capture-table {
+  width: 100%;
+  border-collapse: collapse;
+  
+  th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--slate-200); }
+  th { font-size: 13px; color: var(--slate-500); font-weight: 600; text-transform: uppercase; }
+  td { font-size: 14px; vertical-align: middle; }
+  
+  .mono-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--slate-300);
+    border-radius: 6px;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    text-align: right;
+  }
+
+  /* Abnormal Pulse Alert */
+  @keyframes pulse-red {
+    0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+    70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  }
+
+  .abnormal-input {
+    border-color: var(--app-danger-color);
+    background-color: #fef2f2;
+    color: var(--app-danger-color);
+    font-weight: bold;
+    animation: pulse-red 2s infinite;
+  }
+
+  .eval-badge {
+    padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 600;
+    &.normal { background: var(--teal-50); color: var(--teal-600); }
+    &.abnormal { background: #fee2e2; color: #b91c1c; }
+  }
+}
+
+.notepad-input {
+  width: 100%; padding: 16px; border-radius: 8px; border: 1px solid var(--slate-300);
+  font-family: inherit; resize: vertical;
+}

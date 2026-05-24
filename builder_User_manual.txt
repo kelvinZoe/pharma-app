@@ -1,0 +1,57 @@
+# Laboratory Results Builder: User Manual
+
+The Diagnostic Results Builder is a powerful, dynamic templating system designed for the **Admin/Pathology Director** to design reports, and for the **Laboratory Technicians** to easily enter results.
+
+This manual covers two phases: **1. Designing the Template** and **2. Capturing the Results**.
+
+---
+
+## Phase 1: Designing the Template (Admin Workspace)
+
+As an Administrator or Clinical Director, navigate to **Admin -> Result Templates**.
+
+### 1. Selecting a Service
+From the top dropdown, select the clinical service you wish to build a report for (e.g., *Complete Blood Count (CBC)*, *Lipid Profile*, *Urinalysis*).
+
+### 2. Adding Columns (Data Points)
+Click **Add Column** to define what data you want to collect for each test parameter.
+Common columns include:
+- **Result**: Data type `Decimal` or `Text`. This is where the technician types the value.
+- **Unit**: Data type `Read-Only Label`. Pre-filled unit (e.g., *mg/dL*).
+- **Reference Range**: Data type `Read-Only Label`. Displays the normal biological range.
+- **Flag (Abnormal/Normal)**: Data type `Choices (Dropdown)` or `Formula`.
+
+*Tip: Click the **⚙️ gear icon** on a column header to change its data type, make it required, or set comma-separated dropdown choices.*
+
+### 3. Adding Sections & Rows (Test Parameters)
+- **Add Section**: Creates a categorical header (e.g., "White Blood Cells", "Red Blood Cells").
+- **Add Test Row**: Creates a new test parameter line under a section (e.g., "Hemoglobin", "Platelet Count").
+- You can **drag and drop** rows by clicking the `⋮⋮` grip handle on the left to reorder them or move them between sections.
+
+### 4. Setting Defaults and Automated Flags
+For each row, you can type in the default values for the static columns (like Unit or Reference Range).
+If you set numerical Reference Ranges, the system will automatically flag the technician's input in red if the entered value falls outside those bounds!
+
+### 5. Preview and Save
+Click the **"..."** operations menu to open a **Preview Report** and see exactly how the A4 thermal printout will look with your clinic's letterhead and the pathologist's signature block. Click **Save Template** when finished.
+
+---
+
+## Phase 2: Capturing Results (Laboratory Suite)
+
+When a patient is routed from the Frontdesk to the Laboratory, the Lab Technician navigates to the **Worklist -> Queue**.
+
+### 1. Selecting the Patient
+The left panel displays the active queue of patients waiting for lab work. Clicking a patient card pulls up their requested clinical services.
+
+### 2. Entering Results
+For each service, click the **✓ DONE** button. This instantly renders the dynamic template designed in Phase 1:
+- You will see the sections and test rows cleanly laid out.
+- Input boxes will appear for numerical or text results.
+- **Real-Time Validation**: If you type `150` for fasting glucose and the reference range max is `100`, the field will instantly turn **Red**, visually alerting the technician to an abnormal result.
+
+### 3. Additional Procedures & Prescriptions
+If the patient requires an impromptu extra test, the technician can select it from the **"Add Extra Procedure"** sidebar (ensuring consent is checked) to add it to the current visit billing without sending them back to the Frontdesk.
+
+### 4. Finalizing
+Once all results are entered, click **🚀 Finalize & Route Patient**. The data is securely saved as a JSON payload, locking the record for the physician's review or patient printout.

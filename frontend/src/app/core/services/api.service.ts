@@ -2,7 +2,16 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-const API_URL = 'http://localhost:3000/api';
+const getApiUrl = () => {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return 'http://localhost:3000/api';
+    }
+  }
+  return '/api';
+};
+const API_URL = getApiUrl();
 
 @Injectable({
   providedIn: 'root'
@@ -129,10 +138,14 @@ export class ApiService {
   }
 
   // --- Visits ---
-  getActiveVisits(department?: string): Observable<any[]> {
-    const url = department ? `${API_URL}/visits/active?department=${department}` : `${API_URL}/visits/active`;
+  getActiveVisits(department?: string, all?: boolean): Observable<any[]> {
+    const params = [];
+    if (department) params.push(`department=${department}`);
+    if (all) params.push(`all=true`);
+    const url = params.length > 0 ? `${API_URL}/visits/active?${params.join('&')}` : `${API_URL}/visits/active`;
     return this.http.get<any[]>(url);
   }
+
 
   getVisit(id: string): Observable<any> {
     return this.http.get<any>(`${API_URL}/visits/${id}`);
@@ -149,6 +162,10 @@ export class ApiService {
       quantity,
       approvedByPatient: true
     });
+  }
+
+  removeExtraService(visitId: string, visitServiceId: string): Observable<any> {
+    return this.http.delete<any>(`${API_URL}/visits/${visitId}/services/${visitServiceId}`);
   }
 
   updateVisitServiceStatus(visitId: string, visitServiceId: string, status: string, notDoneReason?: string): Observable<any> {
@@ -226,6 +243,13 @@ export class ApiService {
     return this.http.get<any>(url);
   }
 
+  getDashboardAnalytics(module?: string): Observable<any> {
+    const url = module ? `${API_URL}/reports/dashboard?module=${module}` : `${API_URL}/reports/dashboard`;
+    return this.http.get<any>(url);
+  }
+
+
+
   // --- Pharmacy Daily Closures ---
   getPharmacyUnclosedSales(): Observable<any> {
     return this.http.get<any>(`${API_URL}/pharmacy/sales/unclosed`);
@@ -246,6 +270,15 @@ export class ApiService {
 
   getPharmacyClosure(id: string): Observable<any> {
     return this.http.get<any>(`${API_URL}/pharmacy/closures/${id}`);
+  }
+
+  // --- Clinic/Pharmacy Settings ---
+  getSettings(): Observable<any> {
+    return this.http.get<any>(`${API_URL}/settings`);
+  }
+
+  updateSettings(data: any): Observable<any> {
+    return this.http.post<any>(`${API_URL}/settings`, data);
   }
 }
 

@@ -29,23 +29,33 @@
       <article class="stat-card" [class.stat-card--accent]="first" [class.stat-card--danger]="last && card.value !== '0' && card.value !== '0.00'">
         <div class="stat-card__head">
           <span class="stat-card__label">{{ card.label }}</span>
-          <span class="trend-badge" [class.trend-badge--positive]="card.trendPositive">
-            @if (card.trendPositive) {
-              <svg class="trend-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
-                <polyline points="17 6 23 6 23 12" />
-              </svg>
-            } @else {
-              <svg class="trend-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <polyline points="23 18 13.5 8.5 8.5 13.5 1 6" />
-                <polyline points="17 18 23 18 23 12" />
-              </svg>
-            }
-            {{ card.trend }}
-          </span>
+          @if (dashboardData() !== null) {
+            <span class="trend-badge" [class.trend-badge--positive]="card.trendPositive">
+              @if (card.trendPositive) {
+                <svg class="trend-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                  <polyline points="17 6 23 6 23 12" />
+                </svg>
+              } @else {
+                <svg class="trend-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="23 18 13.5 8.5 8.5 13.5 1 6" />
+                  <polyline points="17 18 23 18 23 12" />
+                </svg>
+              }
+              {{ card.trend }}
+            </span>
+          } @else {
+            <span class="shimmer-loader trend-shimmer"></span>
+          }
         </div>
-        <h2 class="stat-card__value">{{ card.value }}</h2>
-        <p class="stat-card__hint">{{ card.hint }}</p>
+        
+        @if (dashboardData() === null) {
+          <div class="shimmer-loader stat-value-shimmer"></div>
+          <div class="shimmer-loader stat-hint-shimmer"></div>
+        } @else {
+          <h2 class="stat-card__value">{{ card.value }}</h2>
+          <p class="stat-card__hint">{{ card.hint }}</p>
+        }
       </article>
     }
   </section>
@@ -53,7 +63,7 @@
   <!-- ANALYTICS PANEL ROW -->
   <section class="analytics-row">
     <!-- SVG Chart Widget -->
-    <article class="analytics-card chart-widget">
+    <article class="analytics-card chart-widget" [class.is-loading]="dashboardData() === null">
       <div class="card-header">
         <div>
           <h3>Activity Analytics</h3>
@@ -94,7 +104,7 @@
       </div>
 
       <div class="gauge-container">
-        <div class="circular-gauge">
+        <div class="circular-gauge" [class.is-loading]="dashboardData() === null">
           <svg class="gauge-svg" viewBox="0 0 120 120">
             <circle class="gauge-bg" cx="60" cy="60" r="54" />
             <circle
@@ -106,23 +116,37 @@
             />
           </svg>
           <div class="gauge-content">
-            <span class="percentage">{{ completionPercent() }}%</span>
-            <span class="label">Fulfilled</span>
+            @if (dashboardData() === null) {
+              <span class="percentage shimmer-pulse">...</span>
+              <span class="label">Syncing</span>
+            } @else {
+              <span class="percentage">{{ completionPercent() }}%</span>
+              <span class="label">Fulfilled</span>
+            }
           </div>
         </div>
 
         <div class="gauge-stats">
           <div class="stat-item">
             <span class="label">Total Closed</span>
-            <span class="val color-green">High Rate</span>
+            @if (dashboardData() === null) {
+              <span class="shimmer-loader stat-sub-shimmer"></span>
+            } @else {
+              <span class="val color-green">High Rate</span>
+            }
           </div>
           <div class="stat-item">
             <span class="label">Outstanding</span>
-            <span class="val">In Progress</span>
+            @if (dashboardData() === null) {
+              <span class="shimmer-loader stat-sub-shimmer"></span>
+            } @else {
+              <span class="val">In Progress</span>
+            }
           </div>
         </div>
       </div>
     </article>
+
   </section>
 
   <!-- QUICK ACTIONS & ACTIVITY LEDGER GRID -->

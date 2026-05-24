@@ -12,11 +12,13 @@ import { AdminUsersPageComponent } from './features/admin/pages/admin-users-page
 import { AdminServicesPageComponent } from './features/admin/pages/admin-services-page.component';
 import { AdminTemplatesPageComponent } from './features/admin/pages/admin-templates-page.component';
 import { AdminFinancialsPageComponent } from './features/admin/pages/admin-financials-page.component';
+import { AdminSettingsPageComponent } from './features/admin/pages/admin-settings-page.component';
 import { FrontdeskClientsPageComponent } from './features/frontdesk/pages/frontdesk-clients-page.component';
 import { FrontdeskVisitsPageComponent } from './features/frontdesk/pages/frontdesk-visits-page.component';
 import { FrontdeskRegistrationPageComponent } from './features/frontdesk/pages/frontdesk-registration-page.component';
 import { BillingDeskPageComponent } from './features/frontdesk/pages/billing-desk-page.component';
 import { WorklistQueuePageComponent } from './features/department-worklist/pages/worklist-queue-page.component';
+import { WorklistResultsPageComponent } from './features/department-worklist/pages/worklist-results-page.component';
 import { PharmacyInventoryPageComponent } from './features/pharmacy/pages/pharmacy-inventory-page.component';
 import { PharmacyPosSalesPageComponent } from './features/pharmacy/pages/pharmacy-pos-sales-page.component';
 
@@ -38,16 +40,14 @@ const frontdeskMenu: readonly ModuleMenuItem[] = [
 
 const laboratoryMenu: readonly ModuleMenuItem[] = [
   { label: 'Dashboard', path: '/laboratory/dashboard', exact: true },
-  { label: 'Requests', path: '/laboratory/requests' },
-  { label: 'Results', path: '/laboratory/results' },
-  { label: 'Prescriptions', path: '/laboratory/prescriptions' }
+  { label: 'Active Queue', path: '/laboratory/queue' },
+  { label: 'Visits & History', path: '/laboratory/history' }
 ];
 
 const scanningMenu: readonly ModuleMenuItem[] = [
   { label: 'Dashboard', path: '/scanning/dashboard', exact: true },
-  { label: 'Requests', path: '/scanning/requests' },
-  { label: 'Results', path: '/scanning/results' },
-  { label: 'Reports', path: '/scanning/reports' }
+  { label: 'Active Queue', path: '/scanning/queue' },
+  { label: 'Visits & History', path: '/scanning/history' }
 ];
 
 const pharmacyMenu: readonly ModuleMenuItem[] = [
@@ -112,9 +112,8 @@ const laboratoryDashboard: DashboardPageData = {
     { label: 'Not Done Items', value: '0', hint: 'Recorded with reason' }
   ],
   actions: [
-    { title: 'Open request queue', description: 'See new laboratory requests and begin processing.', route: '/laboratory/requests' },
-    { title: 'Complete result entries', description: 'Fill service-specific result templates and finalize done status.', route: '/laboratory/results' },
-    { title: 'Review prescriptions', description: 'Capture medicine recommendations for pharmacy follow-up.', route: '/laboratory/prescriptions' }
+    { title: 'Open Active Queue', description: 'Access the clinical queue to process active requests, enter results, and issue prescriptions.', route: '/laboratory/queue' },
+    { title: 'View History & Logs', description: 'Check completed visits today, print results, and view patients historical archives.', route: '/laboratory/history' }
   ]
 };
 
@@ -130,9 +129,8 @@ const scanningDashboard: DashboardPageData = {
     { label: 'Reports Drafted', value: '0', hint: 'Ready for review or print' }
   ],
   actions: [
-    { title: 'Open scan requests', description: 'Work through queued scan requests by visit order.', route: '/scanning/requests' },
-    { title: 'Enter scan outcomes', description: 'Capture result data and mark done or not done with reason.', route: '/scanning/results' },
-    { title: 'Prepare reports', description: 'Organize printed or reviewed report summaries.', route: '/scanning/reports' }
+    { title: 'Open Active Queue', description: 'Work through queued scan requests, capture outcomes, and draft reports.', route: '/scanning/queue' },
+    { title: 'View History & Logs', description: 'Review finished scan outcomes, check narratives, and print report history.', route: '/scanning/history' }
   ]
 };
 
@@ -413,7 +411,8 @@ export const routes: Routes = [
           { path: 'services', component: AdminServicesPageComponent },
           { path: 'templates', component: AdminTemplatesPageComponent },
           { path: 'services/:id/template', redirectTo: 'templates' },
-          { path: 'financials', component: AdminFinancialsPageComponent }
+          { path: 'financials', component: AdminFinancialsPageComponent },
+          { path: 'settings', component: AdminSettingsPageComponent }
         ]
       },
       {
@@ -446,9 +445,8 @@ export const routes: Routes = [
         children: [
           { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
           { path: 'dashboard', component: RoleDashboardPageComponent, data: { page: laboratoryDashboard } },
-          { path: 'requests', component: WorklistQueuePageComponent },
-          { path: 'results', component: WorklistQueuePageComponent },
-          { path: 'prescriptions', component: WorklistQueuePageComponent }
+          { path: 'queue', component: WorklistQueuePageComponent },
+          { path: 'history', component: WorklistResultsPageComponent }
         ]
       },
       {
@@ -463,9 +461,8 @@ export const routes: Routes = [
         children: [
           { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
           { path: 'dashboard', component: RoleDashboardPageComponent, data: { page: scanningDashboard } },
-          { path: 'requests', component: WorklistQueuePageComponent },
-          { path: 'results', component: WorklistQueuePageComponent },
-          { path: 'reports', component: WorklistQueuePageComponent }
+          { path: 'queue', component: WorklistQueuePageComponent },
+          { path: 'history', component: WorklistResultsPageComponent }
         ]
       },
       {

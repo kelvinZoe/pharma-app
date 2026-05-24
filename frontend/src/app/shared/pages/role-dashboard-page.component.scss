@@ -747,3 +747,104 @@
     grid-column: span 12;
   }
 }
+
+// ----------------------------------------------------
+// SHIMMER PRELOADER ANIMATIONS & CLASSES
+// ----------------------------------------------------
+@keyframes shimmer-sweep {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes gauge-sweep {
+  0% {
+    transform: rotate(-90deg);
+  }
+  100% {
+    transform: rotate(270deg);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.shimmer-loader {
+  display: block;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 37%, #f1f5f9 63%);
+  background-size: 200% 100%;
+  animation: shimmer-sweep 1.4s infinite linear;
+  border-radius: 4px;
+
+  &.stat-value-shimmer {
+    height: 2.2rem;
+    width: 60%;
+    margin-top: 0.2rem;
+    margin-bottom: 0.2rem;
+    border-radius: 6px;
+  }
+
+  &.stat-hint-shimmer {
+    height: 0.8rem;
+    width: 80%;
+    margin-top: 0.6rem;
+  }
+
+  &.trend-shimmer {
+    height: 1.1rem;
+    width: 2.5rem;
+    border-radius: 0.4rem;
+  }
+
+  &.stat-sub-shimmer {
+    height: 0.9rem;
+    width: 3.5rem;
+    margin-top: 0.25rem;
+    border-radius: 0.25rem;
+  }
+}
+
+// Accent card shimmer (primary teal backdrop)
+.stat-card--accent {
+  .shimmer-loader {
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.1) 25%, rgba(255, 255, 255, 0.25) 37%, rgba(255, 255, 255, 0.1) 63%);
+    background-size: 200% 100%;
+  }
+}
+
+// Circular loading gauge sweeping states
+.circular-gauge.is-loading {
+  .gauge-svg {
+    animation: gauge-sweep 2s infinite linear;
+    transform-origin: center;
+  }
+
+  .gauge-progress {
+    stroke-dashoffset: 200 !important; /* sweeping partial arc */
+    stroke: var(--app-primary-color);
+  }
+}
+
+// Pulsing indicator for text loaders
+.shimmer-pulse {
+  animation: pulse-glow 1.5s infinite ease-in-out;
+}
+
+// Shimmering pulse overlay for the weekly chart during loading
+.chart-widget.is-loading {
+  .bar-fill {
+    background: linear-gradient(90deg, var(--app-primary-color) 25%, #2dd4bf 50%, var(--app-primary-color) 75%) !important;
+    background-size: 200% 100% !important;
+    animation: shimmer-sweep 1.8s infinite linear, pulse-glow 2s infinite ease-in-out;
+  }
+}
+

@@ -30,15 +30,13 @@ const MENUS: Record<string, readonly SidebarItem[]> = {
   ],
   laboratory: [
     { label: 'Dashboard', path: '/laboratory/dashboard', exact: true, icon: 'dashboard' },
-    { label: 'Requests', path: '/laboratory/requests', icon: 'visits' },
-    { label: 'Results', path: '/laboratory/results', icon: 'results' },
-    { label: 'Prescriptions', path: '/laboratory/prescriptions', icon: 'prescriptions' }
+    { label: 'Active Queue', path: '/laboratory/queue', icon: 'visits' },
+    { label: 'Visits & History', path: '/laboratory/history', icon: 'results' }
   ],
   scanning: [
     { label: 'Dashboard', path: '/scanning/dashboard', exact: true, icon: 'dashboard' },
-    { label: 'Requests', path: '/scanning/requests', icon: 'visits' },
-    { label: 'Results', path: '/scanning/results', icon: 'results' },
-    { label: 'Reports', path: '/scanning/reports', icon: 'reports' }
+    { label: 'Active Queue', path: '/scanning/queue', icon: 'visits' },
+    { label: 'Visits & History', path: '/scanning/history', icon: 'reports' }
   ],
   pharmacy: [
     { label: 'Dashboard', path: '/pharmacy/dashboard', exact: true, icon: 'dashboard' },
@@ -54,9 +52,11 @@ const MENUS: Record<string, readonly SidebarItem[]> = {
   ]
 };
 
+import { AppToastComponent } from '../../shared/ui/app-toast/app-toast.component';
+
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, AppToastComponent],
   templateUrl: './app-shell.component.html',
   styleUrl: './app-shell.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

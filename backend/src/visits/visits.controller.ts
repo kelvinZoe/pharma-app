@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { VisitsService } from './visits.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -30,9 +30,11 @@ export class VisitsController {
 
   // --- Visits ---
   @Get('visits/active')
-  async getActive(@Query('department') department?: string) {
-    return this.visitsService.getActiveVisits(department);
+  async getActive(@Query('department') department?: string, @Query('all') all?: string) {
+    const includeAll = all === 'true';
+    return this.visitsService.getActiveVisits(department, includeAll);
   }
+
 
   @Get('visits/:id')
   async getDetails(@Param('id') id: string) {
@@ -57,6 +59,14 @@ export class VisitsController {
     @Body() body: any,
   ) {
     return this.visitsService.updateServiceStatus(visitId, visitServiceId, body);
+  }
+
+  @Delete('visits/:id/services/:visitServiceId')
+  async removeService(
+    @Param('id') visitId: string,
+    @Param('visitServiceId') visitServiceId: string,
+  ) {
+    return this.visitsService.removeExtraService(visitId, visitServiceId);
   }
 
   // --- Capture Results ---

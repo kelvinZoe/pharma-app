@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
@@ -15,11 +15,22 @@ import { ApiService } from '../../../core/services/api.service';
         <div class="filter-inputs-group">
           <div class="form-group-item">
             <label class="filter-label">Start Date</label>
-            <input type="date" [(ngModel)]="startDate" class="filter-input-control" />
+            <input type="date" [ngModel]="startDate()" (ngModelChange)="startDate.set($event)" class="filter-input-control" />
           </div>
           <div class="form-group-item">
             <label class="filter-label">End Date</label>
-            <input type="date" [(ngModel)]="endDate" class="filter-input-control" />
+            <input type="date" [ngModel]="endDate()" (ngModelChange)="endDate.set($event)" class="filter-input-control" />
+          </div>
+          <div class="form-group-item search-item" style="min-width: 240px;">
+            <label class="filter-label">Search Patient / Sale</label>
+            <input
+              type="text"
+              [ngModel]="searchQuery()"
+              (ngModelChange)="searchQuery.set($event)"
+              class="filter-input-control"
+              placeholder="Type name, code, or sale #..."
+              style="padding-left: 0.75rem;"
+            />
           </div>
         </div>
 
@@ -138,7 +149,7 @@ import { ApiService } from '../../../core/services/api.service';
         <button
           class="tab-segment-btn"
           [class.active]="activeTab() === 'dashboard'"
-          (click)="activeTab.set('dashboard')"
+          (click)="selectTab('dashboard')"
         >
           <svg class="tab-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="3" width="7" height="9"></rect>
@@ -152,7 +163,7 @@ import { ApiService } from '../../../core/services/api.service';
         <button
           class="tab-segment-btn"
           [class.active]="activeTab() === 'clinic'"
-          (click)="activeTab.set('clinic')"
+          (click)="selectTab('clinic')"
         >
           <svg class="tab-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
@@ -163,7 +174,7 @@ import { ApiService } from '../../../core/services/api.service';
         <button
           class="tab-segment-btn"
           [class.active]="activeTab() === 'pharmacy'"
-          (click)="activeTab.set('pharmacy')"
+          (click)="selectTab('pharmacy')"
         >
           <svg class="tab-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4.5 16.5c-1.5 1.25-2.5 3-2.5 5h20c0-2-1-3.75-2.5-5M12 2v10M8 6h8"></path>
@@ -175,7 +186,7 @@ import { ApiService } from '../../../core/services/api.service';
         <button
           class="tab-segment-btn"
           [class.active]="activeTab() === 'closures'"
-          (click)="activeTab.set('closures')"
+          (click)="selectTab('closures')"
         >
           <svg class="tab-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
@@ -188,7 +199,7 @@ import { ApiService } from '../../../core/services/api.service';
           class="tab-segment-btn alert-tab-btn"
           [class.active]="activeTab() === 'inventory'"
           [class.has-alerts]="(summary()?.lowStockAlertsCount || 0) + (summary()?.expiryAlertsCount || 0) > 0"
-          (click)="activeTab.set('inventory')"
+          (click)="selectTab('inventory')"
         >
           <svg class="tab-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
@@ -325,7 +336,7 @@ import { ApiService } from '../../../core/services/api.service';
           </div>
         </div>
 
-        <div class="premium-table-container" *ngIf="clinicPayments().length > 0; else emptyClinic">
+        <div class="premium-table-container" *ngIf="filteredClinicPayments().length > 0; else emptyClinic">
           <table class="premium-table">
             <thead>
               <tr>
@@ -339,7 +350,7 @@ import { ApiService } from '../../../core/services/api.service';
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let p of clinicPayments()">
+              <tr *ngFor="let p of filteredClinicPayments()">
                 <td><code class="clinical-code">{{ p.id.substring(0, 8) }}</code></td>
                 <td>
                   <span class="patient-name-span">{{ p.invoice?.visit?.patient?.surname }}, {{ p.invoice?.visit?.patient?.firstName }}</span>
@@ -388,7 +399,7 @@ import { ApiService } from '../../../core/services/api.service';
           </div>
         </div>
 
-        <div class="premium-table-container" *ngIf="pharmacySales().length > 0; else emptyPharmacy">
+        <div class="premium-table-container" *ngIf="filteredPharmacySales().length > 0; else emptyPharmacy">
           <table class="premium-table">
             <thead>
               <tr>
@@ -402,7 +413,7 @@ import { ApiService } from '../../../core/services/api.service';
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let s of pharmacySales()">
+              <tr *ngFor="let s of filteredPharmacySales()">
                 <td><strong class="item-name-bold">{{ s.saleNumber }}</strong></td>
                 <td>
                   <span class="status-badge-pill" [class.walk-in]="s.saleSource === 'walk_in'" [class.referred]="s.saleSource === 'clinic_referred'">
@@ -806,6 +817,7 @@ export class AdminFinancialsPageComponent implements OnInit {
   readonly activeTab = signal<'dashboard' | 'clinic' | 'pharmacy' | 'closures' | 'inventory'>('dashboard');
   readonly startDate = signal<string>('');
   readonly endDate = signal<string>('');
+  readonly searchQuery = signal<string>('');
   readonly isLoading = signal<boolean>(false);
 
   // Collections signals
@@ -819,8 +831,43 @@ export class AdminFinancialsPageComponent implements OnInit {
   readonly selectedClosure = signal<any | null>(null);
   readonly selectedSaleId = signal<string | null>(null);
 
+  readonly filteredClinicPayments = computed(() => {
+    const query = this.searchQuery().toLowerCase().trim();
+    const payments = this.clinicPayments();
+    if (!query) return payments;
+    return payments.filter(p => {
+      const surname = p.invoice?.visit?.patient?.surname || '';
+      const firstName = p.invoice?.visit?.patient?.firstName || '';
+      const middleName = p.invoice?.visit?.patient?.middleName || '';
+      const fullName = `${surname} ${firstName} ${middleName}`.toLowerCase();
+      const patientCode = p.invoice?.visit?.patient?.patientCode || p.invoice?.visit?.patient?.code || '';
+      return fullName.includes(query) || patientCode.toLowerCase().includes(query);
+    });
+  });
+
+  readonly filteredPharmacySales = computed(() => {
+    const query = this.searchQuery().toLowerCase().trim();
+    const sales = this.pharmacySales();
+    if (!query) return sales;
+    return sales.filter(s => {
+      const patientName = s.visit?.patient ? `${s.visit.patient.surname} ${s.visit.patient.firstName}` : 'walk-in buyer';
+      const customerName = s.customerName || '';
+      const patientCode = s.visit?.patient?.patientCode || s.visit?.patient?.code || '';
+      const saleNumber = s.saleNumber || '';
+      return patientName.toLowerCase().includes(query) || 
+             customerName.toLowerCase().includes(query) || 
+             patientCode.toLowerCase().includes(query) || 
+             saleNumber.toLowerCase().includes(query);
+    });
+  });
+
   ngOnInit(): void {
     // Default: load stats for today
+    this.loadData();
+  }
+
+  selectTab(tab: 'dashboard' | 'clinic' | 'pharmacy' | 'closures' | 'inventory'): void {
+    this.activeTab.set(tab);
     this.loadData();
   }
 
@@ -828,42 +875,53 @@ export class AdminFinancialsPageComponent implements OnInit {
     this.isLoading.set(true);
     const start = this.startDate() || undefined;
     const end = this.endDate() || undefined;
+    const tab = this.activeTab();
 
-    // Load combined stats
-    this.api.getCombinedSummary(start, end).subscribe({
-      next: (sumRes) => {
-        this.summary.set(sumRes);
-      },
-      error: (err) => console.error('Error fetching combined report summary', err)
-    });
-
-    // Load clinic ledger
-    this.api.getClinicStream(start, end).subscribe({
-      next: (clinicRes) => {
-        this.clinicPayments.set(clinicRes);
-      },
-      error: (err) => console.error('Error fetching clinic ledger', err)
-    });
-
-    // Load pharmacy POS journal
-    this.api.getPharmacyStream(start, end).subscribe({
-      next: (pharmacyRes) => {
-        this.pharmacySales.set(pharmacyRes);
-      },
-      error: (err) => console.error('Error fetching pharmacy POS journal', err)
-    });
-
-    // Load pharmacy daily closures
-    this.api.getPharmacyClosures(start, end).subscribe({
-      next: (closuresRes) => {
-        this.closures.set(closuresRes);
-        this.isLoading.set(false);
-      },
-      error: (err) => {
-        console.error('Error fetching pharmacy daily closures', err);
-        this.isLoading.set(false);
-      }
-    });
+    if (tab === 'dashboard' || tab === 'inventory') {
+      this.api.getCombinedSummary(start, end).subscribe({
+        next: (sumRes) => {
+          this.summary.set(sumRes);
+          this.isLoading.set(false);
+        },
+        error: (err) => {
+          console.error('Error fetching combined report summary', err);
+          this.isLoading.set(false);
+        }
+      });
+    } else if (tab === 'clinic') {
+      this.api.getClinicStream(start, end).subscribe({
+        next: (clinicRes) => {
+          this.clinicPayments.set(clinicRes);
+          this.isLoading.set(false);
+        },
+        error: (err) => {
+          console.error('Error fetching clinic ledger', err);
+          this.isLoading.set(false);
+        }
+      });
+    } else if (tab === 'pharmacy') {
+      this.api.getPharmacyStream(start, end).subscribe({
+        next: (pharmacyRes) => {
+          this.pharmacySales.set(pharmacyRes);
+          this.isLoading.set(false);
+        },
+        error: (err) => {
+          console.error('Error fetching pharmacy POS journal', err);
+          this.isLoading.set(false);
+        }
+      });
+    } else if (tab === 'closures') {
+      this.api.getPharmacyClosures(start, end).subscribe({
+        next: (closuresRes) => {
+          this.closures.set(closuresRes);
+          this.isLoading.set(false);
+        },
+        error: (err) => {
+          console.error('Error fetching pharmacy daily closures', err);
+          this.isLoading.set(false);
+        }
+      });
+    }
   }
 
   loadClosures(): void {
@@ -923,6 +981,7 @@ export class AdminFinancialsPageComponent implements OnInit {
   clearFilters(): void {
     this.startDate.set('');
     this.endDate.set('');
+    this.searchQuery.set('');
     this.loadData();
   }
 
@@ -936,7 +995,7 @@ export class AdminFinancialsPageComponent implements OnInit {
 
     if (tab === 'clinic') {
       csvContent += 'Receipt ID,Patient Name,Patient Code,Phone,Payment Date,Method,Reference Number,Received By,Amount (GHS)\n';
-      this.clinicPayments().forEach(p => {
+      this.filteredClinicPayments().forEach(p => {
         const patientName = `${p.invoice?.visit?.patient?.surname} ${p.invoice?.visit?.patient?.firstName}`.replace(/,/g, '');
         const patientCode = p.invoice?.visit?.patient?.code || '';
         const phone = p.invoice?.visit?.patient?.phone || '';
@@ -950,7 +1009,7 @@ export class AdminFinancialsPageComponent implements OnInit {
       this.downloadFile(csvContent, 'clinic_stream_report.csv');
     } else if (tab === 'pharmacy') {
       csvContent += 'Sale Number,Source,Patient Name,Patient Code,Sale Date,Method,Sold By,Total (GHS)\n';
-      this.pharmacySales().forEach(s => {
+      this.filteredPharmacySales().forEach(s => {
         const source = s.saleSource;
         const patientName = s.visit?.patient ? `${s.visit.patient.surname} ${s.visit.patient.firstName}`.replace(/,/g, '') : 'Walk-in Buyer';
         const patientCode = s.visit?.patient?.code || 'N/A';

@@ -12,8 +12,35 @@ import { FormsModule } from '@angular/forms';
   template: `
     <div class="visits-workspace">
       <div class="panel">
-        <div class="panel-header">
-          <h2>Active Visits Ledger</h2>
+        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 1rem;">
+            <h2>Visits Ledger</h2>
+            
+            <!-- Segmented Control Button Toggle Group -->
+            <div style="display: inline-flex; background: #f1f5f9; padding: 3px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 0.8rem; font-weight: 700; height: 32px; align-items: center;">
+              <button 
+                type="button"
+                [style.background]="!showAll() ? '#ffffff' : 'transparent'"
+                [style.color]="!showAll() ? 'var(--app-primary-color)' : 'var(--app-muted-text-color)'"
+                [style.boxShadow]="!showAll() ? '0 1px 3px rgba(0,0,0,0.05)' : 'none'"
+                style="border: none; padding: 0 0.8rem; height: 26px; border-radius: 6px; cursor: pointer; transition: all 0.15s ease; font-weight: 700; font-size: 0.78rem;"
+                (click)="toggleShowAll(false)"
+              >
+                Active Queue
+              </button>
+              <button 
+                type="button"
+                [style.background]="showAll() ? '#ffffff' : 'transparent'"
+                [style.color]="showAll() ? 'var(--app-primary-color)' : 'var(--app-muted-text-color)'"
+                [style.boxShadow]="showAll() ? '0 1px 3px rgba(0,0,0,0.05)' : 'none'"
+                style="border: none; padding: 0 0.8rem; height: 26px; border-radius: 6px; cursor: pointer; transition: all 0.15s ease; font-weight: 700; font-size: 0.78rem;"
+                (click)="toggleShowAll(true)"
+              >
+                All / History
+              </button>
+            </div>
+          </div>
+
           <button class="btn btn-secondary" (click)="loadVisits()">
             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;">
               <polyline points="23 4 23 10 17 10"></polyline>
@@ -33,7 +60,7 @@ import { FormsModule } from '@angular/forms';
           [page]="1"
           [limit]="50"
           [loading]="loading()"
-          exportFileName="active_visits"
+          exportFileName="visits_ledger"
           (searchChange)="onSearch($event)"
           (actionClick)="onAction($event)"
         ></app-table>
@@ -51,6 +78,7 @@ export class FrontdeskVisitsPageComponent implements OnInit {
   readonly visits = signal<any[]>([]);
   readonly loading = signal(false);
   readonly searchQuery = signal('');
+  readonly showAll = signal(false);
 
   readonly columns: TableColumn[] = [
     { key: 'visitCode', label: 'Visit #', type: 'code' },
@@ -66,13 +94,19 @@ export class FrontdeskVisitsPageComponent implements OnInit {
     this.loadVisits();
   }
 
+  toggleShowAll(val: boolean): void {
+    this.showAll.set(val);
+    this.loadVisits();
+  }
+
   loadVisits(): void {
     this.loading.set(true);
-    this.api.getActiveVisits().subscribe({
+    this.api.getActiveVisits(undefined, this.showAll()).subscribe({
       next: (res) => {
         this.visits.set(res);
         this.loading.set(false);
       },
+
       error: (err) => {
         console.error('Error fetching active visits', err);
         this.loading.set(false);
