@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { SessionService } from '../../../core/auth/session.service';
 
 @Component({
   selector: 'app-admin-settings-page',
@@ -26,8 +27,52 @@ import { ToastService } from '../../../core/services/toast.service';
           <p class="section-desc">These properties dynamically pre-populate A4 clinical reports and patient invoice print headers.</p>
         </div>
 
-        <form (ngSubmit)="saveSettings()" #settingsForm="ngForm" class="settings-grid" *ngIf="settings()">
+        <form (ngSubmit)="saveSettings()" #settingsForm="ngForm" class="settings-grid" *ngIf="settings(); else loadingState">
           
+          <!-- Logo Upload Container -->
+          <div class="form-group full-width logo-upload-container">
+            <label>Clinic Logo / Letterhead Symbol</label>
+            <div class="logo-upload-workspace">
+              <div class="logo-preview-frame">
+                <img *ngIf="settings().logo" [src]="settings().logo" alt="Clinic Logo Preview" />
+                <div *ngIf="!settings().logo" class="logo-placeholder">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                  </svg>
+                  <span>No Logo</span>
+                </div>
+              </div>
+              
+              <div class="logo-upload-actions">
+                <p class="upload-hint">Upload a transparent PNG or high-contrast JPEG logo. Recommended dimensions: 300x100px. Maximum size: 1.5MB.</p>
+                <div class="btn-action-row">
+                  <label class="modern-btn-secondary" for="logo-file-input">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 15px; height: 15px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    Choose Image
+                  </label>
+                  <input
+                    id="logo-file-input"
+                    type="file"
+                    (change)="onLogoChange($event)"
+                    accept="image/*"
+                    style="display: none;"
+                  />
+                  <button
+                    type="button"
+                    *ngIf="settings().logo"
+                    class="modern-btn-danger"
+                    (click)="clearLogo()"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 15px; height: 15px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    Clear Logo
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="form-group full-width">
             <label for="clinicName">Clinic / Pharmacy Name <span class="text-danger">*</span></label>
             <input
@@ -150,6 +195,26 @@ import { ToastService } from '../../../core/services/toast.service';
           </div>
 
         </form>
+
+        <ng-template #loadingState>
+          <div class="settings-loading-workspace">
+            <div class="skeleton-shimmer logo-upload-skeleton"></div>
+            <div class="settings-skeleton-grid">
+              <div class="skeleton-shimmer input-skeleton full-width"></div>
+              <div class="skeleton-shimmer input-skeleton full-width"></div>
+              <div class="skeleton-shimmer input-skeleton"></div>
+              <div class="skeleton-shimmer input-skeleton"></div>
+              <div class="skeleton-shimmer input-skeleton"></div>
+              <div class="skeleton-shimmer input-skeleton"></div>
+              <div class="skeleton-shimmer input-skeleton"></div>
+              <div class="skeleton-shimmer input-skeleton"></div>
+            </div>
+            <div class="skeleton-spinner-overlay">
+              <div class="premium-spinner"></div>
+              <span>Synchronizing settings...</span>
+            </div>
+          </div>
+        </ng-template>
       </div>
     </div>
   `,
@@ -314,12 +379,224 @@ import { ToastService } from '../../../core/services/toast.service';
         cursor: not-allowed;
       }
     }
+
+    .logo-upload-container {
+      margin-bottom: 0.5rem;
+    }
+
+    .logo-upload-workspace {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      align-items: center;
+      transition: all 0.2s ease;
+      width: 100%;
+
+      @media (min-width: 640px) {
+        flex-direction: row;
+        align-items: center;
+      }
+
+      &:hover {
+        border-color: #0d9488;
+        background: #f0fdfa;
+      }
+    }
+
+    .logo-preview-frame {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 120px;
+      height: 70px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.5rem;
+      overflow: hidden;
+      flex-shrink: 0;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+
+      img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        padding: 0.35rem;
+      }
+
+      .logo-placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+        color: #94a3b8;
+        font-size: 0.7rem;
+        text-align: center;
+        font-weight: 600;
+
+        svg {
+          width: 1.5rem;
+          height: 1.5rem;
+        }
+      }
+    }
+
+    .logo-upload-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      flex-grow: 1;
+      justify-content: center;
+
+      .upload-hint {
+        margin: 0;
+        font-size: 0.78rem;
+        color: #64748b;
+        line-height: 1.4;
+      }
+
+      .btn-action-row {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+    }
+
+    .modern-btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: #ffffff;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+      padding: 0.45rem 1rem;
+      border-radius: 0.5rem;
+      font-weight: 700;
+      font-size: 0.82rem;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      transition: all 0.15s ease;
+
+      &:hover {
+        background: #f8fafc;
+        border-color: #94a3b8;
+        color: #0f172a;
+      }
+    }
+
+    .modern-btn-danger {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: #fef2f2;
+      color: #b91c1c;
+      border: 1px solid #fca5a5;
+      padding: 0.45rem 1rem;
+      border-radius: 0.5rem;
+      font-weight: 700;
+      font-size: 0.82rem;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      transition: all 0.15s ease;
+
+      &:hover {
+        background: #fee2e2;
+        border-color: #f87171;
+        color: #991b1b;
+      }
+    }
+
+    /* Shimmer Skeleton & Preloader Styles */
+    .settings-loading-workspace {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      width: 100%;
+      opacity: 0.65;
+      padding: 0.5rem 0;
+    }
+
+    .skeleton-shimmer {
+      background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+      background-size: 200% 100%;
+      animation: shimmer-anim 1.5s infinite linear;
+      border-radius: 0.75rem;
+    }
+
+    @keyframes shimmer-anim {
+      0% {
+        background-position: 200% 0;
+      }
+      100% {
+        background-position: -200% 0;
+      }
+    }
+
+    .logo-upload-skeleton {
+      height: 96px;
+      width: 100%;
+    }
+
+    .settings-skeleton-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+
+      @media (min-width: 768px) {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    .input-skeleton {
+      height: 44px;
+      width: 100%;
+      border-radius: 0.5rem;
+
+      &.full-width {
+        grid-column: 1 / -1;
+      }
+    }
+
+    .skeleton-spinner-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      background: rgba(255, 255, 255, 0.4);
+      backdrop-filter: blur(2px);
+      border-radius: 1rem;
+      color: #0d9488;
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    .premium-spinner {
+      border: 3.5px solid #e2e8f0;
+      border-top: 3.5px solid #0d9488;
+      border-radius: 50%;
+      width: 38px;
+      height: 38px;
+      animation: spin-settings-loader 0.85s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+    }
+
+    @keyframes spin-settings-loader {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AdminSettingsPageComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
+  private readonly sessionService = inject(SessionService);
 
   readonly settings = signal<any | null>(null);
   readonly isSaving = signal(false);
@@ -349,6 +626,7 @@ export class AdminSettingsPageComponent implements OnInit {
       next: (res) => {
         this.isSaving.set(false);
         this.settings.set(res);
+        this.sessionService.updateTenantName(res.clinicName);
         this.toast.success('System settings saved successfully!');
       },
       error: (err) => {
@@ -357,5 +635,44 @@ export class AdminSettingsPageComponent implements OnInit {
         this.toast.error('Failed to save clinic settings on the server.');
       }
     });
+  }
+
+  onLogoChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+    if (!file.type.startsWith('image/')) {
+      this.toast.error('Please select a valid image file (PNG/JPEG).');
+      return;
+    }
+
+    // Size limit: 1.5MB
+    if (file.size > 1.5 * 1024 * 1024) {
+      this.toast.error('Logo file size must be under 1.5MB to prevent database bloat.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64String = reader.result as string;
+      const current = this.settings();
+      if (current) {
+        this.settings.set({ ...current, logo: base64String });
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  clearLogo(): void {
+    const current = this.settings();
+    if (current) {
+      this.settings.set({ ...current, logo: null });
+    }
+    // Also clear the file input value so same file can be re-selected if cleared
+    const fileInput = document.getElementById('logo-file-input') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = '';
+    }
   }
 }

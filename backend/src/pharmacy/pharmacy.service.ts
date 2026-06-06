@@ -131,6 +131,18 @@ export class PharmacyService {
     const saleNumber = `PH-${nextNum}`;
 
     return this.prisma.$transaction(async (tx) => {
+      // Check for active open session
+      const activeSession = await tx.pharmacyDailyClosure.findFirst({
+        where: {
+          openedByUserId: userId,
+          status: 'open',
+        },
+      });
+
+      if (!activeSession) {
+        throw new BadRequestException('No active register session. Please open the register first.');
+      }
+
       let subtotal = 0;
       const saleItemsToCreate: any[] = [];
 
@@ -198,7 +210,7 @@ export class PharmacyService {
         });
       }
 
-      // Create Sale header
+      // Create Sale header linked to session
       const sale = await tx.pharmacySale.create({
         data: {
           saleNumber,
@@ -210,6 +222,7 @@ export class PharmacyService {
           paymentMethod,
           status: 'paid',
           soldByUserId: userId,
+          closureId: activeSession.id,
         },
       });
 
@@ -254,23 +267,67 @@ export class PharmacyService {
     });
   }
 
-  // --- Daily Closures ---
-  async getUnclosedSalesSummary(userId: string) {
-    const sales = await this.prisma.pharmacySale.findMany({
+  // --- Daily Closures & Register Sessions ---
+  async findActiveSession(userId: string) {
+    return this.prisma.pharmacyDailyClosure.findFirst({
       where: {
-        soldByUserId: userId,
-        closureId: null,
-        status: 'paid',
+        openedByUserId: userId,
+        status: 'open',
       },
       include: {
-        items: true,
-        visit: {
-          include: { patient: true }
+        sales: {
+          where: { status: { not: 'voided' } },
+          include: {
+            items: true,
+            visit: {
+              include: { patient: true }
+            }
+          }
         }
-      },
-      orderBy: { createdAt: 'desc' }
+      }
+    });
+  }
+
+  async openSession(userId: string, openingFloat: number) {
+    const active = await this.prisma.pharmacyDailyClosure.findFirst({
+      where: {
+        openedByUserId: userId,
+        status: 'open',
+      }
     });
 
+    if (active) {
+      throw new BadRequestException('A register session is already active for this cashier.');
+    }
+
+    const floatVal = Number(openingFloat);
+    if (isNaN(floatVal) || floatVal < 0) {
+      throw new BadRequestException('Opening float must be a valid positive number');
+    }
+
+    return this.prisma.pharmacyDailyClosure.create({
+      data: {
+        openedByUserId: userId,
+        openingFloat: floatVal,
+        status: 'open',
+      }
+    });
+  }
+
+  async getUnclosedSalesSummary(userId: string) {
+    const activeSession = await this.findActiveSession(userId);
+    if (!activeSession) {
+      return {
+        salesCount: 0,
+        salesTotal: 0,
+        cashTotal: 0,
+        momoTotal: 0,
+        sales: [],
+        openingFloat: 0,
+      };
+    }
+
+    const sales = activeSession.sales;
     const salesCount = sales.length;
     const salesTotal = sales.reduce((sum, s) => sum + Number(s.total), 0);
     const cashTotal = sales.reduce((sum, s) => s.paymentMethod === 'cash' ? sum + Number(s.total) : sum, 0);
@@ -282,10 +339,11 @@ export class PharmacyService {
       cashTotal,
       momoTotal,
       sales,
+      openingFloat: Number(activeSession.openingFloat),
     };
   }
 
-  async closeSalesSession(userId: string, data: any) {
+  async closeSession(userId: string, data: any) {
     const cashCounted = Number(data.cashCounted ?? 0);
     const momoCounted = Number(data.momoCounted ?? 0);
     const notes = data.notes ?? null;
@@ -294,76 +352,52 @@ export class PharmacyService {
       throw new BadRequestException('Counted cash and mobile money must be valid positive numbers');
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      // 1. Fetch unclosed sales
-      const sales = await tx.pharmacySale.findMany({
-        where: {
-          soldByUserId: userId,
-          closureId: null,
-          status: 'paid',
+    const activeSession = await this.prisma.pharmacyDailyClosure.findFirst({
+      where: {
+        openedByUserId: userId,
+        status: 'open',
+      },
+      include: {
+        sales: {
+          where: { status: { not: 'voided' } }
         }
-      });
-
-      if (sales.length === 0) {
-        throw new BadRequestException('No unclosed sales found to perform closure.');
       }
+    });
 
-      const totalSalesCount = sales.length;
-      const totalSalesAmount = sales.reduce((sum, s) => sum + Number(s.total), 0);
-      const totalCounted = cashCounted + momoCounted;
-      const discrepancy = totalCounted - totalSalesAmount;
+    if (!activeSession) {
+      throw new BadRequestException('No active register session found to close.');
+    }
 
-      // 2. Create the daily closure record
-      const closure = await tx.pharmacyDailyClosure.create({
-        data: {
-          closedByUserId: userId,
-          totalSalesCount,
-          totalSalesAmount,
-          cashCounted,
-          momoCounted,
-          totalCounted,
-          discrepancy,
-          notes,
-        }
-      });
+    const totalSalesCount = activeSession.sales.length;
+    const totalSalesAmount = activeSession.sales.reduce((sum, s) => sum + Number(s.total), 0);
+    const totalCounted = cashCounted + momoCounted;
 
-      // 3. Associate sales with this closure
-      await tx.pharmacySale.updateMany({
-        where: {
-          soldByUserId: userId,
-          closureId: null,
-          status: 'paid',
-        },
-        data: {
-          closureId: closure.id
-        }
-      });
+    // expected total includes opening float
+    const expectedTotal = totalSalesAmount + Number(activeSession.openingFloat);
+    const discrepancy = totalCounted - expectedTotal;
 
-      // 4. Log audit event
-      await tx.auditLog.create({
-        data: {
-          actionType: 'create',
-          entityType: 'pharmacy_closure',
-          entityId: closure.id,
-          afterData: JSON.stringify({
-            closureId: closure.id,
-            totalSalesAmount,
-            totalCounted,
-            discrepancy
-          }),
-          actorUserId: userId
-        }
-      });
-
-      return tx.pharmacyDailyClosure.findUnique({
-        where: { id: closure.id },
-        include: { sales: true }
-      });
+    return this.prisma.pharmacyDailyClosure.update({
+      where: { id: activeSession.id },
+      data: {
+        status: 'closed',
+        closedByUserId: userId,
+        closureDate: new Date(),
+        totalSalesCount,
+        totalSalesAmount,
+        cashCounted,
+        momoCounted,
+        totalCounted,
+        discrepancy,
+        notes,
+      },
+      include: { sales: true }
     });
   }
 
   async findAllClosures(startDate?: string, endDate?: string) {
-    const where: any = {};
+    const where: any = {
+      status: 'closed',
+    };
     if (startDate || endDate) {
       where.closureDate = {};
       if (startDate) {
@@ -389,6 +423,9 @@ export class PharmacyService {
     const closure = await this.prisma.pharmacyDailyClosure.findUnique({
       where: { id },
       include: {
+        openedByUser: {
+          select: { fullName: true, username: true }
+        },
         closedByUser: {
           select: { fullName: true, username: true }
         },

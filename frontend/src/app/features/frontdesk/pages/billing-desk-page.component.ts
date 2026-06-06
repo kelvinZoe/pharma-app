@@ -52,7 +52,7 @@ import { AppDropdownComponent } from '../../../shared/ui/app-dropdown/app-dropdo
         </div>
 
         <p class="section-desc" style="margin-bottom: 1.25rem;">
-          {{ showHistory() ? 'View completed invoices, reprint premium A4 receipts, and review historical checkout details.' : 'Select a patient visit from the queue below to compile procedures and collect payment.' }}
+          {{ showHistory() ? 'View completed invoices, reprint thermal POS receipts, and review historical checkout details.' : 'Select a patient visit from the queue below to compile procedures and collect payment.' }}
         </p>
 
         <!-- Full Queue Table -->
@@ -95,7 +95,7 @@ import { AppDropdownComponent } from '../../../shared/ui/app-dropdown/app-dropdo
                   </td>
                   <td style="text-align: right;" (click)="$event.stopPropagation()">
                     <button class="btn btn-secondary btn-sm" (click)="selectVisit(v)" style="font-weight: 700;">
-                      {{ showHistory() ? 'Reprint / View' : 'Process Checkout' }}
+                      {{ showHistory() ? '🖨️ Reprint Receipt' : 'Process Checkout' }}
                     </button>
                   </td>
                 </tr>
@@ -268,7 +268,7 @@ import { AppDropdownComponent } from '../../../shared/ui/app-dropdown/app-dropdo
                         <line x1="16" y1="13" x2="8" y2="13"></line>
                         <line x1="16" y1="17" x2="8" y2="17"></line>
                       </svg>
-                      View & Print A4 Receipt
+                      View & Print Receipt
                     </button>
                   </div>
 
@@ -279,84 +279,87 @@ import { AppDropdownComponent } from '../../../shared/ui/app-dropdown/app-dropdo
             </div>
 
             <!-- Receipt Print Summary Template inside Modal -->
-            <div class="invoice-print-container" *ngIf="showReceipt()" style="background: #ffffff; border: 1px solid var(--app-border-color); border-radius: 0.75rem; padding: 1.5rem;">
+            <div class="invoice-print-container" *ngIf="showReceipt()">
               <div class="receipt-header" *ngIf="settings() as s">
+                <div *ngIf="s.logo">
+                  <img [src]="s.logo" alt="Clinic Logo" />
+                </div>
                 <h1>{{ s.clinicName }}</h1>
-                <p>{{ s.tagline }} • {{ s.location }}</p>
-                <p style="font-size: 0.75rem;">Phone: {{ s.phone }} • Email: {{ s.email }}</p>
+                <p>{{ s.tagline }}</p>
+                <p>{{ s.location }}</p>
+                <p>Tel: {{ s.phone }}</p>
               </div>
 
-              <div class="receipt-meta-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1rem; border-bottom: 1px solid var(--app-border-color); padding-bottom: 0.75rem; font-size: 0.75rem;">
+              <div class="receipt-meta-grid">
                 <div>
-                  <strong style="color: var(--app-text-color);">PATIENT DEMOGRAPHICS</strong>
-                  <div>Name: {{ selectedVisit()?.patient?.surname }}, {{ selectedVisit()?.patient?.firstName }}</div>
-                  <div>Patient Code: {{ selectedVisit()?.patient?.patientCode }}</div>
-                  <div>Sex/Age: {{ selectedVisit()?.patient?.sex === 'male' ? 'Male' : (selectedVisit()?.patient?.sex === 'female' ? 'Female' : 'Other') }}, {{ selectedVisit()?.patient?.age }} yrs</div>
-                  <div>Phone: {{ selectedVisit()?.patient?.phone }}</div>
+                  <strong>PATIENT</strong>
+                  <div>{{ selectedVisit()?.patient?.surname }}, {{ selectedVisit()?.patient?.firstName }}</div>
+                  <div>ID: {{ selectedVisit()?.patient?.patientCode }}</div>
+                  <div>{{ selectedVisit()?.patient?.sex === 'male' ? 'M' : 'F' }} / {{ selectedVisit()?.patient?.age }}yrs</div>
+                  <div>Ph: {{ selectedVisit()?.patient?.phone }}</div>
                 </div>
-                <div style="text-align: right;">
-                  <strong style="color: var(--app-text-color);">INVOICE RECEIPT</strong>
-                  <div>Receipt No: REC-{{ selectedVisit()?.id?.slice(-6)?.toUpperCase() }}</div>
-                  <div>Date: {{ currentDateTime | date:'medium' }}</div>
-                  <div>Status: <span style="color: var(--app-success-color); font-weight: 700;">PAID IN FULL</span></div>
-                  <div>Payment: {{ paymentMethod() | uppercase }} (Ref: {{ paymentReference() || 'Cash' }})</div>
+                <div>
+                  <strong>RECEIPT</strong>
+                  <div>No: REC-{{ selectedVisit()?.id?.slice(-6)?.toUpperCase() }}</div>
+                  <div>Date: {{ currentDateTime | date:'dd/MM/yy HH:mm' }}</div>
+                  <div>PAID IN FULL</div>
+                  <div>Pay: {{ paymentMethod() | uppercase }}</div>
+                  <div *ngIf="paymentReference()">Ref: {{ paymentReference() }}</div>
                 </div>
               </div>
 
-              <table class="receipt-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem; margin-bottom: 1rem;">
+              <table class="receipt-table">
                 <thead>
-                  <tr style="background-color: #f8fafc; border-bottom: 2px solid var(--app-border-color);">
-                    <th style="padding: 0.5rem; text-align: left;">Scan Code</th>
-                    <th style="padding: 0.5rem; text-align: left;">Procedure Details</th>
-                    <th style="padding: 0.5rem; text-align: left;">Department</th>
-                    <th style="padding: 0.5rem; text-align: right;">Unit Cost</th>
-                    <th style="padding: 0.5rem; text-align: right;">Qty</th>
-                    <th style="padding: 0.5rem; text-align: right;">Total (GHS)</th>
+                  <tr>
+                    <th>Code</th>
+                    <th>Procedure</th>
+                    <th>Dept</th>
+                    <th style="text-align:right;">Qty</th>
+                    <th style="text-align:right;">Total</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr *ngFor="let s of invoice()?.services" style="border-bottom: 1px solid var(--app-border-color);">
-                    <td style="padding: 0.5rem;">{{ s.serviceId.slice(-6).toUpperCase() }}</td>
-                    <td style="padding: 0.5rem;">
-                      <strong>{{ s.serviceName }}</strong>
-                      <div *ngIf="s.status === 'not_done'" style="color: var(--app-danger-color); font-size: 0.65rem;">
-                        * Procedure Cancelled
-                      </div>
+                  <tr *ngFor="let s of invoice()?.services">
+                    <td>{{ s.serviceId.slice(-6).toUpperCase() }}</td>
+                    <td>
+                      {{ s.serviceName }}
+                      <div *ngIf="s.status === 'not_done'" style="font-size: 8px; color: #c00;">*Cancelled</div>
                     </td>
-                    <td style="padding: 0.5rem;">{{ s.departmentName }}</td>
-                    <td style="padding: 0.5rem; text-align: right;">₵{{ Number(s.unitPrice).toFixed(2) }}</td>
-                    <td style="padding: 0.5rem; text-align: right;">{{ s.quantity }}</td>
-                    <td style="padding: 0.5rem; text-align: right; font-weight: 700;">₵{{ (s.status === 'not_done' ? 0 : Number(s.lineTotal)).toFixed(2) }}</td>
+                    <td>{{ s.departmentName }}</td>
+                    <td style="text-align:right;">{{ s.quantity }}</td>
+                    <td style="text-align:right;">₵{{ (s.status === 'not_done' ? 0 : Number(s.lineTotal)).toFixed(2) }}</td>
                   </tr>
                 </tbody>
               </table>
 
-              <div class="receipt-totals" style="max-width: 240px; margin-left: auto; font-size: 0.75rem; margin-bottom: 1.5rem;">
-                <div class="total-line" style="display: flex; justify-content: space-between; padding: 0.2rem 0;">
+              <div class="receipt-totals">
+                <div class="total-line">
                   <span>Subtotal:</span>
                   <span>₵{{ invoice()?.subtotal?.toFixed(2) }}</span>
                 </div>
-                <div class="total-line" style="display: flex; justify-content: space-between; padding: 0.2rem 0;">
+                <div class="total-line">
                   <span>Amount Paid:</span>
                   <span>₵{{ invoice()?.amountPaid?.toFixed(2) }}</span>
                 </div>
-                <div class="total-line grand" style="display: flex; justify-content: space-between; padding: 0.3rem 0; border-top: 1.5px solid var(--app-border-color); font-weight: 700; font-size: 0.85rem;">
-                  <span>Total Reconciled:</span>
-                  <span style="color: var(--app-success-color);">₵{{ invoice()?.total?.toFixed(2) }}</span>
+                <div class="total-line grand">
+                  <span>TOTAL:</span>
+                  <span>₵{{ invoice()?.total?.toFixed(2) }}</span>
                 </div>
               </div>
 
-              <div style="margin-top: 2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; font-size: 0.7rem;">
-                <div style="border-top: 1px dashed var(--app-muted-text-color); padding-top: 0.35rem; text-align: center;">
+              <div style="margin-top: 12px; font-size: 9px;">
+
+                  <div style="border-top: 1px dashed var(--app-muted-text-color); padding-top: 0.35rem; text-align: center;">
                   Prepared By (Cashier Stamp & Signature)
                 </div>
                 <div style="border-top: 1px dashed var(--app-muted-text-color); padding-top: 0.35rem; text-align: center;">
                   Patient/Depositor Signature
                 </div>
               </div>
-
-              <div class="receipt-footer" style="margin-top: 1.5rem; padding-top: 0.75rem;">
-                <p>Thank you for choosing {{ settings()?.clinicName || 'our clinic' }}. Payments are non-refundable. Separate receipt issued for pharmacy transactions.</p>
+              
+              <div class="receipt-footer">
+                <p>Thank you for choosing {{ settings()?.clinicName || 'our clinic' }}.</p>
+                <p>Payments are non-refundable. Separate receipt issued for pharmacy transactions.</p>
                 <div style="margin-top: 1rem; display: flex; justify-content: center; gap: 0.75rem;" class="no-print">
                   <button 
                     class="btn btn-primary" 
@@ -368,7 +371,7 @@ import { AppDropdownComponent } from '../../../shared/ui/app-dropdown/app-dropdo
                       <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
                       <rect x="6" y="14" width="12" height="8"></rect>
                     </svg>
-                    <span>Print Invoice Receipt</span>
+                    <span>🖨️ Print Thermal Receipt</span>
                   </button>
                   
                   <button 

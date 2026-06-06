@@ -36,6 +36,7 @@ export class AuthService {
       module: user.module,
       tenantId: user.tenantId,
       tenantSlug: user.tenant?.slug ?? 'default',
+      tenantName: user.tenant?.name ?? 'PharmaFlow Clinic',
     };
 
     return {
@@ -48,6 +49,7 @@ export class AuthService {
         module: user.module,
         tenantId: user.tenantId,
         tenantSlug: user.tenant?.slug ?? 'default',
+        tenantName: user.tenant?.name ?? 'PharmaFlow Clinic',
       },
     };
   }

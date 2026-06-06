@@ -436,8 +436,18 @@ interface ServiceHistoryLine {
     <div class="modal-overlay" *ngIf="printModalVisible()">
       <div class="modal-dossier-print-container premium-glass-panel">
         
-        <div class="modal-actions-header">
+        <!-- Header Save/Action options bar -->
+        <div class="modal-actions-header no-print">
           <h4>Diagnostic Sheet Preview</h4>
+          
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-right: auto; margin-left: 2rem;">
+            <label style="font-weight: 700; font-size: 0.8rem; color: var(--slate-300); margin: 0;">Report Template:</label>
+            <select (change)="onTemplateSelect($any($event.target).value)" class="form-control form-control-sm" style="width: auto; max-width: 220px; font-weight: 600; padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid var(--slate-300); background: #ffffff;">
+              <option value="">Individual Services (Default)</option>
+              <option *ngFor="let t of generalTemplates()" [value]="t.id">{{ t.name }}</option>
+            </select>
+          </div>
+
           <div class="header-action-btns">
             <button class="btn btn-secondary btn-sm" (click)="triggerBrowserPrint()">
               Print Document
@@ -448,12 +458,15 @@ interface ServiceHistoryLine {
           </div>
         </div>
 
-        <!-- Simulated A4 Clinical Page -->
-        <div class="clinical-a4-sheet" id="print-sheet-content">
+        <!-- Document Canvas (Grey background) -->
+        <div class="clinical-a4-canvas">
+          <!-- Simulated A4 Clinical Page -->
+          <div class="clinical-a4-sheet" id="print-sheet-content">
           <!-- Letterhead Banner -->
           <div class="a4-letterhead" *ngIf="settings() as s">
             <div class="logo-space">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+              <img *ngIf="s.logo" [src]="s.logo" alt="Clinic Logo" class="clinic-logo-img" style="max-height: 48px; max-width: 150px; object-fit: contain; margin-right: 0.75rem;" />
+              <svg *ngIf="!s.logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
               <div class="logo-text">
                 <h2>{{ s.clinicName }}</h2>
                 <span>{{ s.tagline }}</span>
@@ -606,6 +619,8 @@ export class WorklistResultsPageComponent implements OnInit {
   // Detailed clinical dossier fields
   readonly selectedVisit = signal<any | null>(null);
   readonly serviceLines = signal<ServiceHistoryLine[]>([]);
+  readonly generalTemplates = signal<any[]>([]);
+  readonly selectedTemplateId = signal<string | null>(null);
 
   // Print previews
   readonly printModalVisible = signal(false);
@@ -623,6 +638,7 @@ export class WorklistResultsPageComponent implements OnInit {
 
     this.loadTodayVisits();
     this.loadSettings();
+    this.loadGeneralTemplates();
   }
 
   loadSettings(): void {
@@ -796,6 +812,99 @@ export class WorklistResultsPageComponent implements OnInit {
     this.searchResults.set([]);
     this.searchQuery.set('');
     this.serviceLines.set([]);
+  }
+
+  loadGeneralTemplates(): void {
+    this.api.getGeneralTemplates(this.deptCode()).subscribe({
+      next: (res) => {
+        this.generalTemplates.set(res);
+      },
+      error: (err) => console.error('Error fetching general templates', err)
+    });
+  }
+
+  onTemplateSelect(templateId: string): void {
+    this.selectedTemplateId.set(templateId || null);
+    const v = this.selectedVisit();
+    if (!v) return;
+
+    if (!templateId) {
+      this.selectVisit(v);
+      return;
+    }
+
+    this.api.getGeneralTemplate(templateId).subscribe({
+      next: (gt) => {
+        const rawServices = v.services || v.visitServices || [];
+        const lines: ServiceHistoryLine[] = [];
+
+        gt.items.forEach((item: any) => {
+          const svc = item.service;
+          const performed = rawServices.find((s: any) => s.service.id === svc.id);
+
+          if (performed) {
+            const line: ServiceHistoryLine = {
+              id: performed.id,
+              serviceId: svc.id,
+              serviceName: svc.name,
+              status: performed.status,
+              notDoneReason: performed.notDoneReason || '',
+              narrativeText: performed.results?.[0]?.narrativeNotes || performed.narrativeNotes || '',
+              resultValues: {}
+            };
+
+            const dbResultJson = performed.results?.[0]?.resultDataJson || performed.resultDataJson;
+            if (dbResultJson) {
+              try {
+                line.resultValues = typeof dbResultJson === 'string' ? JSON.parse(dbResultJson) : dbResultJson;
+              } catch (e) {
+                console.error('Error parsing resultDataJson', e);
+              }
+            }
+            
+            this.loadLineTemplate(line);
+            lines.push(line);
+          } else {
+            const line: ServiceHistoryLine = {
+              id: `dummy_${svc.id}`,
+              serviceId: svc.id,
+              serviceName: svc.name,
+              status: 'done',
+              notDoneReason: '',
+              narrativeText: '',
+              resultValues: {}
+            };
+
+            this.loadLineTemplate(line);
+            lines.push(line);
+          }
+        });
+
+        this.serviceLines.set(lines);
+      },
+      error: (err) => {
+        console.error('Error loading general template details', err);
+        this.toast.error('Failed to load selected report template layout.');
+      }
+    });
+  }
+
+  loadLineTemplate(line: ServiceHistoryLine): void {
+    this.api.getServiceTemplate(line.serviceId).subscribe({
+      next: (res) => {
+        if (res && res.layoutJson) {
+          try {
+            const parsed = typeof res.layoutJson === 'string' ? JSON.parse(res.layoutJson) : res.layoutJson;
+            if (parsed && (parsed.columns || parsed.rows)) {
+              line.template = parsed;
+              this.serviceLines.set([...this.serviceLines()]);
+            }
+          } catch (e) {
+            console.error('Error parsing template layout JSON', e);
+          }
+        }
+      }
+    });
   }
 
   getVisitDeptServicesLabel(v: any): string {

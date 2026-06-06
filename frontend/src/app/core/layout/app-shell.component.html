@@ -162,13 +162,14 @@
           <span class="page-breadcrumb">{{ activePageLabel() }}</span>
         </div>
 
-        <div class="search-box">
-          <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <input type="text" placeholder="Search clinical files..." aria-label="Search files" />
-        </div>
+        @if (currentUser(); as user) {
+          <div class="clinic-name-header">
+            <svg class="clinic-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 21h18M3 10h18M5 6h14a2 2 0 0 1 2 2v13H3V8a2 2 0 0 1 2-2zm5 9v6h4v-6h-4z"/>
+            </svg>
+            <span class="clinic-name">{{ user.tenantName || 'PharmaFlow Clinic' }}</span>
+          </div>
+        }
       </div>
 
       <!-- Live telemetry status and User Profiles -->

@@ -18,7 +18,9 @@ const TENANT_MODELS = new Set([
   'PharmacySale',
   'PharmacyDailyClosure',
   'AuditLog',
-  'Prescription'
+  'Prescription',
+  'GeneralTemplate',
+  'Expense'
 ]);
 
 const isTenantModel = (model: string): boolean => TENANT_MODELS.has(model);

@@ -178,4 +178,143 @@ export class ServicesService {
       });
     }
   }
+
+  // --- General Templates ---
+  async findAllGeneralTemplates(departmentCode?: string) {
+    const whereClause: any = {};
+    if (departmentCode) {
+      whereClause.items = {
+        some: {
+          service: {
+            department: {
+              code: departmentCode.toUpperCase(),
+            },
+          },
+        },
+      };
+    }
+    return this.prisma.generalTemplate.findMany({
+      where: whereClause,
+      include: {
+        items: {
+          include: {
+            service: {
+              include: { department: true }
+            }
+          },
+          orderBy: { sortOrder: 'asc' }
+        }
+      },
+      orderBy: { name: 'asc' }
+    });
+  }
+
+  async findGeneralTemplateById(id: string) {
+    const template = await this.prisma.generalTemplate.findUnique({
+      where: { id },
+      include: {
+        items: {
+          include: {
+            service: {
+              include: { department: true }
+            }
+          },
+          orderBy: { sortOrder: 'asc' }
+        }
+      }
+    });
+    if (!template) {
+      throw new NotFoundException('General Template not found');
+    }
+    return template;
+  }
+
+  async createGeneralTemplate(data: any) {
+    if (!data.name || !Array.isArray(data.serviceIds)) {
+      throw new BadRequestException('Template name and serviceIds list are required');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const template = await tx.generalTemplate.create({
+        data: {
+          name: data.name,
+          isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
+        }
+      });
+
+      for (let i = 0; i < data.serviceIds.length; i++) {
+        await tx.generalTemplateService.create({
+          data: {
+            generalTemplateId: template.id,
+            serviceId: data.serviceIds[i],
+            sortOrder: i,
+          }
+        });
+      }
+
+      return tx.generalTemplate.findUnique({
+        where: { id: template.id },
+        include: {
+          items: {
+            include: { service: true },
+            orderBy: { sortOrder: 'asc' }
+          }
+        }
+      });
+    });
+  }
+
+  async updateGeneralTemplate(id: string, data: any) {
+    const template = await this.prisma.generalTemplate.findUnique({ where: { id } });
+    if (!template) {
+      throw new NotFoundException('General Template not found');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const updateData: any = {};
+      if (data.name !== undefined) updateData.name = data.name;
+      if (data.isActive !== undefined) updateData.isActive = Boolean(data.isActive);
+
+      await tx.generalTemplate.update({
+        where: { id },
+        data: updateData
+      });
+
+      if (Array.isArray(data.serviceIds)) {
+        await tx.generalTemplateService.deleteMany({
+          where: { generalTemplateId: id }
+        });
+
+        for (let i = 0; i < data.serviceIds.length; i++) {
+          await tx.generalTemplateService.create({
+            data: {
+              generalTemplateId: id,
+              serviceId: data.serviceIds[i],
+              sortOrder: i,
+            }
+          });
+        }
+      }
+
+      return tx.generalTemplate.findUnique({
+        where: { id },
+        include: {
+          items: {
+            include: { service: true },
+            orderBy: { sortOrder: 'asc' }
+          }
+        }
+      });
+    });
+  }
+
+  async deleteGeneralTemplate(id: string) {
+    const template = await this.prisma.generalTemplate.findUnique({ where: { id } });
+    if (!template) {
+      throw new NotFoundException('General Template not found');
+    }
+    return this.prisma.generalTemplate.delete({
+      where: { id }
+    });
+  }
 }

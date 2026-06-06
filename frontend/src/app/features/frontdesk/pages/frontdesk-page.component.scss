@@ -981,141 +981,261 @@
   }
 }
 
-/* Receipt Print Preview Styling */
+/* Receipt Print Preview — simulates 80mm thermal POS paper */
 .invoice-print-container {
-  grid-column: 1 / -1; /* Span full width of the parent grid */
-  max-width: 800px;
+  grid-column: 1 / -1;
+  max-width: 340px;
   width: 100%;
   margin: 0 auto;
   background-color: #fff;
-  border: 1px solid var(--app-border-color);
-  border-radius: 1rem;
-  padding: 2.5rem;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+  border: 1px solid #a0aec0;
+  border-radius: 4px;
+  padding: 16px 14px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  color: #000;
+  line-height: 1.45;
+  position: relative;
+
+  /* Paper tear effect top/bottom */
+  &::before, &::after {
+    content: '';
+    display: block;
+    height: 6px;
+    background: repeating-linear-gradient(
+      90deg,
+      transparent 0px, transparent 5px,
+      #e2e8f0 5px, #e2e8f0 6px
+    );
+    margin: 0 -14px;
+  }
+  &::before { margin-bottom: 12px; }
+  &::after { margin-top: 12px; }
 }
 
 .receipt-header {
   text-align: center;
-  border-bottom: 2px solid var(--app-text-color);
-  padding-bottom: 1rem;
-  margin-bottom: 1.5rem;
+  border-bottom: 1px dashed #888;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
 
   h1 {
-    margin: 0;
-    font-size: 1.5rem;
+    margin: 4px 0 2px;
+    font-size: 13px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
-  
+
   p {
-    margin: 0.25rem 0 0;
-    font-size: 0.85rem;
-    color: var(--app-muted-text-color);
+    margin: 2px 0;
+    font-size: 10px;
+    color: #444;
+  }
+
+  img {
+    max-height: 40px;
+    max-width: 150px;
+    object-fit: contain;
+    filter: grayscale(100%);
+    margin-bottom: 4px;
   }
 }
 
 .receipt-meta-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-  font-size: 0.85rem;
+  display: block !important;
+  font-size: 10px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed #888;
+
+  > div { margin-bottom: 2px; }
+
+  strong {
+    display: block;
+    font-size: 9px;
+    text-transform: uppercase;
+    color: #555;
+    margin-top: 6px;
+  }
 }
 
 .receipt-table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 1.5rem;
+  margin-bottom: 8px;
+  font-size: 10px;
+
+  thead tr {
+    border-bottom: 1px dashed #888;
+  }
 
   th, td {
-    padding: 0.6rem;
+    padding: 2px 2px;
     text-align: left;
-    border-bottom: 1px solid var(--app-border-color);
-    font-size: 0.85rem;
+    border-bottom: none;
+    font-size: 10px;
   }
 
   th {
-    font-weight: 700;
-    background-color: #f7fafc;
+    font-weight: bold;
+    background: none;
   }
 
-  .num-col {
-    text-align: right;
+  /* Hide 'Scan Code' and 'Department' columns on screen preview too */
+  th:nth-child(1), td:nth-child(1),
+  th:nth-child(3), td:nth-child(3) {
+    display: none;
   }
+
+  td:last-child, th:last-child { text-align: right; }
 }
 
 .receipt-totals {
   width: 100%;
-  max-width: 320px;
-  margin-left: auto;
-  font-size: 0.85rem;
-  
+  max-width: 100%;
+  font-size: 10px;
+  border-top: 1px dashed #888;
+  padding-top: 4px;
+  margin-bottom: 10px;
+
   .total-line {
     display: flex;
     justify-content: space-between;
-    padding: 0.4rem 0;
-    
-    &.grand {
-      font-weight: 800;
-      border-top: 2px solid var(--app-text-color);
-      font-size: 1.05rem;
-    }
+    padding: 1px 0;
+  }
+
+  .grand {
+    font-weight: 800;
+    border-top: 1px solid #000;
+    padding-top: 2px;
+    margin-top: 2px;
+    font-size: 12px;
   }
 }
 
 .receipt-footer {
   text-align: center;
-  margin-top: 3rem;
-  font-size: 0.75rem;
-  color: var(--app-muted-text-color);
-  border-top: 1px solid var(--app-border-color);
-  padding-top: 1rem;
+  margin-top: 10px;
+  font-size: 9px;
+  color: #555;
+  border-top: 1px dashed #888;
+  padding-top: 6px;
 }
 
-/* Printable media styles */
+
+/* ============================================================
+   THERMAL POS RECEIPT PRINT  — 80mm roll paper
+   ============================================================ */
 @media print {
-  body * {
-    visibility: hidden;
-  }
-  
+  /* --- Hide the entire app shell --- */
+  body > * { visibility: hidden; }
+
+  /* --- Show only the receipt container --- */
   .invoice-print-container,
-  .invoice-print-container * {
-    visibility: visible;
-  }
-  
-  .invoice-print-container {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    border: none;
-    box-shadow: none;
-    padding: 0;
+  .invoice-print-container * { visibility: visible; }
+
+  /* --- Page setup: 80mm wide, auto height (continuous roll) --- */
+  @page {
+    size: 80mm auto;
+    margin: 4mm 3mm;
   }
 
-  /* Compact receipt formatting */
-  .receipt-thermal {
+  /* --- Position receipt at the very top-left --- */
+  .invoice-print-container {
+    position: fixed;
+    left: 0;
+    top: 0;
     width: 80mm;
-    padding: 2mm;
-    font-size: 11px;
-    
-    .receipt-header h1 {
-      font-size: 16px;
-    }
-    
-    .receipt-meta-grid {
-      grid-template-columns: 1fr;
-      gap: 0.25rem;
-    }
-    
-    .receipt-table th, 
-    .receipt-table td {
-      padding: 0.25rem;
-      font-size: 10px;
-    }
-    
-    .receipt-totals {
-      width: 100%;
-    }
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
   }
+
+  /* --- Thermal typography overrides --- */
+  .invoice-print-container {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11px;
+    color: #000;
+    line-height: 1.4;
+  }
+
+  /* Receipt header: centered, compact */
+  .receipt-header {
+    text-align: center;
+    border-bottom: 1px dashed #000;
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+
+    h1 {
+      font-size: 13px;
+      font-weight: bold;
+      margin: 4px 0 2px;
+    }
+
+    p { font-size: 9px; margin: 1px 0; }
+
+    img { max-height: 36px; max-width: 100%; object-fit: contain; filter: grayscale(100%); }
+  }
+
+  /* Meta grid: stack vertically for narrow paper */
+  .receipt-meta-grid {
+    display: block !important;
+    font-size: 9px;
+    margin-bottom: 6px;
+    padding-bottom: 5px;
+    border-bottom: 1px dashed #000;
+
+    > div { margin-bottom: 3px; }
+
+    strong { display: block; font-size: 8px; text-transform: uppercase; color: #555; }
+  }
+
+  /* Items table */
+  .receipt-table {
+    font-size: 9px;
+    margin-bottom: 6px;
+
+    thead tr { background: none !important; border-bottom: 1px dashed #000; }
+    th, td { padding: 2px 1px; border-bottom: none; }
+    th { font-weight: bold; background: none !important; }
+
+    /* Hide 'Scan Code' and 'Department' columns to save space */
+    th:nth-child(1), td:nth-child(1),
+    th:nth-child(3), td:nth-child(3) { display: none; }
+  }
+
+  /* Totals */
+  .receipt-totals {
+    width: 100% !important;
+    max-width: 100% !important;
+    font-size: 10px;
+    border-top: 1px dashed #000;
+    padding-top: 4px;
+
+    .total-line { padding: 1px 0; }
+    .grand { font-size: 12px; border-top: 1px solid #000; padding-top: 3px; }
+  }
+
+  /* Signature block: hide on thermal */
+  .invoice-print-container > div[style*="grid-template-columns: 1fr 1fr"] {
+    display: none !important;
+  }
+
+  /* Footer */
+  .receipt-footer {
+    text-align: center;
+    font-size: 9px;
+    margin-top: 8px;
+    border-top: 1px dashed #000;
+    padding-top: 6px;
+  }
+
+  /* Hide print button and other non-print elements */
+  .no-print { display: none !important; }
 }
 
 /* Premium Table Styles for Frontdesk Workspace */

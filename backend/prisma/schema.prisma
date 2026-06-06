@@ -14,6 +14,14 @@ model Tenant {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  logo             String?
+  tagline          String?
+  location         String?
+  phone            String?
+  email            String?
+  tollFree         String?
+  labEmail         String?
+  accreditationId  String?
 
   users            User[]
   patients         Patient[]
@@ -27,6 +35,8 @@ model Tenant {
   prescriptions    Prescription[]
   auditLogs        AuditLog[]
   closures         PharmacyDailyClosure[]
+  generalTemplates GeneralTemplate[]
+  expenses         Expense[]
 }
 
 model Department {
@@ -63,11 +73,15 @@ model User {
   auditLogs             AuditLog[]              @relation("AuditActor")
   paymentsReceived      ClinicPayment[]         @relation("CashierUser")
   pharmacyClosures      PharmacyDailyClosure[]  @relation("PharmacyClosedBy")
+  pharmacyOpenedClosures PharmacyDailyClosure[] @relation("PharmacyOpenedBy")
   pharmacySales         PharmacySale[]          @relation("PharmacySoldBy")
   stockMovementsCreated PharmacyStockMovement[] @relation("StockMovementCreatedBy")
   prescriptionsCreated  Prescription[]          @relation("PrescriptionCreatedBy")
   visitsCreated         Visit[]                 @relation("FrontdeskUser")
   resultsEntered        VisitResult[]           @relation("ResultEnteredBy")
+  voidedClinicPayments  ClinicPayment[]         @relation("ClinicPaymentVoidedBy")
+  voidedPharmacySales  PharmacySale[]          @relation("PharmacySaleVoidedBy")
+  expensesCreated       Expense[]               @relation("ExpenseCreatedBy")
 
   @@unique([tenantId, username])
 }
@@ -132,6 +146,7 @@ model Service {
   department    Department              @relation(fields: [departmentId], references: [id])
   templates     ServiceResultTemplate[]
   visitServices VisitService[]
+  generalTemplateItems GeneralTemplateService[]
 }
 
 model VisitService {
@@ -222,9 +237,14 @@ model ClinicPayment {
   createdAt        DateTime      @default(now())
   invoiceId        String
   receivedByUserId String
+  status           String        @default("paid")
+  voidReason       String?
+  voidedByUserId   String?
+  voidedAt         DateTime?
   tenantId         String?
   tenant           Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   receivedByUser   User          @relation("CashierUser", fields: [receivedByUserId], references: [id])
+  voidedByUser     User?         @relation("ClinicPaymentVoidedBy", fields: [voidedByUserId], references: [id])
   invoice          ClinicInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 }
 
@@ -292,10 +312,14 @@ model PharmacySale {
   prescriptionId String?
   soldByUserId   String
   closureId      String?
+  voidReason     String?
+  voidedByUserId String?
+  voidedAt       DateTime?
   tenantId       String?
   tenant         Tenant?               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   closure        PharmacyDailyClosure? @relation("PharmacyClosureSales", fields: [closureId], references: [id])
   soldByUser     User                  @relation("PharmacySoldBy", fields: [soldByUserId], references: [id])
+  voidedByUser   User?                 @relation("PharmacySaleVoidedBy", fields: [voidedByUserId], references: [id])
   prescription   Prescription?         @relation(fields: [prescriptionId], references: [id])
   visit          Visit?                @relation(fields: [visitId], references: [id])
   items          PharmacySaleItem[]
@@ -334,19 +358,63 @@ model AuditLog {
 
 model PharmacyDailyClosure {
   id               String         @id @default(uuid())
-  closedByUserId   String
-  closureDate      DateTime       @default(now())
-  totalSalesCount  Int
-  totalSalesAmount Decimal
-  cashCounted      Decimal
-  momoCounted      Decimal
-  totalCounted     Decimal
-  discrepancy      Decimal
+  openedByUserId   String
+  closedByUserId   String?
+  closureDate      DateTime?
+  totalSalesCount  Int?
+  totalSalesAmount Decimal?
+  openingFloat     Decimal        @default(0.00)
+  cashCounted      Decimal?
+  momoCounted      Decimal?
+  totalCounted     Decimal?
+  discrepancy      Decimal?
   notes            String?
+  status           String         @default("open")
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   tenantId         String?
   tenant           Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  closedByUser     User           @relation("PharmacyClosedBy", fields: [closedByUserId], references: [id])
+  openedByUser     User           @relation("PharmacyOpenedBy", fields: [openedByUserId], references: [id])
+  closedByUser     User?          @relation("PharmacyClosedBy", fields: [closedByUserId], references: [id])
   sales            PharmacySale[] @relation("PharmacyClosureSales")
 }
+
+model GeneralTemplate {
+  id        String                   @id @default(uuid())
+  name      String
+  isActive  Boolean                  @default(true)
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+  tenantId  String?
+  tenant    Tenant?                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items     GeneralTemplateService[]
+
+  @@unique([tenantId, name])
+}
+
+model GeneralTemplateService {
+  id                String          @id @default(uuid())
+  generalTemplateId String
+  serviceId         String
+  sortOrder         Int             @default(0)
+  generalTemplate   GeneralTemplate @relation(fields: [generalTemplateId], references: [id], onDelete: Cascade)
+  service           Service         @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([generalTemplateId, serviceId])
+}
+
+model Expense {
+  id            String   @id @default(uuid())
+  title         String
+  category      String
+  amount        Decimal
+  expenseDate   DateTime @default(now())
+  notes         String?
+  createdById   String
+  createdByUser User     @relation("ExpenseCreatedBy", fields: [createdById], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  tenantId      String?
+  tenant        Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+

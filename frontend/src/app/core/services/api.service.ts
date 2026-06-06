@@ -220,22 +220,26 @@ export class ApiService {
   }
 
   // --- Reports ---
-  getClinicStream(startDate?: string, endDate?: string): Observable<any[]> {
+  getClinicStream(startDate?: string, endDate?: string, page?: number, limit?: number): Observable<any> {
     let url = `${API_URL}/reports/clinic`;
     const params = [];
     if (startDate) params.push(`startDate=${startDate}`);
     if (endDate) params.push(`endDate=${endDate}`);
+    if (page !== undefined) params.push(`page=${page}`);
+    if (limit !== undefined) params.push(`limit=${limit}`);
     if (params.length > 0) url += `?${params.join('&')}`;
-    return this.http.get<any[]>(url);
+    return this.http.get<any>(url);
   }
 
-  getPharmacyStream(startDate?: string, endDate?: string): Observable<any[]> {
+  getPharmacyStream(startDate?: string, endDate?: string, page?: number, limit?: number): Observable<any> {
     let url = `${API_URL}/reports/pharmacy`;
     const params = [];
     if (startDate) params.push(`startDate=${startDate}`);
     if (endDate) params.push(`endDate=${endDate}`);
+    if (page !== undefined) params.push(`page=${page}`);
+    if (limit !== undefined) params.push(`limit=${limit}`);
     if (params.length > 0) url += `?${params.join('&')}`;
-    return this.http.get<any[]>(url);
+    return this.http.get<any>(url);
   }
 
   getCombinedSummary(startDate?: string, endDate?: string): Observable<any> {
@@ -283,6 +287,69 @@ export class ApiService {
 
   updateSettings(data: any): Observable<any> {
     return this.http.post<any>(`${API_URL}/settings`, data);
+  }
+
+  // --- General Templates ---
+  getGeneralTemplates(departmentCode?: string): Observable<any[]> {
+    let url = `${API_URL}/general-templates`;
+    if (departmentCode) {
+      url += `?department=${departmentCode}`;
+    }
+    return this.http.get<any[]>(url);
+  }
+
+  getGeneralTemplate(id: string): Observable<any> {
+    return this.http.get<any>(`${API_URL}/general-templates/${id}`);
+  }
+
+  createGeneralTemplate(data: any): Observable<any> {
+    return this.http.post<any>(`${API_URL}/general-templates`, data);
+  }
+
+  updateGeneralTemplate(id: string, data: any): Observable<any> {
+    return this.http.put<any>(`${API_URL}/general-templates/${id}`, data);
+  }
+
+  deleteGeneralTemplate(id: string): Observable<any> {
+    return this.http.delete<any>(`${API_URL}/general-templates/${id}`);
+  }
+
+  // --- Expenses ---
+  getExpenses(startDate?: string, endDate?: string, page?: number, limit?: number): Observable<any> {
+    let url = `${API_URL}/expenses`;
+    const params = [];
+    if (startDate) params.push(`startDate=${startDate}`);
+    if (endDate) params.push(`endDate=${endDate}`);
+    if (page !== undefined) params.push(`page=${page}`);
+    if (limit !== undefined) params.push(`limit=${limit}`);
+    if (params.length > 0) url += `?${params.join('&')}`;
+    return this.http.get<any>(url);
+  }
+
+  createExpense(data: any): Observable<any> {
+    return this.http.post<any>(`${API_URL}/expenses`, data);
+  }
+
+  deleteExpense(id: string): Observable<any> {
+    return this.http.delete<any>(`${API_URL}/expenses/${id}`);
+  }
+
+  // --- Financial Integrity / Voids ---
+  voidClinicPayment(id: string, reason: string): Observable<any> {
+    return this.http.post<any>(`${API_URL}/reports/clinic/${id}/void`, { reason });
+  }
+
+  voidPharmacySale(id: string, reason: string): Observable<any> {
+    return this.http.post<any>(`${API_URL}/reports/pharmacy/${id}/void`, { reason });
+  }
+
+  // --- Register Sessions ---
+  getActiveSession(): Observable<any> {
+    return this.http.get<any>(`${API_URL}/pharmacy/sessions/active`);
+  }
+
+  openSession(openingFloat: number): Observable<any> {
+    return this.http.post<any>(`${API_URL}/pharmacy/sessions/open`, { openingFloat });
   }
 }
 

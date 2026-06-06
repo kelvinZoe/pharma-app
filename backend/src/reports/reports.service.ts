@@ -1,45 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ReportsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getClinicStream(startDate?: string, endDate?: string) {
-    const whereClause: any = {};
-    if (startDate || endDate) {
-      whereClause.paidAt = {};
-      if (startDate) {
-        whereClause.paidAt.gte = new Date(startDate);
-      }
-      if (endDate) {
-        whereClause.paidAt.lte = new Date(endDate);
-      }
-    }
-
-    return this.prisma.clinicPayment.findMany({
-      where: {
-        paidAt: whereClause.paidAt,
-      },
-      include: {
-        invoice: {
-          include: {
-            visit: {
-              include: { patient: true },
-            },
-          },
-        },
-        receivedByUser: {
-          select: { fullName: true, username: true },
-        },
-      },
-      orderBy: { paidAt: 'desc' },
-    });
-  }
-
-  async getPharmacyStream(startDate?: string, endDate?: string) {
+  async getClinicStream(startDate?: string, endDate?: string, page?: number, limit?: number) {
     const whereClause: any = {
-      status: 'paid',
+      status: { not: 'voided' },
     };
     if (startDate || endDate) {
       whereClause.paidAt = {};
@@ -51,30 +19,94 @@ export class ReportsService {
       }
     }
 
-    return this.prisma.pharmacySale.findMany({
+    const findOptions: any = {
+      where: whereClause,
+      include: {
+        invoice: {
+          include: {
+            visit: {
+              include: { patient: true },
+            },
+          },
+        },
+        receivedByUser: {
+          select: { fullName: true, username: true },
+        },
+        voidedByUser: {
+          select: { fullName: true, username: true },
+        },
+      },
+      orderBy: { paidAt: 'desc' },
+    };
+
+    if (page !== undefined && limit !== undefined) {
+      findOptions.skip = (page - 1) * limit;
+      findOptions.take = limit;
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.clinicPayment.findMany(findOptions),
+      this.prisma.clinicPayment.count({ where: whereClause }),
+    ]);
+
+    return page !== undefined ? { data, total, page, limit } : data;
+  }
+
+  async getPharmacyStream(startDate?: string, endDate?: string, page?: number, limit?: number) {
+    const whereClause: any = {
+      status: { not: 'voided' },
+    };
+    if (startDate || endDate) {
+      whereClause.paidAt = {};
+      if (startDate) {
+        whereClause.paidAt.gte = new Date(startDate);
+      }
+      if (endDate) {
+        whereClause.paidAt.lte = new Date(endDate);
+      }
+    }
+
+    const findOptions: any = {
       where: whereClause,
       include: {
         soldByUser: {
           select: { fullName: true, username: true },
         },
+        voidedByUser: {
+          select: { fullName: true, username: true },
+        },
         visit: {
           include: { patient: true },
         },
+        items: true,
       },
       orderBy: { paidAt: 'desc' },
-    });
+    };
+
+    if (page !== undefined && limit !== undefined) {
+      findOptions.skip = (page - 1) * limit;
+      findOptions.take = limit;
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.pharmacySale.findMany(findOptions),
+      this.prisma.pharmacySale.count({ where: whereClause }),
+    ]);
+
+    return page !== undefined ? { data, total, page, limit } : data;
   }
 
   async getCombinedSummary(startDate?: string, endDate?: string) {
-    const clinicPayments = await this.getClinicStream(startDate, endDate);
-    const pharmacySales = await this.getPharmacyStream(startDate, endDate);
+    // Fetch all for summary calculations
+    const clinicPayments = (await this.getClinicStream(startDate, endDate)) as any[];
+    const pharmacySales = (await this.getPharmacyStream(startDate, endDate)) as any[];
 
     // Sum totals
     const clinicTotal = clinicPayments.reduce((sum, p) => sum + Number(p.amount), 0);
     const pharmacyTotal = pharmacySales.reduce((sum, s) => sum + Number(s.total), 0);
     const combinedTotal = clinicTotal + pharmacyTotal;
 
-    // Breakdown by payment method
+    // Breakdown by payment method (excluding voided)
     let clinicCash = 0;
     let clinicMomo = 0;
     clinicPayments.forEach((p) => {
@@ -88,6 +120,59 @@ export class ReportsService {
       if (s.paymentMethod === 'cash') pharmacyCash += Number(s.total);
       else pharmacyMomo += Number(s.total);
     });
+
+    // 7-day Daily combined revenue chart data points
+    const chartData: any[] = [];
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+      const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+
+      const dayPayments = clinicPayments.filter(
+        (p) => new Date(p.paidAt) >= startOfDay && new Date(p.paidAt) <= endOfDay,
+      );
+      const daySales = pharmacySales.filter(
+        (s) => new Date(s.paidAt) >= startOfDay && new Date(s.paidAt) <= endOfDay,
+      );
+
+      const dayPaymentsTotal = dayPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+      const daySalesTotal = daySales.reduce((sum, s) => sum + Number(s.total), 0);
+
+      chartData.push({
+        label: days[d.getDay()],
+        date: d.toISOString().split('T')[0],
+        total: dayPaymentsTotal + daySalesTotal,
+      });
+    }
+
+    // Expense calculations
+    const manualExpenses = await this.prisma.expense.findMany({
+      where: {
+        expenseDate: {
+          gte: startDate ? new Date(startDate) : undefined,
+          lte: endDate ? new Date(endDate) : undefined,
+        },
+      },
+    });
+    const manualExpensesTotal = manualExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+
+    const batches = await this.prisma.pharmacyBatch.findMany({
+      where: {
+        createdAt: {
+          gte: startDate ? new Date(startDate) : undefined,
+          lte: endDate ? new Date(endDate) : undefined,
+        },
+      },
+    });
+    const inventoryExpensesTotal = batches.reduce(
+      (sum, b) => sum + Number(b.purchasePrice) * b.quantityReceived,
+      0,
+    );
+
+    const totalExpenses = manualExpensesTotal + inventoryExpensesTotal;
+    const netProfit = combinedTotal - totalExpenses;
 
     // Expiry & Stock warnings
     const products = await this.prisma.pharmacyProduct.findMany({
@@ -144,6 +229,11 @@ export class ReportsService {
       expiryAlertsCount: expiryAlerts.length,
       lowStockAlerts: lowStockAlerts.slice(0, 10), // return top 10
       expiryAlerts: expiryAlerts.slice(0, 10), // return top 10
+      chartData,
+      manualExpensesTotal,
+      inventoryExpensesTotal,
+      totalExpenses,
+      netProfit,
     };
   }
 
@@ -276,7 +366,7 @@ export class ReportsService {
       });
       recentClosures.forEach((c) => {
         activities.push({
-          title: `Daily financial export completed by ${c.closedByUser.fullName}`,
+          title: `Daily financial export completed by ${c.closedByUser?.fullName || 'N/A'}`,
           time: this.getRelativeTime(c.createdAt),
           status: 'info',
           statusLabel: 'Export',
@@ -818,6 +908,160 @@ export class ReportsService {
       completionPercent,
       activities: finalActivities,
     };
+  }
+
+  async voidClinicPayment(id: string, userId: string, reason: string) {
+    if (!reason) {
+      throw new BadRequestException('Void reason is required');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const payment = await tx.clinicPayment.findUnique({
+        where: { id },
+        include: { invoice: true },
+      });
+
+      if (!payment) {
+        throw new NotFoundException('Clinic payment not found');
+      }
+
+      if (payment.status === 'voided') {
+        throw new BadRequestException('Payment is already voided');
+      }
+
+      // 1. Update payment status
+      const updatedPayment = await tx.clinicPayment.update({
+        where: { id },
+        data: {
+          status: 'voided',
+          voidReason: reason,
+          voidedByUserId: userId,
+          voidedAt: new Date(),
+        },
+      });
+
+      // 2. Adjust invoice amounts
+      const newPaid = Number(payment.invoice.amountPaid) - Number(payment.amount);
+      const newDue = Number(payment.invoice.balanceDue) + Number(payment.amount);
+      const newStatus = newPaid <= 0 ? 'unpaid' : 'partially_paid';
+
+      await tx.clinicInvoice.update({
+        where: { id: payment.invoiceId },
+        data: {
+          amountPaid: newPaid,
+          balanceDue: newDue,
+          status: newStatus,
+        },
+      });
+
+      // 3. Update associated visit status
+      await tx.visit.update({
+        where: { id: payment.invoice.visitId },
+        data: {
+          status: 'completed', // revert from 'paid' back to completed
+        },
+      });
+
+      // 4. Log audit event
+      await tx.auditLog.create({
+        data: {
+          actionType: 'update',
+          entityType: 'clinic_payment_void',
+          entityId: id,
+          afterData: JSON.stringify({ voidReason: reason, voidedByUserId: userId }),
+          actorUserId: userId,
+        },
+      });
+
+      return updatedPayment;
+    });
+  }
+
+  async voidPharmacySale(id: string, userId: string, reason: string) {
+    if (!reason) {
+      throw new BadRequestException('Void reason is required');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const sale = await tx.pharmacySale.findUnique({
+        where: { id },
+        include: { items: true },
+      });
+
+      if (!sale) {
+        throw new NotFoundException('Pharmacy sale not found');
+      }
+
+      if (sale.status === 'voided') {
+        throw new BadRequestException('Sale is already voided');
+      }
+
+      // 1. Update sale status
+      const updatedSale = await tx.pharmacySale.update({
+        where: { id },
+        data: {
+          status: 'voided',
+          voidReason: reason,
+          voidedByUserId: userId,
+          voidedAt: new Date(),
+        },
+      });
+
+      // 2. Restock medicine items back into batches
+      for (const item of sale.items) {
+        if (item.batchId) {
+          const batch = await tx.pharmacyBatch.findUnique({
+            where: { id: item.batchId },
+          });
+
+          if (batch) {
+            // Replenish quantity remaining
+            await tx.pharmacyBatch.update({
+              where: { id: item.batchId },
+              data: {
+                quantityRemaining: batch.quantityRemaining + item.quantity,
+              },
+            });
+
+            // Log restocking stock movement
+            await tx.pharmacyStockMovement.create({
+              data: {
+                productId: item.productId,
+                batchId: item.batchId,
+                movementType: 'void_restock',
+                quantity: item.quantity,
+                unitCost: item.unitPrice,
+                createdByUserId: userId,
+                referenceId: `VOID-${sale.saleNumber}`,
+              },
+            });
+          }
+        }
+      }
+
+      // 3. Revert prescription status back to active if referred
+      if (sale.prescriptionId) {
+        await tx.prescription.update({
+          where: { id: sale.prescriptionId },
+          data: {
+            status: 'active',
+          },
+        });
+      }
+
+      // 4. Log audit event
+      await tx.auditLog.create({
+        data: {
+          actionType: 'update',
+          entityType: 'pharmacy_sale_void',
+          entityId: id,
+          afterData: JSON.stringify({ voidReason: reason, voidedByUserId: userId }),
+          actorUserId: userId,
+        },
+      });
+
+      return updatedSale;
+    });
   }
 }
 

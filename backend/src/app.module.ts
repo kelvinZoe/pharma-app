@@ -13,6 +13,7 @@ import { ReportsModule } from './reports/reports.module';
 import { SettingsModule } from './settings/settings.module';
 import { EmailModule } from './common/email/email.module';
 import { TenantMiddleware } from './common/multitenancy/tenant.middleware';
+import { ExpensesModule } from './expenses/expenses.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { TenantMiddleware } from './common/multitenancy/tenant.middleware';
     ReportsModule,
     SettingsModule,
     EmailModule,
+    ExpensesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

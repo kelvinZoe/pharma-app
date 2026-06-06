@@ -349,48 +349,33 @@
   }
 }
 
-.search-box {
-  position: relative;
+.clinic-name-header {
   display: flex;
   align-items: center;
-  width: min(24rem, 100%);
+  gap: 0.55rem;
+  background: var(--app-primary-soft-color);
+  border: 1px solid color-mix(in srgb, var(--app-primary-color), white 85%);
+  padding: 0.45rem 0.95rem;
+  border-radius: 0.6rem;
+  max-width: 24rem;
+  color: var(--app-primary-color);
+  font-weight: 750;
+  font-size: 0.88rem;
   margin-left: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.01);
 
-  .search-icon {
-    position: absolute;
-    left: 0.95rem;
-    width: 1rem;
-    height: 1rem;
-    color: var(--app-muted-text-color);
-    pointer-events: none;
+  .clinic-icon {
+    width: 1.05rem;
+    height: 1.05rem;
+    stroke-width: 2.2;
+    flex-shrink: 0;
   }
 
-  input {
-    width: 100%;
-    min-height: 2.3rem;
-    background: var(--app-bg-color);
-    border: 1px solid var(--app-border-color);
-    border-radius: 0.55rem;
-    padding: 0.4rem 0.9rem 0.4rem 2.3rem;
-    font-size: 0.86rem;
-    font-weight: 550;
-    outline: none;
-    color: var(--app-text-color);
-    transition: all 0.15s ease;
-
-    &::placeholder {
-      color: var(--app-muted-text-color);
-    }
-
-    &:hover {
-      border-color: #cbd5e1;
-    }
-
-    &:focus {
-      background: #ffffff;
-      border-color: var(--app-primary-color);
-      box-shadow: 0 0 0 3px rgba(13, 148, 216, 0.06);
-    }
+  .clinic-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    letter-spacing: -0.2px;
   }
 }
 
@@ -601,9 +586,9 @@
     }
   }
 
-  .search-box {
+  .clinic-name-header {
     margin-left: 0.5rem;
-    width: 100%;
+    max-width: 15rem;
   }
 
   .live-status {

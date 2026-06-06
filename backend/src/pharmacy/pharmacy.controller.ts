@@ -43,7 +43,17 @@ export class PharmacyController {
 
   @Post('sales/close')
   async closeSales(@Req() req: any, @Body() body: any) {
-    return this.pharmacyService.closeSalesSession(req.user.id, body);
+    return this.pharmacyService.closeSession(req.user.id, body);
+  }
+
+  @Get('sessions/active')
+  async getActiveSession(@Req() req: any) {
+    return this.pharmacyService.findActiveSession(req.user.id);
+  }
+
+  @Post('sessions/open')
+  async openSession(@Req() req: any, @Body('openingFloat') openingFloat: number) {
+    return this.pharmacyService.openSession(req.user.id, openingFloat);
   }
 
   @Get('closures')

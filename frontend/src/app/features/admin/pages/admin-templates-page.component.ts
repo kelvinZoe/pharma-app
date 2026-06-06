@@ -320,18 +320,36 @@ interface ServiceItem {
 
       <!-- No Service Selected Placeholder -->
       <ng-template #selectServicePlaceholder>
-        <div style="background: #fff; border: 1px solid var(--slate-300); border-radius: 0.5rem; min-height: 360px;">
-          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: var(--slate-400); padding: 4rem 1.5rem; flex: 1;">
-            <div style="background-color: var(--slate-50); border: 1.5px solid var(--slate-200); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem;">
-              <svg viewBox="0 0 24 24" style="width: 2.25rem; height: 2.25rem; color: var(--slate-300); stroke: currentColor; fill: none; stroke-width: 2;"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+        <div style="background: #fff; border: 1px solid var(--slate-300); border-radius: 0.5rem; min-height: 360px; display: flex; align-items: center; justify-content: center; width: 100%;">
+          
+          <ng-container *ngIf="loadingList(); else noWorkspaceActive">
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: var(--slate-400); padding: 4rem 1.5rem;">
+              <div style="border: 3px solid #e2e8f0; border-top: 3px solid var(--teal-600); border-radius: 50%; width: 32px; height: 32px; animation: spin-loader-builder 0.8s linear infinite; margin-bottom: 1.25rem;"></div>
+              <style>
+                @keyframes spin-loader-builder {
+                  0% { transform: rotate(0deg); }
+                  100% { transform: rotate(360deg); }
+                }
+              </style>
+              <h3 style="color: var(--slate-700); margin: 0 0 0.5rem; font-size: 1.05rem; font-weight: 800;">Loading Services...</h3>
+              <p style="font-size: 0.85rem; max-width: 320px; line-height: 1.5; margin: 0;">Please wait while we fetch the clinical service catalog.</p>
             </div>
-            <h3 style="color: var(--slate-700); margin: 0 0 0.5rem; font-size: 1.05rem; font-weight: 800;">
-              No Workspace Active
-            </h3>
-            <p style="font-size: 0.85rem; max-width: 320px; line-height: 1.5; margin: 0;">
-              Select a clinical service from the dropdown above to design its result report template.
-            </p>
-          </div>
+          </ng-container>
+
+          <ng-template #noWorkspaceActive>
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: var(--slate-400); padding: 4rem 1.5rem; flex: 1;">
+              <div style="background-color: var(--slate-50); border: 1.5px solid var(--slate-200); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem;">
+                <svg viewBox="0 0 24 24" style="width: 2.25rem; height: 2.25rem; color: var(--slate-300); stroke: currentColor; fill: none; stroke-width: 2;"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+              </div>
+              <h3 style="color: var(--slate-700); margin: 0 0 0.5rem; font-size: 1.05rem; font-weight: 800;">
+                No Workspace Active
+              </h3>
+              <p style="font-size: 0.85rem; max-width: 320px; line-height: 1.5; margin: 0;">
+                Select a clinical service from the dropdown above to design its result report template.
+              </p>
+            </div>
+          </ng-template>
+          
         </div>
       </ng-template>
 

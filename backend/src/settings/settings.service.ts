@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import * as fs from 'fs';
-import * as path from 'path';
+import { Injectable, BadRequestException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { TenantContextService } from '../common/multitenancy/tenant-context.service';
 
 export interface ClinicSettings {
   clinicName: string;
@@ -11,11 +11,12 @@ export interface ClinicSettings {
   tollFree: string;
   labEmail: string;
   accreditationId: string;
+  logo?: string;
 }
 
 @Injectable()
 export class SettingsService {
-  private readonly filePath = path.join(process.cwd(), 'clinic-settings.json');
+  constructor(private readonly prisma: PrismaService) {}
 
   private readonly defaultSettings: ClinicSettings = {
     clinicName: 'KELVIN CLINICAL DIAGNOSTICS & PHARMACY',
@@ -28,36 +29,84 @@ export class SettingsService {
     accreditationId: 'KPL-2026-991A',
   };
 
-  getSettings(): ClinicSettings {
-    if (!fs.existsSync(this.filePath)) {
-      try {
-        fs.writeFileSync(this.filePath, JSON.stringify(this.defaultSettings, null, 2), 'utf-8');
-      } catch (e) {
-        console.error('Failed to create default clinic settings file', e);
-      }
-      return this.defaultSettings;
+  async getSettings(): Promise<ClinicSettings> {
+    const tenantId = TenantContextService.getTenantId();
+    if (!tenantId) {
+      return {
+        clinicName: '',
+        tagline: '',
+        location: '',
+        phone: '',
+        email: '',
+        tollFree: '',
+        labEmail: '',
+        accreditationId: '',
+      };
     }
 
-    try {
-      const content = fs.readFileSync(this.filePath, 'utf-8');
-      const parsed = JSON.parse(content);
-      return { ...this.defaultSettings, ...parsed };
-    } catch (e) {
-      console.error('Failed to parse clinic settings, returning defaults', e);
-      return this.defaultSettings;
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      return {
+        clinicName: '',
+        tagline: '',
+        location: '',
+        phone: '',
+        email: '',
+        tollFree: '',
+        labEmail: '',
+        accreditationId: '',
+      };
     }
+
+    return {
+      clinicName: tenant.name,
+      tagline: tenant.tagline || '',
+      location: tenant.location || '',
+      phone: tenant.phone || '',
+      email: tenant.email || '',
+      tollFree: tenant.tollFree || '',
+      labEmail: tenant.labEmail || '',
+      accreditationId: tenant.accreditationId || '',
+      logo: tenant.logo || undefined,
+    };
   }
 
-  saveSettings(settings: Partial<ClinicSettings>): ClinicSettings {
-    const current = this.getSettings();
-    const updated = { ...current, ...settings };
-    
-    try {
-      fs.writeFileSync(this.filePath, JSON.stringify(updated, null, 2), 'utf-8');
-    } catch (e) {
-      console.error('Failed to save clinic settings', e);
+  async saveSettings(settings: Partial<ClinicSettings>): Promise<ClinicSettings> {
+    const tenantId = TenantContextService.getTenantId();
+    if (!tenantId) {
+      throw new BadRequestException('No tenant context');
     }
-    
-    return updated;
+
+    const updateData: any = {};
+    if (settings.clinicName !== undefined) updateData.name = settings.clinicName;
+    if (settings.tagline !== undefined) updateData.tagline = settings.tagline;
+    if (settings.location !== undefined) updateData.location = settings.location;
+    if (settings.phone !== undefined) updateData.phone = settings.phone;
+    if (settings.email !== undefined) updateData.email = settings.email;
+    if (settings.tollFree !== undefined) updateData.tollFree = settings.tollFree;
+    if (settings.labEmail !== undefined) updateData.labEmail = settings.labEmail;
+    if (settings.accreditationId !== undefined) updateData.accreditationId = settings.accreditationId;
+    if (settings.logo !== undefined) updateData.logo = settings.logo;
+
+    const tenant = await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: updateData,
+    });
+
+    return {
+      clinicName: tenant.name,
+      tagline: tenant.tagline || '',
+      location: tenant.location || '',
+      phone: tenant.phone || '',
+      email: tenant.email || '',
+      tollFree: tenant.tollFree || '',
+      labEmail: tenant.labEmail || '',
+      accreditationId: tenant.accreditationId || '',
+      logo: tenant.logo || undefined,
+    };
   }
 }
+

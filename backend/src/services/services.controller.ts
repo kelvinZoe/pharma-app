@@ -61,6 +61,35 @@ export class ServicesController {
     return this.servicesService.saveTemplate(serviceId, body);
   }
 
+  // --- General Templates ---
+  @Get('general-templates')
+  async getGeneralTemplates(@Query('department') department?: string) {
+    return this.servicesService.findAllGeneralTemplates(department);
+  }
+
+  @Get('general-templates/:id')
+  async getGeneralTemplate(@Param('id') id: string) {
+    return this.servicesService.findGeneralTemplateById(id);
+  }
+
+  @Post('general-templates')
+  async createGeneralTemplate(@Req() req: any, @Body() body: any) {
+    this.ensureAdmin(req.user);
+    return this.servicesService.createGeneralTemplate(body);
+  }
+
+  @Put('general-templates/:id')
+  async updateGeneralTemplate(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    this.ensureAdmin(req.user);
+    return this.servicesService.updateGeneralTemplate(id, body);
+  }
+
+  @Delete('general-templates/:id')
+  async deleteGeneralTemplate(@Req() req: any, @Param('id') id: string) {
+    this.ensureAdmin(req.user);
+    return this.servicesService.deleteGeneralTemplate(id);
+  }
+
   private ensureAdmin(user: any) {
     if (!user || user.role !== 0) {
       throw new ForbiddenException('Only admin accounts can perform setup actions');

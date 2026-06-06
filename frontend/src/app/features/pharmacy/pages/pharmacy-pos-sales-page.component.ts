@@ -252,8 +252,11 @@ interface CartItem {
       <div class="panel" *ngIf="showThermalClosureSlip() && completedClosure()" style="justify-content: center; align-items: center; background: transparent; border: none; box-shadow: none; padding: 0;">
         <div class="pharmacy-receipt-thermal" style="width: 76mm; border: 1px solid #a0aec0;">
           <div class="header">
+            <div style="display: flex; justify-content: center; margin-bottom: 0.25rem;" *ngIf="settings()?.logo">
+              <img [src]="settings().logo" alt="Clinic Logo" style="max-height: 40px; max-width: 140px; object-fit: contain; filter: grayscale(100%);" />
+            </div>
             <h2>SHIFT CLOSURE SLIP</h2>
-            <p>ANTIGRAVITY CLINICAL PHARMACY</p>
+            <p>{{ settings()?.clinicName || 'ANTIGRAVITY CLINICAL PHARMACY' }}</p>
             <p>Drawer Reconciled & Shift Terminated</p>
           </div>
           
@@ -405,9 +408,12 @@ interface CartItem {
       <!-- Thermal Receipt Print View -->
       <div class="pharmacy-receipt-thermal" *ngIf="showThermalReceipt()">
         <div class="header">
-          <h2>ANTIGRAVITY PHARMACY</h2>
-          <p>Separate Pharmacy Inventory & diagnostics Care</p>
-          <p>Phone: +233 24 123 4567 • Accra</p>
+          <div style="display: flex; justify-content: center; margin-bottom: 0.25rem;" *ngIf="settings()?.logo">
+            <img [src]="settings().logo" alt="Clinic Logo" style="max-height: 40px; max-width: 140px; object-fit: contain; filter: grayscale(100%);" />
+          </div>
+          <h2>{{ settings()?.clinicName || 'ANTIGRAVITY PHARMACY' }}</h2>
+          <p>{{ settings()?.tagline || 'Separate Pharmacy Inventory & diagnostics Care' }}</p>
+          <p>Phone: {{ settings()?.phone || '+233 24 123 4567' }} • {{ settings()?.location || 'Accra' }}</p>
         </div>
         
         <div class="meta">
@@ -477,6 +483,7 @@ interface CartItem {
 })
 export class PharmacyPosSalesPageComponent implements OnInit {
   private readonly api = inject(ApiService);
+  readonly settings = signal<any>(null);
 
   readonly activeTab = signal<'walk_in' | 'referred' | 'end_of_day'>('walk_in');
   readonly products = signal<any[]>([]);
@@ -571,6 +578,14 @@ export class PharmacyPosSalesPageComponent implements OnInit {
         this.prescriptions.set(res);
       },
       error: (err) => console.error('Error fetching prescriptions queue', err)
+    });
+
+    // Fetch settings
+    this.api.getSettings().subscribe({
+      next: (res) => {
+        this.settings.set(res);
+      },
+      error: (err) => console.error('Error fetching settings', err)
     });
   }
 

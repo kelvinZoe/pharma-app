@@ -19,6 +19,7 @@ const MENUS: Record<string, readonly SidebarItem[]> = {
     { label: 'Users & Roles', path: '/admin/users', icon: 'users' },
     { label: 'Service Setup', path: '/admin/services', icon: 'services' },
     { label: 'Template Builder', path: '/admin/templates', icon: 'results' },
+    { label: 'General Templates', path: '/admin/general-templates', icon: 'reports' },
     { label: 'Financial Summary', path: '/admin/financials', icon: 'financials' }
   ],
   frontdesk: [

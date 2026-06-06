@@ -520,3 +520,35 @@
     font-size: 10px;
   }
 }
+
+/* ============================================================
+   THERMAL POS RECEIPT PRINT — 80mm roll paper
+   ============================================================ */
+@media print {
+  /* Hide all app chrome */
+  body > * { visibility: hidden; }
+
+  /* Show only the thermal receipt */
+  .pharmacy-receipt-thermal,
+  .pharmacy-receipt-thermal * { visibility: visible; }
+
+  /* 80mm roll paper page setup */
+  @page {
+    size: 80mm auto;
+    margin: 3mm 2mm;
+  }
+
+  /* Anchor receipt to top-left corner */
+  .pharmacy-receipt-thermal {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 76mm;
+    border: none !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+
+  /* Hide action buttons */
+  .no-print { display: none !important; }
+}

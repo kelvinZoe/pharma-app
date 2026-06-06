@@ -12,6 +12,7 @@ import { WorkspacePageComponent, WorkspacePageData } from './shared/pages/worksp
 import { AdminUsersPageComponent } from './features/admin/pages/admin-users-page.component';
 import { AdminServicesPageComponent } from './features/admin/pages/admin-services-page.component';
 import { AdminTemplatesPageComponent } from './features/admin/pages/admin-templates-page.component';
+import { AdminGeneralTemplatesPageComponent } from './features/admin/pages/admin-general-templates-page.component';
 import { AdminFinancialsPageComponent } from './features/admin/pages/admin-financials-page.component';
 import { AdminSettingsPageComponent } from './features/admin/pages/admin-settings-page.component';
 import { FrontdeskClientsPageComponent } from './features/frontdesk/pages/frontdesk-clients-page.component';
@@ -28,6 +29,7 @@ const adminMenu: readonly ModuleMenuItem[] = [
   { label: 'Users & Roles', path: '/admin/users' },
   { label: 'Service Setup', path: '/admin/services' },
   { label: 'Template Builder', path: '/admin/templates' },
+  { label: 'General Templates', path: '/admin/general-templates' },
   { label: 'Financial Summary', path: '/admin/financials' }
 ];
 
@@ -416,6 +418,7 @@ export const routes: Routes = [
           { path: 'users', component: AdminUsersPageComponent },
           { path: 'services', component: AdminServicesPageComponent },
           { path: 'templates', component: AdminTemplatesPageComponent },
+          { path: 'general-templates', component: AdminGeneralTemplatesPageComponent },
           { path: 'services/:id/template', redirectTo: 'templates' },
           { path: 'financials', component: AdminFinancialsPageComponent },
           { path: 'settings', component: AdminSettingsPageComponent }

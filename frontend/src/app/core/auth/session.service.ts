@@ -11,6 +11,9 @@ export interface SessionUser {
   readonly username: string;
   readonly role: UserRoleCode;
   readonly module: ModuleKey;
+  readonly tenantId?: string;
+  readonly tenantSlug?: string;
+  readonly tenantName?: string;
 }
 
 export interface ModuleOption {
@@ -139,6 +142,17 @@ export class SessionService {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(SESSION_STORAGE_KEY);
       localStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
+  }
+
+  updateTenantName(name: string): void {
+    const user = this.currentUserState();
+    if (user) {
+      const updated = { ...user, tenantName: name };
+      this.currentUserState.set(updated);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(updated));
+      }
     }
   }
 

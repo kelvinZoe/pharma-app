@@ -9,13 +9,13 @@ export class SettingsController {
 
   @Get()
   async getSettings() {
-    return this.settingsService.getSettings();
+    return await this.settingsService.getSettings();
   }
 
   @Post()
   async saveSettings(@Req() req: any, @Body() body: Partial<ClinicSettings>) {
     this.ensureAdmin(req.user);
-    return this.settingsService.saveSettings(body);
+    return await this.settingsService.saveSettings(body);
   }
 
   private ensureAdmin(user: any) {
