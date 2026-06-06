@@ -7,6 +7,7 @@ import { AppTableComponent, TableColumn } from '../../../shared/ui/app-table/app
 interface StaffUser {
   id: string;
   name: string;
+  email: string;
   username: string;
   role: number;
   active: boolean;
@@ -76,6 +77,14 @@ interface StaffUser {
               </div>
 
               <div class="form-group">
+                <label for="email">Email Address <span class="text-danger">*</span></label>
+                <input id="email" type="email" formControlName="email" class="form-control" placeholder="e.g. employee&#64;clinic.com" [readOnly]="editingUser() !== null" />
+                <div *ngIf="userForm.get('email')?.touched && userForm.get('email')?.invalid" class="text-danger small mt-1">
+                  A valid email address is required.
+                </div>
+              </div>
+
+              <div class="form-group">
                 <label for="username">System Username <span class="text-danger">*</span></label>
                 <input id="username" type="text" formControlName="username" class="form-control" placeholder="e.g. fboateng" [readOnly]="editingUser() !== null" />
                 <div *ngIf="userForm.get('username')?.touched && userForm.get('username')?.invalid" class="text-danger small mt-1">
@@ -83,15 +92,12 @@ interface StaffUser {
                 </div>
               </div>
 
-              <div class="form-group">
-                <label for="password">Password <span class="text-danger" *ngIf="!editingUser()">*</span></label>
-                <input id="password" type="password" formControlName="password" class="form-control" placeholder="••••••••" />
+              <div class="form-group" *ngIf="editingUser()">
+                <label for="password">Reset Password</label>
+                <input id="password" type="password" formControlName="password" class="form-control" placeholder="Leave blank to keep current password" />
                 <div *ngIf="userForm.get('password')?.touched && userForm.get('password')?.invalid" class="text-danger small mt-1">
                   Password must be at least 4 characters.
                 </div>
-                <p class="small text-muted mt-1" *ngIf="editingUser()">
-                  Leave blank to keep current system password.
-                </p>
               </div>
 
               <div class="form-group">
@@ -151,6 +157,7 @@ export class AdminUsersPageComponent implements OnInit {
 
   readonly columns: TableColumn[] = [
     { key: 'name', label: 'Employee Name', type: 'employee' },
+    { key: 'email', label: 'Email Address', type: 'text' },
     { key: 'username', label: 'Username', type: 'code' },
     { key: 'roleLevelText', label: 'Clinic Role Level', type: 'text' },
     { key: 'roleName', label: 'Access Boundaries', type: 'badge' },
@@ -160,6 +167,7 @@ export class AdminUsersPageComponent implements OnInit {
 
   readonly userForm = this.fb.group({
     name: ['', [Validators.required]],
+    email: ['', [Validators.required, Validators.email]],
     username: ['', [Validators.required, Validators.minLength(3)]],
     password: ['', []],
     role: ['', [Validators.required]],
@@ -168,8 +176,6 @@ export class AdminUsersPageComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadUsers();
-    // Default password required for new user
-    this.userForm.get('password')?.setValidators([Validators.required, Validators.minLength(4)]);
   }
 
   loadUsers(): void {
@@ -225,6 +231,7 @@ export class AdminUsersPageComponent implements OnInit {
     
     this.userForm.patchValue({
       name: u.name,
+      email: u.email ?? '',
       username: u.username,
       password: '',
       role: String(u.role),
@@ -238,12 +245,12 @@ export class AdminUsersPageComponent implements OnInit {
     this.isModalOpen.set(false);
     this.userForm.reset({
       name: '',
+      email: '',
       username: '',
       password: '',
       role: '',
       active: true
     });
-    this.userForm.get('password')?.setValidators([Validators.required, Validators.minLength(4)]);
   }
 
   onPageChange(page: number): void {
@@ -271,6 +278,7 @@ export class AdminUsersPageComponent implements OnInit {
 
     const payload: any = {
       name: (formVal.name ?? '').trim(),
+      email: (formVal.email ?? '').trim().toLowerCase(),
       role: Number(formVal.role),
       active: !!formVal.active
     };
@@ -301,7 +309,7 @@ export class AdminUsersPageComponent implements OnInit {
           this.isSubmitting.set(false);
           this.cancelEdit();
           this.loadUsers();
-          alert('New staff member registered successfully.');
+          alert('Staff invitation email sent successfully.');
         },
         error: (err) => {
           console.error('Error creating user', err);

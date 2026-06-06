@@ -21,31 +21,54 @@ const prisma = getPrismaClient();
 async function main() {
   console.log('Seeding database...');
 
+  // 0. Seed Default Tenant
+  const tenant = await prisma.tenant.upsert({
+    where: { slug: 'default' },
+    update: {},
+    create: {
+      name: 'Default Clinic',
+      slug: 'default',
+    },
+  });
+  console.log(`Seeded Tenant: ${tenant.name} (${tenant.slug})`);
+
   // 1. Seed Departments
   console.log('Seeding departments...');
   const labDept = await prisma.department.upsert({
-    where: { name: 'Laboratory' },
+    where: {
+      tenantId_name: {
+        tenantId: tenant.id,
+        name: 'Laboratory',
+      },
+    },
     update: {},
     create: {
       name: 'Laboratory',
       code: 'LAB',
       isActive: true,
+      tenantId: tenant.id,
     },
   });
 
   const scanDept = await prisma.department.upsert({
-    where: { name: 'Scanning' },
+    where: {
+      tenantId_name: {
+        tenantId: tenant.id,
+        name: 'Scanning',
+      },
+    },
     update: {},
     create: {
       name: 'Scanning',
       code: 'SCAN',
       isActive: true,
+      tenantId: tenant.id,
     },
   });
 
   console.log(`Seeded Departments: ${labDept.name}, ${scanDept.name}`);
 
-  // 2. Seed Users for each of the 6 roles
+  // 2. Seed Users
   console.log('Seeding default accounts (password: password123)...');
   const passwordHash = await bcrypt.hash('password123', 10);
 
@@ -58,6 +81,8 @@ async function main() {
       module: 'admin',
       phone: '0241112222',
       email: 'admin@clinic.com',
+      isVerified: true,
+      tenantId: tenant.id,
     },
     {
       username: 'frontdesk',
@@ -67,6 +92,8 @@ async function main() {
       module: 'frontdesk',
       phone: '0242223333',
       email: 'frontdesk@clinic.com',
+      isVerified: true,
+      tenantId: tenant.id,
     },
     {
       username: 'laboratory',
@@ -76,6 +103,8 @@ async function main() {
       module: 'laboratory',
       phone: '0243334444',
       email: 'lab@clinic.com',
+      isVerified: true,
+      tenantId: tenant.id,
     },
     {
       username: 'scanning',
@@ -85,6 +114,8 @@ async function main() {
       module: 'scanning',
       phone: '0244445555',
       email: 'scan@clinic.com',
+      isVerified: true,
+      tenantId: tenant.id,
     },
     {
       username: 'pharmacy',
@@ -94,6 +125,8 @@ async function main() {
       module: 'pharmacy',
       phone: '0245556666',
       email: 'pharmacy@clinic.com',
+      isVerified: true,
+      tenantId: tenant.id,
     },
     {
       username: 'accounting',
@@ -103,16 +136,19 @@ async function main() {
       module: 'accounting',
       phone: '0246667777',
       email: 'accounting@clinic.com',
+      isVerified: true,
+      tenantId: tenant.id,
     },
   ];
 
   for (const userData of usersData) {
     const user = await prisma.user.upsert({
-      where: { username: userData.username },
+      where: { email: userData.email },
       update: {
-        passwordHash, // reset password to password123
+        passwordHash,
         role: userData.role,
         module: userData.module,
+        tenantId: tenant.id,
       },
       create: userData,
     });
@@ -141,7 +177,7 @@ async function main() {
 
   for (const s of services) {
     const existing = await prisma.service.findFirst({
-      where: { name: s.name },
+      where: { name: s.name, tenantId: tenant.id },
     });
     if (!existing) {
       await prisma.service.create({
@@ -149,6 +185,7 @@ async function main() {
           name: s.name,
           price: s.price,
           departmentId: s.departmentId,
+          tenantId: tenant.id,
         },
       });
       console.log(`- Service created: ${s.name} (GHS ${s.price.toFixed(2)})`);
@@ -164,19 +201,24 @@ async function main() {
   // 4. Seed Pharmacy Products
   console.log('Seeding pharmacy inventory catalog...');
   const products = [
-    { name: 'Paracetamol 500mg', productCode: 'PXM001', unitOfMeasure: 'tablet', reorderLevel: 100 },
-    { name: 'Amoxicillin 250mg', productCode: 'AMX002', unitOfMeasure: 'capsule', reorderLevel: 50 },
-    { name: 'Ibuprofen 400mg', productCode: 'IBU003', unitOfMeasure: 'tablet', reorderLevel: 50 },
-    { name: 'Cough Syrup 100ml', productCode: 'CSY004', unitOfMeasure: 'bottle', reorderLevel: 20 },
-    { name: 'Artemether-Lumefantrine (Coartem)', productCode: 'COA005', unitOfMeasure: 'pack', reorderLevel: 30 },
-    { name: 'Vitamin C 100mg', productCode: 'VIT006', unitOfMeasure: 'tablet', reorderLevel: 200 },
-    { name: 'Ciprofloxacin 500mg', productCode: 'CIP007', unitOfMeasure: 'tablet', reorderLevel: 40 },
-    { name: 'Salbutamol Inhaler', productCode: 'SAL008', unitOfMeasure: 'inhaler', reorderLevel: 10 },
+    { name: 'Paracetamol 500mg', productCode: 'PXM001', unitOfMeasure: 'tablet', reorderLevel: 100, tenantId: tenant.id },
+    { name: 'Amoxicillin 250mg', productCode: 'AMX002', unitOfMeasure: 'capsule', reorderLevel: 50, tenantId: tenant.id },
+    { name: 'Ibuprofen 400mg', productCode: 'IBU003', unitOfMeasure: 'tablet', reorderLevel: 50, tenantId: tenant.id },
+    { name: 'Cough Syrup 100ml', productCode: 'CSY004', unitOfMeasure: 'bottle', reorderLevel: 20, tenantId: tenant.id },
+    { name: 'Artemether-Lumefantrine (Coartem)', productCode: 'COA005', unitOfMeasure: 'pack', reorderLevel: 30, tenantId: tenant.id },
+    { name: 'Vitamin C 100mg', productCode: 'VIT006', unitOfMeasure: 'tablet', reorderLevel: 200, tenantId: tenant.id },
+    { name: 'Ciprofloxacin 500mg', productCode: 'CIP007', unitOfMeasure: 'tablet', reorderLevel: 40, tenantId: tenant.id },
+    { name: 'Salbutamol Inhaler', productCode: 'SAL008', unitOfMeasure: 'inhaler', reorderLevel: 10, tenantId: tenant.id },
   ];
 
   for (const p of products) {
     await prisma.pharmacyProduct.upsert({
-      where: { productCode: p.productCode },
+      where: {
+        tenantId_productCode: {
+          tenantId: tenant.id,
+          productCode: p.productCode,
+        },
+      },
       update: {
         name: p.name,
         unitOfMeasure: p.unitOfMeasure,

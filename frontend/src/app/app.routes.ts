@@ -4,6 +4,7 @@ import { authGuard, guestGuard, moduleAccessGuard } from './core/auth/auth.guard
 import { AppShellComponent } from './core/layout/app-shell.component';
 import { ModuleMenuItem, ModuleShellComponent } from './core/layout/module-shell/module-shell.component';
 import { LoginPageComponent } from './features/auth/pages/login-page.component';
+import { VerifyInviteComponent } from './features/auth/pages/verify-invite.component';
 import { DashboardPageData, RoleDashboardPageComponent } from './shared/pages/role-dashboard-page.component';
 import { WorkspacePageComponent, WorkspacePageData } from './shared/pages/workspace-page.component';
 
@@ -388,6 +389,11 @@ export const routes: Routes = [
   {
     path: 'login',
     component: LoginPageComponent,
+    canActivate: [guestGuard]
+  },
+  {
+    path: 'auth/verify-invite',
+    component: VerifyInviteComponent,
     canActivate: [guestGuard]
   },
   {

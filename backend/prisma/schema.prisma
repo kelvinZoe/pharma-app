@@ -7,28 +7,59 @@ datasource db {
   provider = "postgresql"
 }
 
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  slug      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users            User[]
+  patients         Patient[]
+  departments      Department[]
+  services         Service[]
+  visits           Visit[]
+  clinicInvoices   ClinicInvoice[]
+  clinicPayments   ClinicPayment[]
+  pharmacyProducts PharmacyProduct[]
+  pharmacySales    PharmacySale[]
+  prescriptions    Prescription[]
+  auditLogs        AuditLog[]
+  closures         PharmacyDailyClosure[]
+}
+
 model Department {
   id        String    @id @default(uuid())
-  name      String    @unique
+  name      String
   code      String?
   isActive  Boolean   @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  tenantId  String?
+  tenant    Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   services  Service[]
+
+  @@unique([tenantId, name])
 }
 
 model User {
   id                    String                  @id @default(uuid())
   fullName              String
-  username              String                  @unique
+  username              String?
   passwordHash          String
   phone                 String?
-  email                 String?
+  email                 String                  @unique
   role                  Int                     @default(1)
   module                String                  @default("frontdesk")
   isActive              Boolean                 @default(true)
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
+  tenantId              String?
+  tenant                Tenant?                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  inviteToken           String?                 @unique
+  inviteExpires         DateTime?
+  isVerified            Boolean                 @default(false)
   auditLogs             AuditLog[]              @relation("AuditActor")
   paymentsReceived      ClinicPayment[]         @relation("CashierUser")
   pharmacyClosures      PharmacyDailyClosure[]  @relation("PharmacyClosedBy")
@@ -37,11 +68,13 @@ model User {
   prescriptionsCreated  Prescription[]          @relation("PrescriptionCreatedBy")
   visitsCreated         Visit[]                 @relation("FrontdeskUser")
   resultsEntered        VisitResult[]           @relation("ResultEnteredBy")
+
+  @@unique([tenantId, username])
 }
 
 model Patient {
   id                    String   @id @default(uuid())
-  patientCode           String   @unique
+  patientCode           String
   surname               String
   firstName             String
   middleName            String?
@@ -57,12 +90,16 @@ model Patient {
   isMinor               Boolean  @default(false)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+  tenantId              String?
+  tenant                Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   visits                Visit[]
+
+  @@unique([tenantId, patientCode])
 }
 
 model Visit {
   id              String         @id @default(uuid())
-  visitNumber     String         @unique
+  visitNumber     String
   visitDate       DateTime       @default(now())
   status          String         @default("registered")
   notes           String?
@@ -70,12 +107,16 @@ model Visit {
   updatedAt       DateTime       @updatedAt
   patientId       String
   frontdeskUserId String
+  tenantId        String?
+  tenant          Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   invoice         ClinicInvoice?
   pharmacySales   PharmacySale[]
   prescriptions   Prescription[]
   frontdeskUser   User           @relation("FrontdeskUser", fields: [frontdeskUserId], references: [id])
   patient         Patient        @relation(fields: [patientId], references: [id])
   visitServices   VisitService[]
+
+  @@unique([tenantId, visitNumber])
 }
 
 model Service {
@@ -86,6 +127,8 @@ model Service {
   createdAt     DateTime                @default(now())
   updatedAt     DateTime                @updatedAt
   departmentId  String
+  tenantId      String?
+  tenant        Tenant?                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   department    Department              @relation(fields: [departmentId], references: [id])
   templates     ServiceResultTemplate[]
   visitServices VisitService[]
@@ -143,6 +186,8 @@ model Prescription {
   updatedAt        DateTime       @updatedAt
   visitId          String
   createdByUserId  String
+  tenantId         String?
+  tenant           Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   pharmacySales    PharmacySale[]
   createdBy        User           @relation("PrescriptionCreatedBy", fields: [createdByUserId], references: [id])
   visit            Visit          @relation(fields: [visitId], references: [id], onDelete: Cascade)
@@ -150,7 +195,7 @@ model Prescription {
 
 model ClinicInvoice {
   id            String          @id @default(uuid())
-  invoiceNumber String          @unique
+  invoiceNumber String
   subtotal      Decimal
   total         Decimal
   amountPaid    Decimal         @default(0.0)
@@ -160,8 +205,12 @@ model ClinicInvoice {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   visitId       String          @unique
+  tenantId      String?
+  tenant        Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   visit         Visit           @relation(fields: [visitId], references: [id], onDelete: Cascade)
   payments      ClinicPayment[]
+
+  @@unique([tenantId, invoiceNumber])
 }
 
 model ClinicPayment {
@@ -173,22 +222,28 @@ model ClinicPayment {
   createdAt        DateTime      @default(now())
   invoiceId        String
   receivedByUserId String
+  tenantId         String?
+  tenant           Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   receivedByUser   User          @relation("CashierUser", fields: [receivedByUserId], references: [id])
   invoice          ClinicInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 }
 
 model PharmacyProduct {
   id             String                  @id @default(uuid())
-  productCode    String?                 @unique
+  productCode    String?
   name           String
   unitOfMeasure  String
   isActive       Boolean                 @default(true)
   reorderLevel   Float                   @default(10.0)
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
+  tenantId       String?
+  tenant         Tenant?                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   batches        PharmacyBatch[]
   saleItems      PharmacySaleItem[]
   stockMovements PharmacyStockMovement[]
+
+  @@unique([tenantId, productCode])
 }
 
 model PharmacyBatch {
@@ -224,7 +279,7 @@ model PharmacyStockMovement {
 
 model PharmacySale {
   id             String                @id @default(uuid())
-  saleNumber     String                @unique
+  saleNumber     String
   saleSource     String                @default("walk_in")
   subtotal       Decimal
   total          Decimal
@@ -237,11 +292,15 @@ model PharmacySale {
   prescriptionId String?
   soldByUserId   String
   closureId      String?
+  tenantId       String?
+  tenant         Tenant?               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   closure        PharmacyDailyClosure? @relation("PharmacyClosureSales", fields: [closureId], references: [id])
   soldByUser     User                  @relation("PharmacySoldBy", fields: [soldByUserId], references: [id])
   prescription   Prescription?         @relation(fields: [prescriptionId], references: [id])
   visit          Visit?                @relation(fields: [visitId], references: [id])
   items          PharmacySaleItem[]
+
+  @@unique([tenantId, saleNumber])
 }
 
 model PharmacySaleItem {
@@ -268,6 +327,8 @@ model AuditLog {
   afterData   String?
   createdAt   DateTime @default(now())
   actorUserId String
+  tenantId    String?
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   actorUser   User     @relation("AuditActor", fields: [actorUserId], references: [id])
 }
 
@@ -284,6 +345,8 @@ model PharmacyDailyClosure {
   notes            String?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
+  tenantId         String?
+  tenant           Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   closedByUser     User           @relation("PharmacyClosedBy", fields: [closedByUserId], references: [id])
   sales            PharmacySale[] @relation("PharmacyClosureSales")
 }

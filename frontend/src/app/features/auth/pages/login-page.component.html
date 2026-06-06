@@ -59,97 +59,252 @@
   <!-- Right Side: Highly Aesthetic Login Credentials Form -->
   <div class="login-page__panel login-page__panel--form">
     <div class="login-card-container">
-      <div class="login-card-header">
-        <p class="login-card-eyebrow">Authentication Protocol</p>
-        <h2>Secure Sign In</h2>
-        <p class="login-card-instruction">Please enter your clinician credentials below.</p>
-      </div>
-
-      <form class="login-form" [formGroup]="form" (ngSubmit)="submit()">
-        <!-- Username input -->
-        <div class="input-block" [class.input-block--error]="form.controls.username.touched && form.controls.username.invalid">
-          <span class="input-label">Username</span>
-          <div class="input-wrapper">
-            <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-            <input formControlName="username" type="text" placeholder="Clinician username" autocomplete="username" />
-          </div>
-          @if (form.controls.username.touched && form.controls.username.invalid) {
-            <span class="error-msg">Username must be at least 3 characters.</span>
-          }
+      @if (mode() === 'login') {
+        <div class="login-card-header">
+          <p class="login-card-eyebrow">Authentication Protocol</p>
+          <h2>Secure Sign In</h2>
+          <p class="login-card-instruction">Please enter your clinician credentials below.</p>
         </div>
 
-        <!-- Password input -->
-        <div class="input-block" [class.input-block--error]="form.controls.password.touched && form.controls.password.invalid">
-          <span class="input-label">Password</span>
-          <div class="input-wrapper">
-            <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
-            <input formControlName="password" type="password" placeholder="••••••••" autocomplete="current-password" />
+        <form class="login-form" [formGroup]="loginForm" (ngSubmit)="submitLogin()">
+          <!-- Email Address input -->
+          <div class="input-block" [class.input-block--error]="loginForm.controls.email.touched && loginForm.controls.email.invalid">
+            <span class="input-label">Email Address</span>
+            <div class="input-wrapper">
+              <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22,6 12,13 2,6" />
+              </svg>
+              <input formControlName="email" type="email" placeholder="clinician@example.com" autocomplete="email" />
+            </div>
+            @if (loginForm.controls.email.touched && loginForm.controls.email.invalid) {
+              <span class="error-msg">A valid email address is required.</span>
+            }
           </div>
-          @if (form.controls.password.touched && form.controls.password.invalid) {
-            <span class="error-msg">Password must be at least 4 characters.</span>
+
+          <!-- Password input -->
+          <div class="input-block" [class.input-block--error]="loginForm.controls.password.touched && loginForm.controls.password.invalid">
+            <span class="input-label">Password</span>
+            <div class="input-wrapper">
+              <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <input formControlName="password" type="password" placeholder="••••••••" autocomplete="current-password" />
+            </div>
+            @if (loginForm.controls.password.touched && loginForm.controls.password.invalid) {
+              <span class="error-msg">Password must be at least 4 characters.</span>
+            }
+          </div>
+
+          <!-- Dynamic backend validation error alert banner -->
+          @if (errorMessage()) {
+            <div class="login-error-banner">
+              <svg class="banner-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <div class="banner-text">{{ errorMessage() }}</div>
+            </div>
           }
+
+          @if (successMessage()) {
+            <div class="login-success-banner">
+              <svg class="banner-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              <div class="banner-text">{{ successMessage() }}</div>
+            </div>
+          }
+
+          <!-- Interactive submit button -->
+          <button class="clinician-submit-btn" type="submit" [disabled]="isSubmitting() || loginForm.invalid">
+            @if (isSubmitting()) {
+              <span class="loader-dot-container">
+                <span class="loader-dot"></span>
+                <span class="loader-dot"></span>
+                <span class="loader-dot"></span>
+              </span>
+              <span>Initializing session...</span>
+            } @else {
+              <span>Authenticate Session</span>
+              <svg class="btn-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            }
+          </button>
+        </form>
+
+        <div class="auth-toggle-link-container">
+          <button class="auth-toggle-link" (click)="toggleMode()">
+            Setup New Clinic
+          </button>
         </div>
 
-        <!-- Dynamic backend validation error alert banner -->
-        @if (errorMessage()) {
-          <div class="login-error-banner">
-            <svg class="banner-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <div class="banner-text">{{ errorMessage() }}</div>
+        <!-- Bottom helper hints (for quick testing verification) -->
+        <footer class="login-card-footer">
+          <p class="footer-title">Access Reference Logs</p>
+          <div class="reference-accounts">
+            <div class="account-badge">
+              <span class="label">Admin:</span>
+              <span class="val">admin&#64;default.com</span>
+            </div>
+            <div class="account-badge">
+              <span class="label">Frontdesk:</span>
+              <span class="val">frontdesk&#64;default.com</span>
+            </div>
+            <div class="account-badge">
+              <span class="label">Diagnostics:</span>
+              <span class="val">lab&#64;default.com</span>
+            </div>
+            <div class="account-badge">
+              <span class="label">Pharmacy:</span>
+              <span class="val">pharmacy&#64;default.com</span>
+            </div>
           </div>
-        }
-
-        <!-- Interactive submit button -->
-        <button class="clinician-submit-btn" type="submit" [disabled]="isSubmitting() || form.invalid">
-          @if (isSubmitting()) {
-            <span class="loader-dot-container">
-              <span class="loader-dot"></span>
-              <span class="loader-dot"></span>
-              <span class="loader-dot"></span>
-            </span>
-            <span>Initializing session...</span>
-          } @else {
-            <span>Authenticate Session</span>
-            <svg class="btn-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="5" y1="12" x2="19" y2="12" />
-              <polyline points="12 5 19 12 12 19" />
-            </svg>
-          }
-        </button>
-      </form>
-
-      <!-- Bottom helper hints (for quick testing verification) -->
-      <footer class="login-card-footer">
-        <p class="footer-title">Access Reference Logs</p>
-        <div class="reference-accounts">
-          <div class="account-badge">
-            <span class="label">Admin:</span>
-            <span class="val">admin</span>
-          </div>
-          <div class="account-badge">
-            <span class="label">Frontdesk:</span>
-            <span class="val">frontdesk</span>
-          </div>
-          <div class="account-badge">
-            <span class="label">Diagnostics:</span>
-            <span class="val">laboratory / scanning</span>
-          </div>
-          <div class="account-badge">
-            <span class="label">Pharmacy:</span>
-            <span class="val">pharmacy</span>
-          </div>
+          <p class="footer-password">Seeded clinician password: <span>password123</span></p>
+        </footer>
+      } @else {
+        <div class="login-card-header">
+          <p class="login-card-eyebrow">Clinic Registration</p>
+          <h2>Setup New Clinic</h2>
+          <p class="login-card-instruction">Register your clinic and configure your admin account.</p>
         </div>
-        <p class="footer-password">Seeded clinician password: <span>password123</span></p>
-      </footer>
+
+        <form class="login-form" [formGroup]="registerForm" (ngSubmit)="submitRegister()">
+          <!-- Clinic Name input -->
+          <div class="input-block" [class.input-block--error]="registerForm.controls.clinicName.touched && registerForm.controls.clinicName.invalid">
+            <span class="input-label">Clinic Name</span>
+            <div class="input-wrapper">
+              <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <path d="M9 3v18" />
+                <path d="M15 3v18" />
+                <path d="M3 9h18" />
+                <path d="M3 15h18" />
+              </svg>
+              <input #clinicNameInput formControlName="clinicName" type="text" placeholder="e.g. St. Jude Clinic" (input)="onClinicNameChange(clinicNameInput.value)" />
+            </div>
+            @if (registerForm.controls.clinicName.touched && registerForm.controls.clinicName.invalid) {
+              <span class="error-msg">Clinic name must be at least 3 characters.</span>
+            }
+          </div>
+
+          <!-- Clinic Slug input (with pattern restriction / auto generated) -->
+          <div class="input-block" [class.input-block--error]="registerForm.controls.clinicSlug.touched && registerForm.controls.clinicSlug.invalid">
+            <span class="input-label">Domain Slug</span>
+            <div class="input-wrapper">
+              <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+              <input formControlName="clinicSlug" type="text" placeholder="st-jude-clinic" />
+            </div>
+            <span class="input-tip">This acts as your tenant identifier (lowercase, hyphens, alphanumeric only).</span>
+            @if (registerForm.controls.clinicSlug.touched && registerForm.controls.clinicSlug.invalid) {
+              <span class="error-msg">Please enter a valid slug (only lowercase, digits and hyphens).</span>
+            }
+          </div>
+
+          <!-- Admin Name input -->
+          <div class="input-block" [class.input-block--error]="registerForm.controls.adminName.touched && registerForm.controls.adminName.invalid">
+            <span class="input-label">Administrator Full Name</span>
+            <div class="input-wrapper">
+              <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+              <input formControlName="adminName" type="text" placeholder="Dr. John Doe" />
+            </div>
+            @if (registerForm.controls.adminName.touched && registerForm.controls.adminName.invalid) {
+              <span class="error-msg">Administrator name must be at least 3 characters.</span>
+            }
+          </div>
+
+          <!-- Admin Email input -->
+          <div class="input-block" [class.input-block--error]="registerForm.controls.adminEmail.touched && registerForm.controls.adminEmail.invalid">
+            <span class="input-label">Admin Email Address</span>
+            <div class="input-wrapper">
+              <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22,6 12,13 2,6" />
+              </svg>
+              <input formControlName="adminEmail" type="email" placeholder="admin@clinic.com" autocomplete="email" />
+            </div>
+            @if (registerForm.controls.adminEmail.touched && registerForm.controls.adminEmail.invalid) {
+              <span class="error-msg">Please enter a valid email address.</span>
+            }
+          </div>
+
+          <!-- Admin Phone input -->
+          <div class="input-block" [class.input-block--error]="registerForm.controls.adminPhone.touched && registerForm.controls.adminPhone.invalid">
+            <span class="input-label">Admin Phone Number</span>
+            <div class="input-wrapper">
+              <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+              </svg>
+              <input formControlName="adminPhone" type="text" placeholder="+233 55 123 4567" />
+            </div>
+            @if (registerForm.controls.adminPhone.touched && registerForm.controls.adminPhone.invalid) {
+              <span class="error-msg">Admin phone number is required.</span>
+            }
+          </div>
+
+          <!-- Admin Password input -->
+          <div class="input-block" [class.input-block--error]="registerForm.controls.adminPassword.touched && registerForm.controls.adminPassword.invalid">
+            <span class="input-label">Set Administrator Password</span>
+            <div class="input-wrapper">
+              <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <input formControlName="adminPassword" type="password" placeholder="••••••••" autocomplete="new-password" />
+            </div>
+            @if (registerForm.controls.adminPassword.touched && registerForm.controls.adminPassword.invalid) {
+              <span class="error-msg">Password must be at least 6 characters.</span>
+            }
+          </div>
+
+          <!-- Dynamic backend validation error alert banner -->
+          @if (errorMessage()) {
+            <div class="login-error-banner">
+              <svg class="banner-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <div class="banner-text">{{ errorMessage() }}</div>
+            </div>
+          }
+
+          <!-- Interactive submit button -->
+          <button class="clinician-submit-btn" type="submit" [disabled]="isSubmitting() || registerForm.invalid">
+            @if (isSubmitting()) {
+              <span class="loader-dot-container">
+                <span class="loader-dot"></span>
+                <span class="loader-dot"></span>
+                <span class="loader-dot"></span>
+              </span>
+              <span>Registering Clinic...</span>
+            } @else {
+              <span>Provision Clinic Account</span>
+              <svg class="btn-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            }
+          </button>
+        </form>
+
+        <div class="auth-toggle-link-container">
+          <button class="auth-toggle-link" (click)="toggleMode()">
+            Back to Clinician Sign In
+          </button>
+        </div>
+      }
     </div>
   </div>
 </section>

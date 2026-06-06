@@ -77,8 +77,29 @@ export class SessionService {
     return ROLE_HOME[role];
   }
 
-  login(payload: { readonly username: string; readonly password?: string }): Observable<SessionUser> {
+  login(payload: { readonly email: string; readonly password?: string }): Observable<SessionUser> {
     return this.http.post<{ accessToken: string; user: SessionUser }>(`${API_URL}/auth/login`, payload).pipe(
+      tap((res) => {
+        this.currentUserState.set(res.user);
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(TOKEN_STORAGE_KEY, res.accessToken);
+          localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(res.user));
+        }
+      }),
+      map((res) => res.user)
+    );
+  }
+
+  registerClinic(payload: any): Observable<any> {
+    return this.http.post<any>(`${API_URL}/auth/register-clinic`, payload);
+  }
+
+  verifyInvite(token: string): Observable<any> {
+    return this.http.get<any>(`${API_URL}/auth/verify-invite?token=${encodeURIComponent(token)}`);
+  }
+
+  completeInvite(payload: { readonly token: string; readonly password?: string }): Observable<any> {
+    return this.http.post<{ accessToken: string; user: SessionUser }>(`${API_URL}/auth/complete-invite`, payload).pipe(
       tap((res) => {
         this.currentUserState.set(res.user);
         if (typeof localStorage !== 'undefined') {

@@ -1,10 +1,15 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../common/email/email.service';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
   async findAll(page?: number, limit?: number, search?: string) {
     if (page === undefined && limit === undefined && search === undefined) {
@@ -70,29 +75,36 @@ export class UsersService {
   }
 
   async create(data: any) {
-    if (!data.username || !data.password || !data.fullName) {
-      throw new BadRequestException('Username, password and full name are required');
+    if (!data.email || !data.fullName) {
+      throw new BadRequestException('Email and full name are required');
     }
 
     const existing = await this.prisma.user.findUnique({
-      where: { username: data.username },
+      where: { email: data.email },
     });
     if (existing) {
-      throw new BadRequestException('Username is already taken');
+      throw new BadRequestException('Email is already taken');
     }
 
-    const passwordHash = await bcrypt.hash(data.password, 10);
+    const inviteToken = crypto.randomBytes(32).toString('hex');
+    const inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours
 
-    return this.prisma.user.create({
+    // Generate dummy password hash so it can't be logged into until verified
+    const dummyPasswordHash = await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 10);
+
+    const newUser = await this.prisma.user.create({
       data: {
         fullName: data.fullName,
-        username: data.username,
-        passwordHash,
+        email: data.email,
+        username: data.username ?? data.email.split('@')[0],
+        passwordHash: dummyPasswordHash,
         phone: data.phone ?? null,
-        email: data.email ?? null,
         role: Number(data.role ?? 1),
         module: data.module ?? 'frontdesk',
         isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
+        isVerified: false,
+        inviteToken,
+        inviteExpires,
       },
       select: {
         id: true,
@@ -105,6 +117,11 @@ export class UsersService {
         isActive: true,
       },
     });
+
+    // Send the email invite
+    await this.emailService.sendStaffInvitation(data.email, data.fullName, inviteToken);
+
+    return newUser;
   }
 
   async update(id: string, data: any) {
@@ -116,7 +133,6 @@ export class UsersService {
     const updateData: any = {};
     if (data.fullName !== undefined) updateData.fullName = data.fullName;
     if (data.phone !== undefined) updateData.phone = data.phone;
-    if (data.email !== undefined) updateData.email = data.email;
     if (data.role !== undefined) updateData.role = Number(data.role);
     if (data.module !== undefined) updateData.module = data.module;
     if (data.isActive !== undefined) updateData.isActive = Boolean(data.isActive);
@@ -125,14 +141,18 @@ export class UsersService {
       updateData.passwordHash = await bcrypt.hash(data.password, 10);
     }
 
-    // Check username change
-    if (data.username && data.username !== user.username) {
+    // Check email change
+    if (data.email && data.email !== user.email) {
       const existing = await this.prisma.user.findUnique({
-        where: { username: data.username },
+        where: { email: data.email },
       });
       if (existing) {
-        throw new BadRequestException('Username is already taken');
+        throw new BadRequestException('Email is already taken');
       }
+      updateData.email = data.email;
+    }
+
+    if (data.username !== undefined) {
       updateData.username = data.username;
     }
 

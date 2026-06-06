@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -11,6 +11,8 @@ import { BillingModule } from './billing/billing.module';
 import { PharmacyModule } from './pharmacy/pharmacy.module';
 import { ReportsModule } from './reports/reports.module';
 import { SettingsModule } from './settings/settings.module';
+import { EmailModule } from './common/email/email.module';
+import { TenantMiddleware } from './common/multitenancy/tenant.middleware';
 
 @Module({
   imports: [
@@ -23,8 +25,15 @@ import { SettingsModule } from './settings/settings.module';
     PharmacyModule,
     ReportsModule,
     SettingsModule,
+    EmailModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(TenantMiddleware)
+      .forRoutes('*');
+  }
+}
