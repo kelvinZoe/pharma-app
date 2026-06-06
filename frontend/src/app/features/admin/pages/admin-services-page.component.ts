@@ -9,6 +9,7 @@ interface ServiceItem {
   id: string;
   name: string;
   price: number;
+  departmentId?: string;
   department: {
     code: string;
     name: string;
