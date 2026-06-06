@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards, Req, ForbiddenException, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req, ForbiddenException, Query } from '@nestjs/common';
 import { ServicesService } from './services.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -41,6 +41,12 @@ export class ServicesController {
   async updateService(@Req() req: any, @Param('id') id: string, @Body() body: any) {
     this.ensureAdmin(req.user);
     return this.servicesService.updateService(id, body);
+  }
+
+  @Delete('services/:id')
+  async deleteService(@Req() req: any, @Param('id') id: string) {
+    this.ensureAdmin(req.user);
+    return this.servicesService.deleteService(id);
   }
 
   // --- Result Templates ---

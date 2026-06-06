@@ -63,7 +63,7 @@ interface ServiceItem {
         <div class="modal-card" (click)="$event.stopPropagation()">
           <div class="modal-card-header">
             <h3>
-              {{ editingPriceService() ? 'Edit Catalog Price' : 'Register Clinical Service' }}
+              {{ editingPriceService() ? 'Edit Service Details' : 'Register Clinical Service' }}
             </h3>
             <button class="modal-close-btn" (click)="cancelPriceEdit()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -72,7 +72,7 @@ interface ServiceItem {
 
           <div class="modal-body">
             <form [formGroup]="serviceForm" (ngSubmit)="submitService()" class="sidebar-form">
-              <div class="form-group" *ngIf="!editingPriceService()">
+              <div class="form-group">
                 <label for="service-name">Procedure/Scan Name <span class="text-danger">*</span></label>
                 <input id="service-name" type="text" formControlName="name" class="form-control" placeholder="e.g. Chest X-Ray (A/P)" />
                 <div *ngIf="serviceForm.get('name')?.touched && serviceForm.get('name')?.invalid" class="text-danger small mt-1">
@@ -80,7 +80,7 @@ interface ServiceItem {
                 </div>
               </div>
 
-              <div class="form-group" *ngIf="!editingPriceService()">
+              <div class="form-group">
                 <label for="service-department">Clinic Department <span class="text-danger">*</span></label>
                 <select id="service-department" formControlName="departmentId" class="form-control">
                   <option value="">-- Choose Department --</option>
@@ -99,13 +99,20 @@ interface ServiceItem {
                 </div>
               </div>
 
-              <div class="d-flex gap-2 justify-content-end mt-4">
-                <button type="button" class="btn btn-secondary" (click)="cancelPriceEdit()">Cancel</button>
-                <button type="submit" class="btn btn-primary" [disabled]="serviceForm.invalid || isSubmittingService()">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                  <span *ngIf="!isSubmittingService()">Save Service</span>
-                  <span *ngIf="isSubmittingService()">Processing...</span>
-                </button>
+              <div class="d-flex justify-content-between mt-4">
+                <div>
+                  <button type="button" class="btn btn-danger" *ngIf="editingPriceService()" (click)="deleteService()" [disabled]="isSubmittingService()" style="background-color: #dc2626; color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#b91c1c'" onmouseout="this.style.backgroundColor='#dc2626'">
+                    Delete Service
+                  </button>
+                </div>
+                <div class="d-flex gap-2">
+                  <button type="button" class="btn btn-secondary" (click)="cancelPriceEdit()">Cancel</button>
+                  <button type="submit" class="btn btn-primary" [disabled]="serviceForm.invalid || isSubmittingService()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; margin-right: 4px; display: inline-block; vertical-align: middle;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                    <span *ngIf="!isSubmittingService()">Save Service</span>
+                    <span *ngIf="isSubmittingService()">Processing...</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -143,7 +150,7 @@ export class AdminServicesPageComponent implements OnInit {
     { key: 'department.name', label: 'Clinic Department', type: 'badge' },
     { key: 'price', label: 'Standard Price', type: 'price' },
     { key: 'templateStatus', label: 'Template Status', type: 'status' },
-    { key: 'actions', label: 'Actions', type: 'actions', actionLabel: 'Edit Price' }
+    { key: 'actions', label: 'Actions', type: 'actions', actionLabel: 'Edit Details' }
   ];
 
   readonly serviceForm = this.fb.group({
@@ -213,12 +220,9 @@ export class AdminServicesPageComponent implements OnInit {
 
   editServicePrice(s: ServiceItem): void {
     this.editingPriceService.set(s);
-    this.serviceForm.get('name')?.clearValidators();
-    this.serviceForm.get('departmentId')?.clearValidators();
-    
     this.serviceForm.patchValue({
       name: s.name,
-      departmentId: 'placeholder',
+      departmentId: s.departmentId ?? '',
       price: s.price
     });
     this.isModalOpen.set(true);
@@ -228,8 +232,6 @@ export class AdminServicesPageComponent implements OnInit {
     this.editingPriceService.set(null);
     this.isModalOpen.set(false);
     this.serviceForm.reset({ name: '', departmentId: '', price: null });
-    this.serviceForm.get('name')?.setValidators([Validators.required]);
-    this.serviceForm.get('departmentId')?.setValidators([Validators.required]);
   }
 
   onPageChange(page: number): void {
@@ -253,6 +255,29 @@ export class AdminServicesPageComponent implements OnInit {
     this.router.navigate(['/admin/templates'], { queryParams: { id: row.id } });
   }
 
+  deleteService(): void {
+    const service = this.editingPriceService();
+    if (!service) return;
+
+    const confirmDelete = confirm(`Are you sure you want to permanently delete the service "${service.name}"?`);
+    if (!confirmDelete) return;
+
+    this.isSubmittingService.set(true);
+    this.api.deleteService(service.id).subscribe({
+      next: () => {
+        this.isSubmittingService.set(false);
+        this.cancelPriceEdit();
+        this.loadServices();
+        alert('Service has been successfully deleted.');
+      },
+      error: (err) => {
+        console.error(err);
+        this.isSubmittingService.set(false);
+        alert(err?.error?.message ?? 'Failed to delete service.');
+      }
+    });
+  }
+
   submitService(): void {
     if (this.serviceForm.invalid) return;
 
@@ -263,18 +288,20 @@ export class AdminServicesPageComponent implements OnInit {
     const priceTarget = this.editingPriceService();
     if (priceTarget) {
       this.api.updateService(priceTarget.id, {
+        name: (formVal.name ?? '').trim(),
+        departmentId: formVal.departmentId,
         price: priceVal
       }).subscribe({
         next: () => {
           this.isSubmittingService.set(false);
           this.cancelPriceEdit();
           this.loadServices();
-          alert('Catalog service pricing updated successfully.');
+          alert('Catalog service updated successfully.');
         },
         error: (err) => {
           console.error(err);
           this.isSubmittingService.set(false);
-          alert('Failed to edit standard service price.');
+          alert('Failed to edit standard service details.');
         }
       });
     } else {

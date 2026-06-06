@@ -117,6 +117,25 @@ export class ServicesService {
     });
   }
 
+  async deleteService(id: string) {
+    const service = await this.prisma.service.findUnique({ where: { id } });
+    if (!service) {
+      throw new NotFoundException('Service not found');
+    }
+    try {
+      await this.prisma.serviceResultTemplate.deleteMany({
+        where: { serviceId: id },
+      });
+      return await this.prisma.service.delete({
+        where: { id },
+      });
+    } catch (err) {
+      throw new BadRequestException(
+        'Cannot delete this service because it is already referenced in patient visit logs or invoices.'
+      );
+    }
+  }
+
   // --- Result Templates ---
   async findTemplateByServiceId(serviceId: string) {
     return this.prisma.serviceResultTemplate.findFirst({

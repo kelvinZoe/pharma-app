@@ -112,6 +112,10 @@ export class ApiService {
     return this.http.put<any>(`${API_URL}/services/${id}`, data);
   }
 
+  deleteService(id: string): Observable<any> {
+    return this.http.delete<any>(`${API_URL}/services/${id}`);
+  }
+
   getServiceTemplate(serviceId: string): Observable<any> {
     return this.http.get<any>(`${API_URL}/services/${serviceId}/template`);
   }
