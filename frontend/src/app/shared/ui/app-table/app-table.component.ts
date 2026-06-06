@@ -10,6 +10,7 @@ export interface TableColumn {
   label: string;
   type?: 'text' | 'code' | 'badge' | 'status' | 'price' | 'employee' | 'actions';
   actionLabel?: string;
+  showDelete?: boolean;
 }
 
 @Component({
@@ -148,7 +149,7 @@ export interface TableColumn {
                     </div>
 
                     <!-- ACTIONS BUTTON -->
-                    <div *ngIf="col.type === 'actions'" class="actions-cell">
+                    <div *ngIf="col.type === 'actions'" class="actions-cell" style="display: flex; gap: 0.5rem; justify-content: flex-end;">
                       <button 
                         tuiButton
                         type="button"
@@ -160,6 +161,22 @@ export interface TableColumn {
                           <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                         </svg>
                         {{ col.actionLabel || 'Action' }}
+                      </button>
+                      <button 
+                        *ngIf="col.showDelete"
+                        tuiButton
+                        type="button"
+                        appearance="secondary" 
+                        size="s" 
+                        style="color: #ef4444; border-color: rgba(239, 68, 68, 0.2);"
+                        (click)="$event.stopPropagation(); onAction('delete', row)">
+                        <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px; margin-right: 4px;">
+                          <polyline points="3 6 5 6 21 6"></polyline>
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                          <line x1="10" y1="11" x2="10" y2="17"></line>
+                          <line x1="14" y1="11" x2="14" y2="17"></line>
+                        </svg>
+                        Delete
                       </button>
                     </div>
 
@@ -314,7 +331,7 @@ export interface TableColumn {
     }
 
     .actions-col {
-      width: 120px;
+      width: 190px;
       text-align: right;
     }
 

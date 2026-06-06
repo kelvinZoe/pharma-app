@@ -4,6 +4,7 @@ import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angu
 import { Router } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { AppTableComponent, TableColumn } from '../../../shared/ui/app-table/app-table.component';
+import { ToastService } from '../../../shared/ui/toast/toast.service';
 
 interface ServiceItem {
   id: string;
@@ -100,20 +101,13 @@ interface ServiceItem {
                 </div>
               </div>
 
-              <div class="d-flex justify-content-between mt-4">
-                <div>
-                  <button type="button" class="btn btn-danger" *ngIf="editingPriceService()" (click)="deleteService()" [disabled]="isSubmittingService()" style="background-color: #dc2626; color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#b91c1c'" onmouseout="this.style.backgroundColor='#dc2626'">
-                    Delete Service
-                  </button>
-                </div>
-                <div class="d-flex gap-2">
-                  <button type="button" class="btn btn-secondary" (click)="cancelPriceEdit()">Cancel</button>
-                  <button type="submit" class="btn btn-primary" [disabled]="serviceForm.invalid || isSubmittingService()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; margin-right: 4px; display: inline-block; vertical-align: middle;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                    <span *ngIf="!isSubmittingService()">Save Service</span>
-                    <span *ngIf="isSubmittingService()">Processing...</span>
-                  </button>
-                </div>
+              <div class="d-flex gap-2 justify-content-end mt-4">
+                <button type="button" class="btn btn-secondary" (click)="cancelPriceEdit()">Cancel</button>
+                <button type="submit" class="btn btn-primary" [disabled]="serviceForm.invalid || isSubmittingService()">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; margin-right: 4px; display: inline-block; vertical-align: middle;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                  <span *ngIf="!isSubmittingService()">Save Service</span>
+                  <span *ngIf="isSubmittingService()">Processing...</span>
+                </button>
               </div>
             </form>
           </div>
@@ -129,6 +123,7 @@ export class AdminServicesPageComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
+  private readonly toast = inject(ToastService);
 
   // Table source signals
   readonly services = signal<ServiceItem[]>([]);
@@ -151,7 +146,7 @@ export class AdminServicesPageComponent implements OnInit {
     { key: 'department.name', label: 'Clinic Department', type: 'badge' },
     { key: 'price', label: 'Standard Price', type: 'price' },
     { key: 'templateStatus', label: 'Template Status', type: 'status' },
-    { key: 'actions', label: 'Actions', type: 'actions', actionLabel: 'Edit Details' }
+    { key: 'actions', label: 'Actions', type: 'actions', actionLabel: 'Edit Details', showDelete: true }
   ];
 
   readonly serviceForm = this.fb.group({
@@ -249,6 +244,8 @@ export class AdminServicesPageComponent implements OnInit {
   onActionClick(event: { action: string, row: any }): void {
     if (event.action === 'click') {
       this.editServicePrice(event.row);
+    } else if (event.action === 'delete') {
+      this.deleteService(event.row);
     }
   }
 
@@ -256,25 +253,25 @@ export class AdminServicesPageComponent implements OnInit {
     this.router.navigate(['/admin/templates'], { queryParams: { id: row.id } });
   }
 
-  deleteService(): void {
-    const service = this.editingPriceService();
+  deleteService(serviceToDelete?: ServiceItem): void {
+    const service = serviceToDelete || this.editingPriceService();
     if (!service) return;
-
+ 
     const confirmDelete = confirm(`Are you sure you want to permanently delete the service "${service.name}"?`);
     if (!confirmDelete) return;
-
+ 
     this.isSubmittingService.set(true);
     this.api.deleteService(service.id).subscribe({
       next: () => {
         this.isSubmittingService.set(false);
         this.cancelPriceEdit();
         this.loadServices();
-        alert('Service has been successfully deleted.');
+        this.toast.success('Service has been successfully deleted.');
       },
       error: (err) => {
         console.error(err);
         this.isSubmittingService.set(false);
-        alert(err?.error?.message ?? 'Failed to delete service.');
+        this.toast.error(err?.error?.message ?? 'Failed to delete service.');
       }
     });
   }
@@ -297,12 +294,12 @@ export class AdminServicesPageComponent implements OnInit {
           this.isSubmittingService.set(false);
           this.cancelPriceEdit();
           this.loadServices();
-          alert('Catalog service updated successfully.');
+          this.toast.success('Catalog service updated successfully.');
         },
         error: (err) => {
           console.error(err);
           this.isSubmittingService.set(false);
-          alert('Failed to edit standard service details.');
+          this.toast.error('Failed to edit standard service details.');
         }
       });
     } else {
@@ -315,12 +312,12 @@ export class AdminServicesPageComponent implements OnInit {
           this.isSubmittingService.set(false);
           this.cancelPriceEdit();
           this.loadServices();
-          alert('New radiography/laboratory service registered in catalog.');
+          this.toast.success('New radiography/laboratory service registered in catalog.');
         },
         error: (err) => {
           console.error(err);
           this.isSubmittingService.set(false);
-          alert(err?.error?.message ?? 'Failed to create service catalog.');
+          this.toast.error(err?.error?.message ?? 'Failed to create service catalog.');
         }
       });
     }

@@ -51,8 +51,6 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
             const anyArgs = args as any;
 
             if (tenantId && isTenantModel(model)) {
-              anyArgs.where = anyArgs.where || {};
-
               if (operation === 'create') {
                 anyArgs.data = anyArgs.data || {};
                 anyArgs.data.tenantId = tenantId;
@@ -65,10 +63,11 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
               } else if (operation === 'findUnique' || operation === 'findUniqueOrThrow') {
                 // Convert findUnique to findFirst to allow filtering by tenantId (non-unique composite constraint)
                 const findFirstOperation = operation === 'findUnique' ? 'findFirst' : 'findFirstOrThrow';
+                const currentWhere = anyArgs.where || {};
                 const newArgs = {
                   ...args,
                   where: {
-                    ...anyArgs.where,
+                    ...currentWhere,
                     tenantId,
                   },
                 };
@@ -85,6 +84,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
                 operation === 'aggregate' ||
                 operation === 'groupBy'
               ) {
+                anyArgs.where = anyArgs.where || {};
                 anyArgs.where.tenantId = tenantId;
               }
             }

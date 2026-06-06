@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
 import { AppTableComponent, TableColumn } from '../../../shared/ui/app-table/app-table.component';
+import { ToastService } from '../../../shared/ui/toast/toast.service';
 
 interface StaffUser {
   id: string;
@@ -141,6 +142,7 @@ interface StaffUser {
 export class AdminUsersPageComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly fb = inject(FormBuilder);
+  private readonly toast = inject(ToastService);
 
   // Table source signals
   readonly users = signal<StaffUser[]>([]);
@@ -294,12 +296,12 @@ export class AdminUsersPageComponent implements OnInit {
           this.isSubmitting.set(false);
           this.cancelEdit();
           this.loadUsers();
-          alert('Staff account access updated successfully.');
+          this.toast.success('Staff account access updated successfully.');
         },
         error: (err) => {
           console.error('Error updating user', err);
           this.isSubmitting.set(false);
-          alert(err?.error?.message ?? 'Failed to edit staff account.');
+          this.toast.error(err?.error?.message ?? 'Failed to edit staff account.');
         }
       });
     } else {
@@ -309,12 +311,12 @@ export class AdminUsersPageComponent implements OnInit {
           this.isSubmitting.set(false);
           this.cancelEdit();
           this.loadUsers();
-          alert('Staff invitation email sent successfully.');
+          this.toast.success('Staff invitation email sent successfully.');
         },
         error: (err) => {
           console.error('Error creating user', err);
           this.isSubmitting.set(false);
-          alert(err?.error?.message ?? 'Failed to register new user.');
+          this.toast.error(err?.error?.message ?? 'Failed to register new user.');
         }
       });
     }
