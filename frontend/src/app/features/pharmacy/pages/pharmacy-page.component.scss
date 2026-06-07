@@ -553,7 +553,7 @@
   /* --- Page setup: auto-fit margins for POS receipt rolls --- */
   @page {
     size: auto;
-    margin: 3mm 2mm;
+    margin: 0;
   }
 
   /* Style thermal receipt for continuous flow roll printing, supporting 58mm and 80mm roll width dynamically */
@@ -563,9 +563,15 @@
     width: 100% !important;
     max-width: 80mm !important;
     margin: 0 auto !important;
-    padding: 0 !important;
+    padding: 6mm 3mm !important; /* Safety padding inside print container since page margins are 0 */
     border: none !important;
     box-shadow: none !important;
     background: #fff !important;
+    color: #000 !important;
+    box-sizing: border-box !important;
+
+    * {
+      color: #000 !important;
+    }
   }
 }

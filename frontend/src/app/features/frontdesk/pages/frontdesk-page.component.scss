@@ -1228,7 +1228,7 @@
   /* --- Page setup: auto-fit margins for POS receipt rolls --- */
   @page {
     size: auto;
-    margin: 4mm 2mm;
+    margin: 0;
   }
 
   /* Style cashier invoice receipt to fit any thermal paper width (e.g. 58mm up to 80mm) */
@@ -1238,12 +1238,17 @@
     width: 100% !important;
     max-width: 80mm !important; /* Cap at 80mm on larger paper but scale down to 58mm automatically */
     margin: 0 auto !important;
-    padding: 0 4px !important;
+    padding: 6mm 3mm !important; /* Safety padding inside print container since page margins are 0 */
     border: none !important;
     box-shadow: none !important;
     border-radius: 0 !important;
     background: #fff !important;
+    color: #000 !important;
     box-sizing: border-box !important;
+
+    * {
+      color: #000 !important;
+    }
   }
 }
 
