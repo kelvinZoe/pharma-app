@@ -109,13 +109,25 @@ body {
   .sidebar,
   .sidebar-overlay,
   .topbar,
-  app-toast-container,
+  app-toast,
+  .toast-container,
   .no-print {
     display: none !important;
   }
 
   html, body,
   app-root,
+  app-shell,
+  app-module-shell,
+  app-frontdesk-page,
+  app-billing-desk-page,
+  app-frontdesk-clients-page,
+  app-frontdesk-visits-page,
+  app-frontdesk-registration-page,
+  app-worklist-queue-page,
+  app-worklist-results-page,
+  app-pharmacy-inventory-page,
+  app-pharmacy-pos-sales-page,
   .shell-container,
   .workspace-main,
   .content-portal,
@@ -127,7 +139,7 @@ body {
     position: static !important;
     margin: 0 !important;
     padding: 0 !important;
-    background: #fff !important;
+    background: transparent !important;
     box-shadow: none !important;
   }
 }

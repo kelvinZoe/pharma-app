@@ -1171,6 +1171,20 @@
     display: none !important;
   }
 
+  .clients-workspace,
+  .visits-workspace,
+  .registration-workspace,
+  .billing-workspace {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
   /* Reset modal containers to print standard content only without backdrops or cards */
   .modal-backdrop {
     position: static !important;
@@ -1180,6 +1194,7 @@
     margin: 0 !important;
     width: 100% !important;
     height: auto !important;
+    min-height: 0 !important;
     box-shadow: none !important;
     display: block !important;
   }
@@ -1193,6 +1208,7 @@
     margin: 0 !important;
     width: 100% !important;
     height: auto !important;
+    min-height: 0 !important;
     max-width: none !important;
     display: block !important;
   }
@@ -1203,6 +1219,8 @@
     padding: 0 !important;
     margin: 0 !important;
     overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
     max-height: none !important;
     display: block !important;
   }
