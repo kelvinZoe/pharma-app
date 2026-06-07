@@ -67,41 +67,87 @@ interface ServiceItem {
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let p of patients()" (click)="selectPatient(p)">
-                  <td><code class="tag code" style="font-weight: 700; font-family: monospace;">{{ p.patientCode || p.code || 'N/A' }}</code></td>
-                  <td><strong style="color: var(--app-text-color); font-weight: 600;">{{ p.surname }}, {{ p.firstName }} {{ p.middleName || '' }}</strong></td>
-                  <td>
-                    <span class="tag sex" [class.male]="p.sex === 'male'" [class.female]="p.sex === 'female'">
-                      {{ p.sex === 'male' ? 'Male' : (p.sex === 'female' ? 'Female' : 'Other') }}
-                    </span>
-                    <span class="tag age" style="margin-left: 0.25rem;">{{ p.age }} yrs</span>
-                  </td>
-                  <td>{{ p.phone }}</td>
-                  <td>{{ p.emergencyContactName || 'N/A' }} ({{ p.emergencyContactPhone || 'N/A' }})</td>
-                  <td style="text-align: right;" (click)="$event.stopPropagation()">
-                    <button class="btn btn-secondary btn-sm" (click)="selectPatient(p)" style="display: inline-flex; align-items: center; gap: 0.25rem; font-weight: 700;">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M12 8v8"></path>
-                        <path d="M8 12h8"></path>
-                      </svg>
-                      <span>Manage & Route</span>
-                    </button>
-                  </td>
-                </tr>
-                <tr *ngIf="patients().length === 0">
-                  <td colspan="6" style="text-align: center; padding: 4rem 2rem; color: var(--app-muted-text-color);">
-                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem;">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 48px; height: 48px; color: var(--slate-300);">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="8" y1="12" x2="16" y2="12"></line>
-                      </svg>
-                      <p style="margin: 0; font-size: 0.95rem; font-weight: 500;">No patient records match the filter criteria.</p>
-                    </div>
-                  </td>
-                </tr>
+                <!-- Loading Skeleton Rows -->
+                <ng-container *ngIf="loading()">
+                  <tr *ngFor="let dummy of [1, 2, 3, 4, 5]">
+                    <td><div class="skeleton-shimmer" style="width: 70px;"></div></td>
+                    <td><div class="skeleton-shimmer" style="width: 140px;"></div></td>
+                    <td><div class="skeleton-shimmer" style="width: 95px;"></div></td>
+                    <td><div class="skeleton-shimmer" style="width: 90px;"></div></td>
+                    <td><div class="skeleton-shimmer" style="width: 160px;"></div></td>
+                    <td style="text-align: right;"><div class="skeleton-shimmer" style="width: 100px; display: inline-block;"></div></td>
+                  </tr>
+                </ng-container>
+
+                <!-- Patient Data Rows -->
+                <ng-container *ngIf="!loading()">
+                  <tr *ngFor="let p of paginatedPatients()" (click)="selectPatient(p)">
+                    <td><code class="tag code" style="font-weight: 700; font-family: monospace;">{{ p.patientCode || p.code || 'N/A' }}</code></td>
+                    <td><strong style="color: var(--app-text-color); font-weight: 600;">{{ p.surname }}, {{ p.firstName }} {{ p.middleName || '' }}</strong></td>
+                    <td>
+                      <span class="tag sex" [class.male]="p.sex === 'male'" [class.female]="p.sex === 'female'">
+                        {{ p.sex === 'male' ? 'Male' : (p.sex === 'female' ? 'Female' : 'Other') }}
+                      </span>
+                      <span class="tag age" style="margin-left: 0.25rem;">{{ p.age }} yrs</span>
+                    </td>
+                    <td>{{ p.phone }}</td>
+                    <td>{{ p.emergencyContactName || 'N/A' }} ({{ p.emergencyContactPhone || 'N/A' }})</td>
+                    <td style="text-align: right;" (click)="$event.stopPropagation()">
+                      <button class="btn btn-secondary btn-sm" (click)="selectPatient(p)" style="display: inline-flex; align-items: center; gap: 0.25rem; font-weight: 700;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;">
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <path d="M12 8v8"></path>
+                          <path d="M8 12h8"></path>
+                        </svg>
+                        <span>Manage & Route</span>
+                      </button>
+                    </td>
+                  </tr>
+                  <tr *ngIf="totalPatients() === 0">
+                    <td colspan="6" style="text-align: center; padding: 4rem 2rem; color: var(--app-muted-text-color);">
+                      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 48px; height: 48px; color: var(--slate-300);">
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <line x1="8" y1="12" x2="16" y2="12"></line>
+                        </svg>
+                        <p style="margin: 0; font-size: 0.95rem; font-weight: 500;">No patient records match the filter criteria.</p>
+                      </div>
+                    </td>
+                  </tr>
+                </ng-container>
               </tbody>
             </table>
+          </div>
+
+          <!-- Pagination Footer -->
+          <div class="table-footer" *ngIf="!loading() && totalPatients() > 0">
+            <div class="pagination-info">
+              Showing <strong>{{ getRangeStart() }}-{{ getRangeEnd() }}</strong> of <strong>{{ totalPatients() }}</strong> clients
+            </div>
+            <div class="pagination-controls">
+              <button 
+                class="page-btn" 
+                [disabled]="page() === 1" 
+                (click)="page.set(page() - 1)"
+              >
+                &larr; Prev
+              </button>
+              <button 
+                *ngFor="let pNum of [].constructor(totalPages()); let i = index" 
+                class="page-btn" 
+                [class.active]="page() === i + 1"
+                (click)="page.set(i + 1)"
+              >
+                {{ i + 1 }}
+              </button>
+              <button 
+                class="page-btn" 
+                [disabled]="page() === totalPages()" 
+                (click)="page.set(page() + 1)"
+              >
+                Next &rarr;
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -154,7 +200,18 @@ interface ServiceItem {
               <!-- History Section -->
               <div class="sub-panel history-section" style="max-height: 480px; display: flex; flex-direction: column;">
                 <h4>Visit History</h4>
-                <div class="history-timeline" style="flex: 1; max-height: 380px;" *ngIf="history().length > 0; else noHistory">
+                <!-- History Loading Shimmers -->
+                <div style="display: flex; flex-direction: column; gap: 0.75rem; padding: 0.5rem;" *ngIf="loadingHistory()">
+                  <div *ngFor="let dummy of [1, 2]" style="display: flex; gap: 1rem; position: relative; padding-bottom: 0.5rem;">
+                    <div class="timeline-dot" style="background-color: var(--app-border-color); margin-top: 4px;"></div>
+                    <div class="history-content" style="display: flex; flex-direction: column; gap: 0.35rem; width: 100%;">
+                      <div class="skeleton-shimmer" style="width: 50%; height: 12px;"></div>
+                      <div class="skeleton-shimmer" style="width: 80%; height: 10px;"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="history-timeline" style="flex: 1; max-height: 380px;" *ngIf="!loadingHistory() && history().length > 0; else noHistory">
                   <div *ngFor="let h of history()" class="history-item">
                     <div class="timeline-dot" [class.completed]="h.status === 'completed' || h.status === 'paid'"></div>
                     <div class="history-content">
@@ -171,7 +228,7 @@ interface ServiceItem {
                   </div>
                 </div>
                 <ng-template #noHistory>
-                  <div class="sub-empty" style="text-align: center; padding: 3rem 1rem; color: var(--app-muted-text-color);">
+                  <div class="sub-empty" style="text-align: center; padding: 3rem 1rem; color: var(--app-muted-text-color);" *ngIf="!loadingHistory()">
                     <p>No past visits recorded for this client.</p>
                   </div>
                 </ng-template>
@@ -264,27 +321,58 @@ export class FrontdeskClientsPageComponent implements OnInit {
   readonly serviceFilter = signal('');
   readonly isSubmitting = signal(false);
 
+  // Pagination & Loader signals
+  readonly page = signal(1);
+  readonly limit = signal(10);
+  readonly loading = signal(false);
+  readonly loadingHistory = signal(false);
+
+  readonly totalPatients = computed(() => this.patients().length);
+  readonly paginatedPatients = computed(() => {
+    const start = (this.page() - 1) * this.limit();
+    return this.patients().slice(start, start + this.limit());
+  });
+  readonly totalPages = computed(() => Math.ceil(this.totalPatients() / this.limit()));
+  readonly getRangeStart = computed(() => {
+    if (this.totalPatients() === 0) return 0;
+    return (this.page() - 1) * this.limit() + 1;
+  });
+  readonly getRangeEnd = computed(() => {
+    return Math.min(this.page() * this.limit(), this.totalPatients());
+  });
+
   ngOnInit(): void {
     this.loadServices();
     this.loadAllPatients();
   }
 
   loadAllPatients(): void {
+    this.loading.set(true);
     this.api.searchPatients('').subscribe({
       next: (res) => {
         this.patients.set(res);
+        this.loading.set(false);
       },
-      error: (err) => console.error('Patient search error', err)
+      error: (err) => {
+        console.error('Patient search error', err);
+        this.loading.set(false);
+      }
     });
   }
 
   onSearchChange(): void {
     const query = this.searchQuery().trim();
+    this.loading.set(true);
+    this.page.set(1);
     this.api.searchPatients(query).subscribe({
       next: (res) => {
         this.patients.set(res);
+        this.loading.set(false);
       },
-      error: (err) => console.error('Patient search error', err)
+      error: (err) => {
+        console.error('Patient search error', err);
+        this.loading.set(false);
+      }
     });
   }
 
@@ -305,6 +393,8 @@ export class FrontdeskClientsPageComponent implements OnInit {
 
   selectPatient(p: any): void {
     this.selectedPatient.set(p);
+    this.history.set([]);
+    this.loadingHistory.set(true);
     
     // Reset service selections
     this.services.update(list => list.map(s => ({ ...s, selected: false })));
@@ -313,13 +403,19 @@ export class FrontdeskClientsPageComponent implements OnInit {
     this.api.getPatientHistory(p.id).subscribe({
       next: (res) => {
         this.history.set(res);
+        this.loadingHistory.set(false);
       },
-      error: (err) => console.error('Error fetching history', err)
+      error: (err) => {
+        console.error('Error fetching history', err);
+        this.loadingHistory.set(false);
+      }
     });
   }
 
   closeModal(): void {
     this.selectedPatient.set(null);
+    this.history.set([]);
+    this.loadingHistory.set(false);
     this.services.update(list => list.map(s => ({ ...s, selected: false })));
     this.serviceFilter.set('');
   }

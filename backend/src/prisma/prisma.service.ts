@@ -34,7 +34,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     let adapter: any;
 
     if (isProduction) {
-      const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+      const pool = new Pool({ 
+        connectionString: process.env.DATABASE_URL,
+        max: 5, // Allow up to 5 concurrent connections to handle simultaneous API calls
+        idleTimeoutMillis: 30000, // Automatically close idle connections after 30 seconds
+        connectionTimeoutMillis: 5000, // Timeout after 5 seconds if connection cannot be established
+      });
       adapter = new PrismaPg(pool);
     } else {
       const baseDir = process.cwd().endsWith('backend') ? process.cwd() : path.join(process.cwd(), 'backend');

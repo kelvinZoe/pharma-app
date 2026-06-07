@@ -42,13 +42,31 @@ import { AppDropdownComponent } from '../../../shared/ui/app-dropdown/app-dropdo
             </div>
           </div>
 
-          <button class="btn btn-secondary btn-sm" (click)="loadVisits()">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;">
-              <polyline points="23 4 23 10 17 10"></polyline>
-              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-            </svg>
-            <span>Refresh Queue</span>
-          </button>
+          <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            <!-- Search bar -->
+            <div class="filter-search-group" style="position: relative; width: 240px; margin-bottom: 0;">
+              <input
+                type="text"
+                placeholder="Search patient or code..."
+                [ngModel]="searchQuery()"
+                (ngModelChange)="onSearchChange($event)"
+                class="search-input-control"
+                style="padding-top: 0.35rem; padding-bottom: 0.35rem; font-size: 0.8rem; border-radius: 0.375rem; width: 100%;"
+              />
+              <svg class="search-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px; left: 0.65rem; position: absolute; top: 50%; transform: translateY(-50%); color: var(--app-muted-text-color); pointer-events: none;">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </div>
+
+            <button class="btn btn-secondary btn-sm" (click)="loadVisits()">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+              <span>Refresh Queue</span>
+            </button>
+          </div>
         </div>
 
         <p class="section-desc" style="margin-bottom: 1.25rem;">
@@ -71,49 +89,96 @@ import { AppDropdownComponent } from '../../../shared/ui/app-dropdown/app-dropdo
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let v of visits()" (click)="selectVisit(v)">
-                  <td>
-                    <code class="tag code" style="font-weight: 700; font-family: monospace;">
-                      VIS-{{ v.id.slice(-6).toUpperCase() }}
-                    </code>
-                  </td>
-                  <td>
-                    <strong style="color: var(--app-text-color); font-weight: 600;">{{ v.patient.surname }}, {{ v.patient.firstName }}</strong>
-                    <div style="font-size: 0.75rem; color: var(--app-muted-text-color);">ID: {{ v.patient.patientCode }}</div>
-                  </td>
-                  <td>
-                    <span class="status-pill" [class]="v.status">{{ getStatusLabel(v.status) }}</span>
-                  </td>
-                  <td>{{ v.createdAt | date:'shortTime' }}</td>
-                  <td>
-                    <div style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem;" [title]="getProceduresSummary(v)">
-                      {{ getProceduresSummary(v) }}
-                    </div>
-                  </td>
-                  <td style="text-align: right; font-weight: 700; color: var(--app-primary-color);">
-                    ₵{{ getVisitBillTotal(v).toFixed(2) }}
-                  </td>
-                  <td style="text-align: right;" (click)="$event.stopPropagation()">
-                    <button class="btn btn-secondary btn-sm" (click)="selectVisit(v)" style="font-weight: 700;">
-                      {{ showHistory() ? '🖨️ Reprint Receipt' : 'Process Checkout' }}
-                    </button>
-                  </td>
-                </tr>
-                <tr *ngIf="visits().length === 0">
-                  <td colspan="7" style="text-align: center; padding: 4rem 2rem; color: var(--app-muted-text-color);">
-                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem;">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 48px; height: 48px; color: var(--slate-300);">
-                        <rect x="2" y="4" width="20" height="16" rx="2"></rect>
-                        <line x1="2" y1="10" x2="22" y2="10"></line>
-                      </svg>
-                      <p style="margin: 0; font-size: 0.95rem; font-weight: 500;">
-                        {{ showHistory() ? 'No paid visits found in history.' : 'No active visits awaiting billing desk checkout.' }}
-                      </p>
-                    </div>
-                  </td>
-                </tr>
+                <!-- Loading Skeleton Rows -->
+                <ng-container *ngIf="loading()">
+                  <tr *ngFor="let dummy of [1, 2, 3, 4, 5]">
+                    <td><div class="skeleton-shimmer" style="width: 80px;"></div></td>
+                    <td><div class="skeleton-shimmer" style="width: 150px;"></div></td>
+                    <td><div class="skeleton-shimmer" style="width: 100px;"></div></td>
+                    <td><div class="skeleton-shimmer" style="width: 60px;"></div></td>
+                    <td><div class="skeleton-shimmer" style="width: 180px;"></div></td>
+                    <td style="text-align: right;"><div class="skeleton-shimmer" style="width: 70px; display: inline-block;"></div></td>
+                    <td style="text-align: right;"><div class="skeleton-shimmer" style="width: 90px; display: inline-block;"></div></td>
+                  </tr>
+                </ng-container>
+
+                <!-- Data Rows -->
+                <ng-container *ngIf="!loading()">
+                  <tr *ngFor="let v of paginatedVisits()" (click)="selectVisit(v)">
+                    <td>
+                      <code class="tag code" style="font-weight: 700; font-family: monospace;">
+                        VIS-{{ v.id.slice(-6).toUpperCase() }}
+                      </code>
+                    </td>
+                    <td>
+                      <strong style="color: var(--app-text-color); font-weight: 600;">{{ v.patient.surname }}, {{ v.patient.firstName }}</strong>
+                      <div style="font-size: 0.75rem; color: var(--app-muted-text-color);">ID: {{ v.patient.patientCode }}</div>
+                    </td>
+                    <td>
+                      <span class="status-pill" [class]="v.status">{{ getStatusLabel(v.status) }}</span>
+                    </td>
+                    <td>{{ v.createdAt | date:'shortTime' }}</td>
+                    <td>
+                      <div style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem;" [title]="getProceduresSummary(v)">
+                        {{ getProceduresSummary(v) }}
+                      </div>
+                    </td>
+                    <td style="text-align: right; font-weight: 700; color: var(--app-primary-color);">
+                      ₵{{ getVisitBillTotal(v).toFixed(2) }}
+                    </td>
+                    <td style="text-align: right;" (click)="$event.stopPropagation()">
+                      <button class="btn btn-secondary btn-sm" (click)="selectVisit(v)" style="font-weight: 700;">
+                        {{ showHistory() ? '🖨️ Reprint Receipt' : 'Process Checkout' }}
+                      </button>
+                    </td>
+                  </tr>
+                  <tr *ngIf="totalVisits() === 0">
+                    <td colspan="7" style="text-align: center; padding: 4rem 2rem; color: var(--app-muted-text-color);">
+                      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 48px; height: 48px; color: var(--slate-300);">
+                          <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                          <line x1="2" y1="10" x2="22" y2="10"></line>
+                        </svg>
+                        <p style="margin: 0; font-size: 0.95rem; font-weight: 500;">
+                          {{ showHistory() ? 'No paid visits found in history.' : 'No active visits awaiting billing desk checkout.' }}
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                </ng-container>
               </tbody>
             </table>
+          </div>
+
+          <!-- Pagination Footer -->
+          <div class="table-footer" *ngIf="!loading() && totalVisits() > 0">
+            <div class="pagination-info">
+              Showing <strong>{{ getRangeStart() }}-{{ getRangeEnd() }}</strong> of <strong>{{ totalVisits() }}</strong> entries
+            </div>
+            <div class="pagination-controls">
+              <button 
+                class="page-btn" 
+                [disabled]="page() === 1" 
+                (click)="page.set(page() - 1)"
+              >
+                &larr; Prev
+              </button>
+              <button 
+                *ngFor="let pNum of [].constructor(totalPages()); let i = index" 
+                class="page-btn" 
+                [class.active]="page() === i + 1"
+                (click)="page.set(i + 1)"
+              >
+                {{ i + 1 }}
+              </button>
+              <button 
+                class="page-btn" 
+                [disabled]="page() === totalPages()" 
+                (click)="page.set(page() + 1)"
+              >
+                Next &rarr;
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -163,13 +228,13 @@ import { AppDropdownComponent } from '../../../shared/ui/app-dropdown/app-dropdo
               </div>
 
               <!-- Content Split Layout -->
-              <div class="actions-grid" style="grid-template-columns: 1.2fr 1fr; gap: 1.25rem;">
+              <div class="actions-grid" style="grid-template-columns: 1.2fr 1fr; gap: 1.25rem;" *ngIf="invoice() || loadingInvoice()">
                 
                 <!-- Left: Procedures List -->
                 <div class="sub-panel" style="padding: 1rem; display: flex; flex-direction: column;">
                   <h4 style="margin-bottom: 0.75rem;">Visit Procedures Checklist</h4>
                   
-                  <div style="flex: 1; overflow-y: auto; max-height: 280px; display: flex; flex-direction: column; gap: 0.5rem;" *ngIf="invoice()">
+                  <div style="flex: 1; overflow-y: auto; max-height: 280px; display: flex; flex-direction: column; gap: 0.5rem;" *ngIf="invoice() && !loadingInvoice()">
                     <div *ngFor="let s of invoice().services" style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; border: 1px solid var(--app-border-color); border-radius: 0.5rem; background: #fafafa;">
                       <div style="flex: 1; display: flex; flex-direction: column;">
                         <span style="font-size: 0.85rem; font-weight: 600; color: var(--app-text-color);">{{ s.serviceName }}</span>
@@ -196,12 +261,23 @@ import { AppDropdownComponent } from '../../../shared/ui/app-dropdown/app-dropdo
                       Procedures cancelled by departments are excluded from the checkout total.
                     </div>
                   </div>
+
+                  <!-- Procedures Loading Shimmers -->
+                  <div style="display: flex; flex-direction: column; gap: 0.5rem;" *ngIf="loadingInvoice()">
+                    <div *ngFor="let dummy of [1, 2]" style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; border: 1px solid var(--app-border-color); border-radius: 0.5rem; background: #fff;">
+                      <div style="display: flex; flex-direction: column; gap: 0.35rem; width: 70%;">
+                        <div class="skeleton-shimmer" style="width: 80%; height: 14px;"></div>
+                        <div class="skeleton-shimmer" style="width: 50%; height: 10px;"></div>
+                      </div>
+                      <div class="skeleton-shimmer" style="width: 40px; height: 14px;"></div>
+                    </div>
+                  </div>
                 </div>
 
                 <!-- Right: Totals and Payment form -->
                 <div style="display: flex; flex-direction: column; gap: 1rem;">
                   <!-- Stat totals cards -->
-                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;" *ngIf="invoice()">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;" *ngIf="invoice() && !loadingInvoice()">
                     <div style="background: #fafafa; border: 1px solid var(--app-border-color); border-radius: 0.5rem; padding: 0.5rem; text-align: center;">
                       <div style="font-size: 0.7rem; color: var(--app-muted-text-color); font-weight: 600; text-transform: uppercase;">Subtotal</div>
                       <strong style="font-size: 1.1rem; color: var(--app-text-color);">₵{{ invoice().subtotal.toFixed(2) }}</strong>
@@ -212,8 +288,20 @@ import { AppDropdownComponent } from '../../../shared/ui/app-dropdown/app-dropdo
                     </div>
                   </div>
 
+                  <!-- Totals Loading Skeletons -->
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;" *ngIf="loadingInvoice()">
+                    <div style="background: #fafafa; border: 1px solid var(--app-border-color); border-radius: 0.5rem; padding: 0.75rem; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.35rem;">
+                      <div class="skeleton-shimmer" style="width: 60px; height: 10px;"></div>
+                      <div class="skeleton-shimmer" style="width: 80px; height: 18px;"></div>
+                    </div>
+                    <div style="background: #fafafa; border: 1px solid var(--app-border-color); border-radius: 0.5rem; padding: 0.75rem; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.35rem;">
+                      <div class="skeleton-shimmer" style="width: 60px; height: 10px;"></div>
+                      <div class="skeleton-shimmer" style="width: 80px; height: 18px;"></div>
+                    </div>
+                  </div>
+
                   <!-- Payment form if outstanding balance -->
-                  <div class="payment-form" style="padding: 1rem; border-radius: 0.75rem; border: 1px dashed var(--app-border-color); background: #fff;" *ngIf="invoice() && invoice().balanceDue > 0">
+                  <div class="payment-form" style="padding: 1rem; border-radius: 0.75rem; border: 1px dashed var(--app-border-color); background: #fff;" *ngIf="invoice() && !loadingInvoice() && invoice().balanceDue > 0">
                     <h4 style="font-size: 0.95rem; margin-bottom: 0.75rem;">Collect Payment</h4>
                     
                     <div class="form-group" style="margin-bottom: 0.75rem;">
@@ -253,7 +341,7 @@ import { AppDropdownComponent } from '../../../shared/ui/app-dropdown/app-dropdo
                   </div>
 
                   <!-- Already paid actions -->
-                  <div class="already-paid-container" *ngIf="invoice() && invoice().balanceDue === 0" style="padding: 1.5rem; text-align: center; background: #fafafa; border: 1px solid var(--app-border-color); border-radius: 0.75rem;">
+                  <div class="already-paid-container" *ngIf="invoice() && !loadingInvoice() && invoice().balanceDue === 0" style="padding: 1.5rem; text-align: center; background: #fafafa; border: 1px solid var(--app-border-color); border-radius: 0.75rem;">
                     <div style="color: var(--app-success-color); margin-bottom: 0.5rem; display: flex; justify-content: center;">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 48px; height: 48px;">
                         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
@@ -272,8 +360,38 @@ import { AppDropdownComponent } from '../../../shared/ui/app-dropdown/app-dropdo
                     </button>
                   </div>
 
+                  <!-- Checkout Form Loading Skeleton -->
+                  <div style="padding: 1.25rem; border-radius: 0.75rem; border: 1px dashed var(--app-border-color); background: #fff; display: flex; flex-direction: column; gap: 0.75rem;" *ngIf="loadingInvoice()">
+                    <div class="skeleton-shimmer" style="width: 100px; height: 14px; margin-bottom: 0.25rem;"></div>
+                    <div class="skeleton-shimmer" style="width: 100%; height: 36px; border-radius: 6px;"></div>
+                    <div class="skeleton-shimmer" style="width: 150px; height: 14px; margin-top: 0.25rem; margin-bottom: 0.25rem;"></div>
+                    <div class="skeleton-shimmer" style="width: 100%; height: 36px; border-radius: 6px;"></div>
+                    <div class="skeleton-shimmer" style="width: 100%; height: 42px; border-radius: 8px; margin-top: 0.5rem;"></div>
+                  </div>
                 </div>
 
+              </div>
+
+              <!-- Error State if Invoice failed to load -->
+              <div *ngIf="!invoice() && !loadingInvoice()" style="padding: 3rem 1.5rem; text-align: center; background: #fff; border: 1px solid var(--app-border-color); border-radius: 0.75rem; display: flex; flex-direction: column; align-items: center; gap: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-top: 1rem;">
+                <div style="color: var(--app-danger-color);">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 48px; height: 48px;">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                  </svg>
+                </div>
+                <h3 style="font-weight: 700; font-size: 1.15rem; color: var(--app-text-color); margin: 0;">Failed to Load Invoice Details</h3>
+                <p style="font-size: 0.85rem; color: var(--app-muted-text-color); margin: 0; max-width: 380px; line-height: 1.5;">
+                  The clinic invoice could not be retrieved or computed for this visit. This can happen if no billing record exists in the database.
+                </p>
+                <button class="btn btn-secondary" (click)="selectVisit(v)" style="font-weight: 700; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.25rem; margin-top: 0.5rem;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 14px; height: 14px;">
+                    <path d="M21.5 2v6h-6"></path>
+                    <path d="M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+                  </svg>
+                  <span>Retry Loading</span>
+                </button>
               </div>
 
             </div>
@@ -347,13 +465,15 @@ import { AppDropdownComponent } from '../../../shared/ui/app-dropdown/app-dropdo
                 </div>
               </div>
 
-              <div style="margin-top: 12px; font-size: 9px;">
-
-                  <div style="border-top: 1px dashed var(--app-muted-text-color); padding-top: 0.35rem; text-align: center;">
-                  Prepared By (Cashier Stamp & Signature)
+              <!-- A5 Receipt Signature Block -->
+              <div class="receipt-signatures">
+                <div class="sig-field">
+                  <div class="sig-line"></div>
+                  <span>Prepared By (Cashier Stamp & Signature)</span>
                 </div>
-                <div style="border-top: 1px dashed var(--app-muted-text-color); padding-top: 0.35rem; text-align: center;">
-                  Patient/Depositor Signature
+                <div class="sig-field">
+                  <div class="sig-line"></div>
+                  <span>Patient/Depositor Signature</span>
                 </div>
               </div>
               
@@ -412,6 +532,40 @@ export class BillingDeskPageComponent implements OnInit {
   readonly showReceipt = signal(false);
   readonly showHistory = signal(false);
 
+  // Search, Pagination & Loading state signals
+  readonly searchQuery = signal('');
+  readonly page = signal(1);
+  readonly limit = signal(10);
+  readonly loading = signal(false);
+  readonly loadingInvoice = signal(false);
+
+  readonly filteredVisits = computed(() => {
+    const list = this.visits();
+    const query = this.searchQuery().toLowerCase().trim();
+    if (!query) return list;
+    return list.filter(v => {
+      const name = `${v.patient?.surname}, ${v.patient?.firstName}`.toLowerCase();
+      const patientCode = (v.patient?.patientCode || '').toLowerCase();
+      const visitCode = `VIS-${v.id.slice(-6).toUpperCase()}`.toLowerCase();
+      return name.includes(query) || patientCode.includes(query) || visitCode.includes(query);
+    });
+  });
+
+  readonly paginatedVisits = computed(() => {
+    const start = (this.page() - 1) * this.limit();
+    return this.filteredVisits().slice(start, start + this.limit());
+  });
+
+  readonly totalVisits = computed(() => this.filteredVisits().length);
+  readonly totalPages = computed(() => Math.ceil(this.totalVisits() / this.limit()));
+  readonly getRangeStart = computed(() => {
+    if (this.totalVisits() === 0) return 0;
+    return (this.page() - 1) * this.limit() + 1;
+  });
+  readonly getRangeEnd = computed(() => {
+    return Math.min(this.page() * this.limit(), this.totalVisits());
+  });
+
   readonly settings = signal<any>({
     clinicName: 'KELVIN CLINICAL DIAGNOSTICS & PHARMACY',
     tagline: 'Pathology, Diagnostic Imaging, & Premium Pharmaceutical Care',
@@ -440,7 +594,14 @@ export class BillingDeskPageComponent implements OnInit {
     this.selectedVisit.set(null);
     this.invoice.set(null);
     this.paymentReference.set('');
+    this.searchQuery.set('');
+    this.page.set(1);
     this.loadVisits();
+  }
+
+  onSearchChange(val: string): void {
+    this.searchQuery.set(val);
+    this.page.set(1);
   }
 
   loadSettings(): void {
@@ -454,6 +615,7 @@ export class BillingDeskPageComponent implements OnInit {
 
   loadVisits(): void {
     const showAll = this.showHistory();
+    this.loading.set(true);
     this.api.getActiveVisits(undefined, showAll).subscribe({
       next: (res) => {
         if (showAll) {
@@ -461,8 +623,12 @@ export class BillingDeskPageComponent implements OnInit {
         } else {
           this.visits.set(res.filter(v => v.status === 'completed' || v.status === 'awaiting_payment'));
         }
+        this.loading.set(false);
       },
-      error: (err) => console.error('Error fetching billing queue', err)
+      error: (err) => {
+        console.error('Error fetching billing queue', err);
+        this.loading.set(false);
+      }
     });
   }
 
@@ -481,6 +647,7 @@ export class BillingDeskPageComponent implements OnInit {
     this.invoice.set(null);
     this.paymentReference.set('');
     this.showReceipt.set(false);
+    this.loadingInvoice.set(true);
     
     this.api.getInvoice(v.id).subscribe({
       next: (res) => {
@@ -508,8 +675,12 @@ export class BillingDeskPageComponent implements OnInit {
           services: servicesList
         };
         this.invoice.set(normalized);
+        this.loadingInvoice.set(false);
       },
-      error: (err) => console.error('Error fetching clinic invoice', err)
+      error: (err) => {
+        console.error('Error fetching clinic invoice', err);
+        this.loadingInvoice.set(false);
+      }
     });
   }
 

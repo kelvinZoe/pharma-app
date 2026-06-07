@@ -453,7 +453,7 @@
   }
 }
 
-/* Receipt Print (Thermal Style) */
+/* Receipt Print (Thermal Style — 80mm Roll) */
 .pharmacy-receipt-thermal {
   width: 76mm;
   background-color: #fff;
@@ -464,91 +464,108 @@
   color: #000;
   box-shadow: 0 4px 15px rgba(0,0,0,0.05);
   margin: 0 auto;
+  line-height: 1.4;
 
   .header {
     text-align: center;
     border-bottom: 1px dashed #000;
-    padding-bottom: 10px;
-    margin-bottom: 10px;
+    padding-bottom: 6px;
+    margin-bottom: 8px;
     
-    h2 { margin: 0; font-size: 14px; font-weight: bold; }
-    p { margin: 2px 0; font-size: 10px; }
+    h2 { margin: 0; font-size: 13px; font-weight: bold; }
+    p { margin: 1px 0; font-size: 9px; color: #444; }
+    img { max-height: 36px; max-width: 140px; object-fit: contain; filter: grayscale(100%); margin-bottom: 4px; }
   }
 
   .meta {
     border-bottom: 1px dashed #000;
-    padding-bottom: 5px;
-    margin-bottom: 10px;
+    padding-bottom: 4px;
+    margin-bottom: 8px;
+    font-size: 9px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 4px;
     
-    div { margin-bottom: 2px; }
+    div { margin-bottom: 0; }
   }
 
   .item-table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
+    font-size: 9px;
     
     th, td {
-      padding: 3px 0;
+      padding: 3px 2px;
       text-align: left;
-      font-size: 11px;
+      font-size: 9px;
     }
     
     th { border-bottom: 1px dashed #000; font-weight: bold; }
     .num { text-align: right; }
+    
+    td div {
+      font-size: 8px;
+      color: #555;
+    }
   }
 
   .totals {
     border-top: 1px dashed #000;
-    padding-top: 5px;
-    margin-bottom: 15px;
+    padding-top: 4px;
+    margin-bottom: 8px;
+    font-size: 9.5px;
     
     div {
       display: flex;
       justify-content: space-between;
       margin-bottom: 2px;
       
-      &.grand { font-weight: bold; font-size: 12px; }
+      &.grand { font-weight: bold; font-size: 11px; border-top: 1px solid #000; padding-top: 2px; margin-top: 2px; }
     }
   }
 
   .footer {
     text-align: center;
     border-top: 1px dashed #000;
-    padding-top: 10px;
-    margin-top: 10px;
-    font-size: 10px;
+    padding-top: 6px;
+    margin-top: 8px;
+    font-size: 9px;
+    line-height: 1.3;
+    p { margin: 0; }
   }
 }
 
 /* ============================================================
-   THERMAL POS RECEIPT PRINT — 80mm roll paper
+   THERMAL POS RECEIPT PRINT — 80mm wide auto-height continuous roll
    ============================================================ */
 @media print {
-  /* Hide all app chrome */
-  body > * { visibility: hidden; }
+  /* Hide active POS screens, headers, grids, and modal backdrops */
+  .modern-page-header,
+  .pos-grid,
+  .shift-closure-trigger-btn,
+  .shift-closure-dialog-overlay,
+  .modal-backdrop,
+  .panel:not(.pharmacy-receipt-thermal) {
+    display: none !important;
+  }
 
-  /* Show only the thermal receipt */
-  .pharmacy-receipt-thermal,
-  .pharmacy-receipt-thermal * { visibility: visible; }
-
-  /* 80mm roll paper page setup */
+  /* --- Page setup: 80mm wide auto-height paper size --- */
   @page {
     size: 80mm auto;
     margin: 3mm 2mm;
   }
 
-  /* Anchor receipt to top-left corner */
+  /* Style thermal receipt for continuous flow roll printing */
   .pharmacy-receipt-thermal {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: 76mm;
+    display: block !important;
+    position: static !important;
+    width: 76mm !important;
+    max-width: 76mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
     background: #fff !important;
   }
-
-  /* Hide action buttons */
-  .no-print { display: none !important; }
 }

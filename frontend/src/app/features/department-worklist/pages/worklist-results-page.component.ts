@@ -112,40 +112,55 @@ interface ServiceHistoryLine {
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let v of todayVisits()" (click)="selectVisitAndOpen(v)">
-                  <td>
-                    <code class="tag code" style="font-weight: 700; font-family: monospace;">
-                      {{ v.patient.patientCode }}
-                    </code>
-                  </td>
-                  <td><strong style="color: var(--slate-800); font-weight: 600;">{{ v.patient.surname }}, {{ v.patient.firstName }}</strong></td>
-                  <td>{{ v.patient.sex | uppercase }} • {{ v.patient.age }} Yrs</td>
-                  <td>{{ v.createdAt | date:'shortTime' }}</td>
-                  <td>
-                    <div style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem;" [title]="getVisitDeptServicesLabel(v)">
-                      {{ getVisitDeptServicesLabel(v) }}
-                    </div>
-                  </td>
-                  <td>
-                    <span class="status-pill" [class]="v.status">{{ getStatusLabel(v.status) }}</span>
-                  </td>
-                  <td style="text-align: right;" (click)="$event.stopPropagation()">
-                    <button class="btn btn-secondary btn-sm" (click)="selectVisitAndOpen(v)" style="font-weight: 700;">
-                      Inspect Dossier
-                    </button>
-                  </td>
-                </tr>
-                <tr *ngIf="todayVisits().length === 0">
-                  <td colspan="7" style="text-align: center; padding: 4rem 2rem; color: var(--slate-400);">
-                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem;">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 48px; height: 48px; color: var(--slate-300);">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="8" y1="12" x2="16" y2="12"></line>
-                      </svg>
-                      <p style="margin: 0; font-size: 0.95rem; font-weight: 500;">No visits found for the {{ deptName() }} department today.</p>
-                    </div>
-                  </td>
-                </tr>
+                <!-- Shimmer skeletons while loading today visits -->
+                <ng-container *ngIf="isLoadingToday()">
+                  <tr *ngFor="let dummy of [1, 2, 3, 4]">
+                    <td><div class="skeleton-shimmer" style="height: 1.5rem; width: 80px;"></div></td>
+                    <td><div class="skeleton-shimmer" style="height: 1.2rem; width: 140px;"></div></td>
+                    <td><div class="skeleton-shimmer" style="height: 1.1rem; width: 90px;"></div></td>
+                    <td><div class="skeleton-shimmer" style="height: 1.1rem; width: 70px;"></div></td>
+                    <td><div class="skeleton-shimmer" style="height: 1.1rem; width: 180px;"></div></td>
+                    <td><div class="skeleton-shimmer" style="height: 1.3rem; width: 80px; border-radius: 99px;"></div></td>
+                    <td style="text-align: right;"><div class="skeleton-shimmer" style="height: 1.8rem; width: 100px; border-radius: 0.5rem; margin-left: auto;"></div></td>
+                  </tr>
+                </ng-container>
+
+                <ng-container *ngIf="!isLoadingToday()">
+                  <tr *ngFor="let v of todayVisits()" (click)="selectVisitAndOpen(v)">
+                    <td>
+                      <code class="tag code" style="font-weight: 700; font-family: monospace;">
+                        {{ v.patient.patientCode }}
+                      </code>
+                    </td>
+                    <td><strong style="color: var(--slate-800); font-weight: 600;">{{ v.patient.surname }}, {{ v.patient.firstName }}</strong></td>
+                    <td>{{ v.patient.sex | uppercase }} • {{ v.patient.age }} Yrs</td>
+                    <td>{{ v.createdAt | date:'shortTime' }}</td>
+                    <td>
+                      <div style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem;" [title]="getVisitDeptServicesLabel(v)">
+                        {{ getVisitDeptServicesLabel(v) }}
+                      </div>
+                    </td>
+                    <td>
+                      <span class="status-pill" [class]="v.status">{{ getStatusLabel(v.status) }}</span>
+                    </td>
+                    <td style="text-align: right;" (click)="$event.stopPropagation()">
+                      <button class="btn btn-secondary btn-sm" (click)="selectVisitAndOpen(v)" style="font-weight: 700;">
+                        Inspect Dossier
+                      </button>
+                    </td>
+                  </tr>
+                  <tr *ngIf="todayVisits().length === 0">
+                    <td colspan="7" style="text-align: center; padding: 4rem 2rem; color: var(--slate-400);">
+                      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 48px; height: 48px; color: var(--slate-300);">
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <line x1="8" y1="12" x2="16" y2="12"></line>
+                        </svg>
+                        <p style="margin: 0; font-size: 0.95rem; font-weight: 500;">No visits found for the {{ deptName() }} department today.</p>
+                      </div>
+                    </td>
+                  </tr>
+                </ng-container>
               </tbody>
             </table>
           </div>
@@ -166,35 +181,48 @@ interface ServiceHistoryLine {
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let p of searchResults()" (click)="selectPatientAndOpen(p)">
-                  <td>
-                    <code class="tag code" style="font-weight: 700; font-family: monospace;">
-                      {{ p.patientCode }}
-                    </code>
-                  </td>
-                  <td><strong style="color: var(--slate-800); font-weight: 600;">{{ p.surname }}, {{ p.firstName }}</strong></td>
-                  <td>{{ p.sex | uppercase }} • {{ p.age }} Yrs</td>
-                  <td>{{ p.phone }}</td>
-                  <td>{{ p.emergencyContactName || 'N/A' }}</td>
-                  <td style="text-align: right;" (click)="$event.stopPropagation()">
-                    <button class="btn btn-secondary btn-sm" (click)="selectPatientAndOpen(p)" style="font-weight: 700;">
-                      Dossier Archives
-                    </button>
-                  </td>
-                </tr>
-                <tr *ngIf="searchResults().length === 0">
-                  <td colspan="6" style="text-align: center; padding: 4rem 2rem; color: var(--slate-400);">
-                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem;">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 48px; height: 48px; color: var(--slate-300);">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                      </svg>
-                      <p style="margin: 0; font-size: 0.95rem; font-weight: 500;" *ngIf="searchQuery().length < 3">Enter at least 3 characters to search.</p>
-                      <p style="margin: 0; font-size: 0.95rem; font-weight: 500;" *ngIf="searchQuery().length >= 3 && !loadingSearch()">No patients match your search.</p>
-                      <p style="margin: 0; font-size: 0.95rem; font-weight: 500;" *ngIf="loadingSearch()">Searching patient ledger...</p>
-                    </div>
-                  </td>
-                </tr>
+                <!-- Shimmer skeletons while searching patient lookup -->
+                <ng-container *ngIf="loadingSearch()">
+                  <tr *ngFor="let dummy of [1, 2, 3]">
+                    <td><div class="skeleton-shimmer" style="height: 1.5rem; width: 80px;"></div></td>
+                    <td><div class="skeleton-shimmer" style="height: 1.2rem; width: 140px;"></div></td>
+                    <td><div class="skeleton-shimmer" style="height: 1.1rem; width: 90px;"></div></td>
+                    <td><div class="skeleton-shimmer" style="height: 1.1rem; width: 100px;"></div></td>
+                    <td><div class="skeleton-shimmer" style="height: 1.1rem; width: 120px;"></div></td>
+                    <td style="text-align: right;"><div class="skeleton-shimmer" style="height: 1.8rem; width: 100px; border-radius: 0.5rem; margin-left: auto;"></div></td>
+                  </tr>
+                </ng-container>
+
+                <ng-container *ngIf="!loadingSearch()">
+                  <tr *ngFor="let p of searchResults()" (click)="selectPatientAndOpen(p)">
+                    <td>
+                      <code class="tag code" style="font-weight: 700; font-family: monospace;">
+                        {{ p.patientCode }}
+                      </code>
+                    </td>
+                    <td><strong style="color: var(--slate-800); font-weight: 600;">{{ p.surname }}, {{ p.firstName }}</strong></td>
+                    <td>{{ p.sex | uppercase }} • {{ p.age }} Yrs</td>
+                    <td>{{ p.phone }}</td>
+                    <td>{{ p.emergencyContactName || 'N/A' }}</td>
+                    <td style="text-align: right;" (click)="$event.stopPropagation()">
+                      <button class="btn btn-secondary btn-sm" (click)="selectPatientAndOpen(p)" style="font-weight: 700;">
+                        Dossier Archives
+                      </button>
+                    </td>
+                  </tr>
+                  <tr *ngIf="searchResults().length === 0">
+                    <td colspan="6" style="text-align: center; padding: 4rem 2rem; color: var(--slate-400);">
+                      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 48px; height: 48px; color: var(--slate-300);">
+                          <circle cx="11" cy="11" r="8"></circle>
+                          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <p style="margin: 0; font-size: 0.95rem; font-weight: 500;" *ngIf="searchQuery().length < 3">Enter at least 3 characters to search.</p>
+                        <p style="margin: 0; font-size: 0.95rem; font-weight: 500;" *ngIf="searchQuery().length >= 3">No patients match your search.</p>
+                      </div>
+                    </td>
+                  </tr>
+                </ng-container>
               </tbody>
             </table>
           </div>
@@ -237,7 +265,18 @@ interface ServiceHistoryLine {
             <!-- Left side: Dossier Visits Timeline list -->
             <div class="sub-panel history-section" style="max-height: 520px; display: flex; flex-direction: column;">
               <h4 class="timeline-title" style="margin-bottom: 0.75rem; font-size: 0.95rem; font-weight: 700;">Lifelong Dossier Visits</h4>
-              <div class="history-timeline" style="flex: 1; max-height: 440px;" *ngIf="patientHistory().length > 0; else noTimeline">
+              <!-- Timeline Loading Shimmers -->
+              <div style="display: flex; flex-direction: column; gap: 0.5rem;" *ngIf="loadingHistory()">
+                <div *ngFor="let dummy of [1, 2, 3]" style="display: flex; gap: 0.75rem; padding: 0.5rem; border: 1px solid var(--app-border-color); border-radius: 0.5rem;">
+                  <div class="timeline-dot" style="background-color: var(--app-border-color); margin-top: 4px;"></div>
+                  <div class="history-content" style="flex: 1; display: flex; flex-direction: column; gap: 0.35rem;">
+                    <div class="skeleton-shimmer" style="width: 50%; height: 12px;"></div>
+                    <div class="skeleton-shimmer" style="width: 80%; height: 10px;"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="history-timeline" style="flex: 1; max-height: 440px;" *ngIf="!loadingHistory() && patientHistory().length > 0; else noTimeline">
                 <div 
                   *ngFor="let h of patientHistory()" 
                   class="history-item"
@@ -258,7 +297,7 @@ interface ServiceHistoryLine {
                 </div>
               </div>
               <ng-template #noTimeline>
-                <div class="sub-empty" style="text-align: center; padding: 3rem 1rem; color: var(--slate-400); font-size: 0.85rem;">
+                <div class="sub-empty" style="text-align: center; padding: 3rem 1rem; color: var(--slate-400); font-size: 0.85rem;" *ngIf="!loadingHistory()">
                   <p>No past visits belonging to {{ deptName() }} recorded.</p>
                 </div>
               </ng-template>
@@ -610,11 +649,13 @@ export class WorklistResultsPageComponent implements OnInit {
   readonly todayVisits = signal<any[]>([]);
   readonly searchResults = signal<any[]>([]);
   readonly loadingSearch = signal(false);
+  readonly isLoadingToday = signal(false);
   readonly searchQuery = signal('');
 
   // Timeline view dossier fields
   readonly selectedPatient = signal<any | null>(null);
   readonly patientHistory = signal<any[]>([]);
+  readonly loadingHistory = signal(false);
 
   // Detailed clinical dossier fields
   readonly selectedVisit = signal<any | null>(null);
@@ -665,11 +706,16 @@ export class WorklistResultsPageComponent implements OnInit {
   }
 
   loadTodayVisits(): void {
+    this.isLoadingToday.set(true);
     this.api.getActiveVisits(this.deptCode(), true).subscribe({
       next: (res) => {
         this.todayVisits.set(res);
+        this.isLoadingToday.set(false);
       },
-      error: (err) => console.error('Error loading history log queue', err)
+      error: (err) => {
+        console.error('Error loading history log queue', err);
+        this.isLoadingToday.set(false);
+      }
     });
   }
 
@@ -707,7 +753,8 @@ export class WorklistResultsPageComponent implements OnInit {
     this.selectedVisit.set(null);
     this.serviceLines.set([]);
     this.patientHistory.set([]);
-
+    this.loadingHistory.set(true);
+ 
     this.api.getPatientHistory(p.id).subscribe({
       next: (res) => {
         // Exclude visits that do not have any services belonging to our active department
@@ -716,8 +763,12 @@ export class WorklistResultsPageComponent implements OnInit {
           return svcs.some((s: any) => s.service?.department?.code === this.deptCode());
         });
         this.patientHistory.set(filteredHistory);
+        this.loadingHistory.set(false);
       },
-      error: (err) => console.error('Error loading patient visit history', err)
+      error: (err) => {
+        console.error('Error loading patient visit history', err);
+        this.loadingHistory.set(false);
+      }
     });
   }
 
@@ -809,6 +860,7 @@ export class WorklistResultsPageComponent implements OnInit {
     this.selectedPatient.set(null);
     this.selectedVisit.set(null);
     this.patientHistory.set([]);
+    this.loadingHistory.set(false);
     this.searchResults.set([]);
     this.searchQuery.set('');
     this.serviceLines.set([]);

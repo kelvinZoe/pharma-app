@@ -55,13 +55,14 @@ import { FormsModule } from '@angular/forms';
         <!-- Using AppTable for robust tabular view instead of cards -->
         <app-table
           [columns]="columns"
-          [data]="tableData()"
-          [total]="tableData().length"
-          [page]="1"
-          [limit]="50"
+          [data]="paginatedTableData()"
+          [total]="filteredTableData().length"
+          [page]="page()"
+          [limit]="limit()"
           [loading]="loading()"
           exportFileName="visits_ledger"
           (searchChange)="onSearch($event)"
+          (pageChange)="page.set($event)"
           (actionClick)="onAction($event)"
         ></app-table>
 
@@ -80,6 +81,10 @@ export class FrontdeskVisitsPageComponent implements OnInit {
   readonly searchQuery = signal('');
   readonly showAll = signal(false);
 
+  // Pagination signals
+  readonly page = signal(1);
+  readonly limit = signal(10);
+
   readonly columns: TableColumn[] = [
     { key: 'visitCode', label: 'Visit #', type: 'code' },
     { key: 'patientName', label: 'Patient Name', type: 'text' },
@@ -96,6 +101,7 @@ export class FrontdeskVisitsPageComponent implements OnInit {
 
   toggleShowAll(val: boolean): void {
     this.showAll.set(val);
+    this.page.set(1);
     this.loadVisits();
   }
 
@@ -114,12 +120,12 @@ export class FrontdeskVisitsPageComponent implements OnInit {
     });
   }
 
-  readonly tableData = computed(() => {
+  readonly filteredTableData = computed(() => {
     const list = this.visits();
-    const query = this.searchQuery().toLowerCase();
+    const query = this.searchQuery().toLowerCase().trim();
     
     const mapped = list.map(v => ({
-      ...v, // keep original object reference for actions
+      ...v,
       visitCode: v.visitNumber || 'V-TBD',
       patientName: `${v.patient?.surname}, ${v.patient?.firstName}`,
       time: this.datePipe.transform(v.createdAt, 'MMM d, h:mm a') || '',
@@ -137,8 +143,14 @@ export class FrontdeskVisitsPageComponent implements OnInit {
     );
   });
 
+  readonly paginatedTableData = computed(() => {
+    const start = (this.page() - 1) * this.limit();
+    return this.filteredTableData().slice(start, start + this.limit());
+  });
+
   onSearch(q: string): void {
     this.searchQuery.set(q);
+    this.page.set(1);
   }
 
   onAction(event: { action: string, row: any }): void {

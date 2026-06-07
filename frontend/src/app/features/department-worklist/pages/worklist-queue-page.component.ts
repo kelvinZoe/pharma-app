@@ -39,33 +39,71 @@ interface ServiceLine {
       <!-- Requests Queue Panel -->
       <div class="panel list-panel modern-glass-panel">
         <div class="panel-header">
-          <h2>{{ deptName() }} Queue</h2>
+          <h2>{{ deptName() }} Queue <span class="queue-badge-count" [style.background-color]="deptCode() === 'LAB' ? 'var(--teal-500)' : 'var(--app-primary-color)'">{{ visits().length }}</span></h2>
           <button class="modern-btn-icon" (click)="loadQueue()" title="Refresh Queue">
-            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+            <svg class="refresh-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
           </button>
         </div>
 
         <p class="section-desc">Select a patient below to start executing procedures, capturing results, or prescribing drugs.</p>
 
-        <div class="queue-list" *ngIf="visits().length > 0; else emptyQueue">
-          <div
-            *ngFor="let v of visits()"
-            class="queue-card premium-stat-card"
-            [class.active]="selectedVisit()?.id === v.id"
-            (click)="selectVisit(v)"
-          >
-            <div class="queue-info">
-              <div class="patient-name">{{ v.patient.surname }}, {{ v.patient.firstName }}</div>
-              <div class="queue-meta">
-                <span class="bold-monospaced">{{ v.patient.patientCode }}</span> • 
-                <span>{{ v.patient.age }} Yrs</span> • 
-                <span>{{ v.createdAt | date:'shortTime' }}</span>
+        <!-- Realtime Queue Search Input -->
+        <div class="queue-search-bar">
+          <svg class="search-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input 
+            type="text" 
+            placeholder="Search patient or code..." 
+            [ngModel]="searchQuery()" 
+            (ngModelChange)="searchQuery.set($event)"
+            class="queue-search-input"
+          />
+          <button *ngIf="searchQuery()" class="clear-search-btn" (click)="searchQuery.set('')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+
+        <div class="queue-list" *ngIf="isLoadingQueue() || visits().length > 0; else emptyQueue">
+          <!-- Loading Preloader Skeletons -->
+          <ng-container *ngIf="isLoadingQueue()">
+            <div *ngFor="let dummy of [1, 2, 3, 4]" class="skeleton-queue-card">
+              <div class="avatar-skeleton skeleton-shimmer"></div>
+              <div class="info-skeleton">
+                <div class="skeleton-shimmer" style="height: 0.95rem; width: 70%;"></div>
+                <div class="skeleton-shimmer" style="height: 0.75rem; width: 50%;"></div>
               </div>
             </div>
-            <div class="arrow-indicator">
-              <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.5;"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+          </ng-container>
+
+          <ng-container *ngIf="!isLoadingQueue()">
+            <div
+              *ngFor="let v of filteredVisits()"
+              class="queue-card premium-stat-card"
+              [class.active]="selectedVisit()?.id === v.id"
+              [class.lab-active]="selectedVisit()?.id === v.id && deptCode() === 'LAB'"
+              [class.scan-active]="selectedVisit()?.id === v.id && deptCode() === 'SCAN'"
+              (click)="selectVisit(v)"
+            >
+              <div class="avatar" [style.background-color]="deptCode() === 'LAB' ? '#f0fdf4' : '#eff6ff'" [style.color]="deptCode() === 'LAB' ? '#0d9488' : '#2563eb'" [style.border]="'1px solid ' + (deptCode() === 'LAB' ? '#bcf0da' : '#bfdbfe')" style="font-family: inherit; font-weight: 800; border-radius: 50%; min-width: 2.75rem; height: 2.75rem; display: flex; align-items: center; justify-content: center; font-size: 0.9rem;">
+                {{ v.patient.surname.slice(0, 1) }}{{ v.patient.firstName.slice(0, 1) }}
+              </div>
+              <div class="queue-info">
+                <div class="patient-name">{{ v.patient.surname }}, {{ v.patient.firstName }}</div>
+                <div class="queue-meta">
+                  <span class="bold-monospaced">{{ v.patient.patientCode }}</span> • 
+                  <span>{{ v.patient.age }} Yrs</span> • 
+                  <span>{{ v.createdAt | date:'shortTime' }}</span>
+                </div>
+              </div>
+              <div class="arrow-indicator">
+                <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.5;"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </div>
             </div>
-          </div>
+            
+            <div *ngIf="filteredVisits().length === 0" class="search-empty-state">
+              <svg class="search-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <p>No patients match your search filter.</p>
+            </div>
+          </ng-container>
         </div>
 
         <ng-template #emptyQueue>
@@ -81,23 +119,52 @@ interface ServiceLine {
 
       <!-- Procedure Workspace Panel -->
       <div class="panel detail-panel premium-border" [class.visible]="selectedVisit() !== null">
-        <div *ngIf="selectedVisit() as v; else selectPlaceholder" class="clinical-details">
-          
-          <!-- Demographics Strip -->
-          <div class="demographics-card modern-glass-panel">
-            <div class="patient-info-content">
-              <h3>{{ v.patient.surname }}, {{ v.patient.firstName }} {{ v.patient.middleName || '' }}</h3>
-              <div class="modern-meta-tags">
-                <span class="tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> Code: <strong>{{ v.patient.patientCode }}</strong></span>
-                <span class="tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> {{ v.patient.sex }}</span>
-                <span class="tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> {{ v.patient.age }} Yrs</span>
+        <!-- Preloader Skeleton for details workspace -->
+        <div class="skeleton-details-workspace" *ngIf="isLoadingDetails()">
+          <div class="banner-skeleton skeleton-shimmer"></div>
+          <div class="grid-skeleton">
+            <div class="skeleton-shimmer" style="height: 120px; border-radius: 0.75rem;"></div>
+            <div class="skeleton-shimmer" style="height: 120px; border-radius: 0.75rem;"></div>
+          </div>
+          <div class="table-skeleton skeleton-shimmer" style="margin-top: 1.5rem;"></div>
+        </div>
+
+        <ng-container *ngIf="!isLoadingDetails()">
+          <div *ngIf="selectedVisit() as v; else selectPlaceholder" class="clinical-details">
+            
+            <!-- Demographics Strip -->
+            <div class="demographics-card modern-glass-panel">
+              <div class="patient-avatar-large" 
+                   [style.background]="deptCode() === 'LAB' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'linear-gradient(135deg, #2563eb, #1d4ed8)'">
+                {{ v.patient.surname.slice(0, 1) }}{{ v.patient.firstName.slice(0, 1) }}
+              </div>
+              
+              <div class="patient-info-content">
+                <h3>{{ v.patient.surname }}, {{ v.patient.firstName }} {{ v.patient.middleName || '' }}</h3>
+                <div class="modern-meta-tags">
+                  <span class="tag tag-code">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    Code: <strong class="monospaced-code">{{ v.patient.patientCode }}</strong>
+                  </span>
+                  
+                  <span class="tag tag-gender" [class.male]="v.patient.sex?.toLowerCase() === 'male' || v.patient.sex?.toLowerCase() === 'm'" [class.female]="v.patient.sex?.toLowerCase() === 'female' || v.patient.sex?.toLowerCase() === 'f'">
+                    <svg *ngIf="v.patient.sex?.toLowerCase() === 'male' || v.patient.sex?.toLowerCase() === 'm'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="14" r="6"></circle><path d="M18 6l-6 6M14 6h4v4"></path></svg>
+                    <svg *ngIf="v.patient.sex?.toLowerCase() === 'female' || v.patient.sex?.toLowerCase() === 'f'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"></circle><path d="M12 14v8M9 18h6"></path></svg>
+                    <span>{{ v.patient.sex }}</span>
+                  </span>
+                  
+                  <span class="tag tag-age">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    {{ v.patient.age }} Yrs
+                  </span>
+                  
+                  <span class="tag tag-referral" *ngIf="v.patient.referralCenter">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    Ref: {{ v.patient.referralCenter }}
+                  </span>
+                </div>
               </div>
             </div>
-            <div class="referral-badge" *ngIf="v.patient.referralCenter">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-              <span>Ref: {{ v.patient.referralCenter }}</span>
-            </div>
-          </div>
 
           <!-- Main Workspace split -->
           <!-- Helper Tools Row (Procedure addition & Prescriptions Notepad) -->
@@ -122,10 +189,12 @@ interface ServiceLine {
                   </app-dropdown>
                 </div>
                 
-                <label class="consent-checkbox mb-2" [class.active]="consentApproved()">
-                  <input type="checkbox" [ngModel]="consentApproved()" (ngModelChange)="consentApproved.set($event)" style="width: 16px; height: 16px;" />
-                  <span>Patient has approved and consented to billing</span>
-                </label>
+                <div class="consent-switch-container mb-2" (click)="consentApproved.set(!consentApproved())">
+                  <div class="switch-toggle" [class.switch-active]="consentApproved()">
+                    <div class="switch-handle"></div>
+                  </div>
+                  <span class="switch-label">Patient has approved and consented to billing</span>
+                </div>
 
                 <button
                   class="btn btn-primary btn-sm btn-block"
@@ -143,15 +212,24 @@ interface ServiceLine {
                 <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.5;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                 Prescriber Notepad
               </h4>
-              <p style="color: var(--slate-500); font-size: 0.8rem; margin-bottom: 1rem;">Prescribe medications or follow-up pharmacy treatments below.</p>
+              <p style="color: var(--slate-500); font-size: 0.8rem; margin-bottom: 0.5rem;">Prescribe medications or follow-up pharmacy treatments below.</p>
               
-              <textarea
-                placeholder="e.g. Amoxicillin 500mg - 3 times daily for 5 days. Paracetamol 500mg - PRN for pain."
-                [ngModel]="prescriptionText()"
-                (ngModelChange)="prescriptionText.set($event)"
-                class="form-control"
-                style="height: 90px; font-size: 0.825rem;"
-              ></textarea>
+              <div class="notepad-paper-container">
+                <textarea
+                  placeholder="e.g. Amoxicillin 500mg - 3 times daily for 5 days. Paracetamol 500mg - PRN for pain."
+                  [ngModel]="prescriptionText()"
+                  (ngModelChange)="prescriptionText.set($event)"
+                  class="clinical-notepad"
+                ></textarea>
+              </div>
+              <div class="notepad-quick-tags">
+                <span class="quick-tag-badge" (click)="insertNotepadText('Amoxicillin 500mg - 3x daily for 5 days')">+ Amox</span>
+                <span class="quick-tag-badge" (click)="insertNotepadText('Paracetamol 500mg - PRN for pain')">+ Para</span>
+                <span class="quick-tag-badge" (click)="insertNotepadText('1x Daily')">+ 1x</span>
+                <span class="quick-tag-badge" (click)="insertNotepadText('2x Daily')">+ 2x</span>
+                <span class="quick-tag-badge" (click)="insertNotepadText('3x Daily')">+ 3x</span>
+                <span class="quick-tag-badge" (click)="insertNotepadText('PRN')">+ PRN</span>
+              </div>
             </div>
 
           </div>
@@ -184,27 +262,6 @@ interface ServiceLine {
                   >
                     <svg viewBox="0 0 24 24" style="width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.5;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                     REMOVE
-                  </button>
-
-                  <div *ngIf="s.source === 'department_added'" style="width: 1px; height: 16px; background-color: var(--slate-200); margin: 0 0.25rem;"></div>
-
-                  <button
-                    class="btn-done-toggle"
-                    [class.active]="s.status === 'done'"
-                    (click)="setLineStatus(s, 'done')"
-                    style="display: flex; align-items: center; gap: 0.25rem;"
-                  >
-                    <svg viewBox="0 0 24 24" style="width: 14px; height: 14px;" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                    DONE
-                  </button>
-                  <button
-                    class="btn-notdone-toggle"
-                    [class.active]="s.status === 'not_done'"
-                    (click)="setLineStatus(s, 'not_done')"
-                    style="display: flex; align-items: center; gap: 0.25rem;"
-                  >
-                    <svg viewBox="0 0 24 24" style="width: 14px; height: 14px;" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                    NOT DONE
                   </button>
                 </div>
               </div>
@@ -475,8 +532,8 @@ interface ServiceLine {
             </div>
 
           </div>
-
         </div>
+      </ng-container>
         
         <ng-template #selectPlaceholder>
           <div class="empty-clinical-state select-placeholder">
@@ -489,6 +546,39 @@ interface ServiceLine {
           </div>
         </ng-template>
       </div>
+
+      <!-- Success / Post-Finalize Print Dialog Modal -->
+      <div class="modal-backdrop" *ngIf="showPostFinalize() && finalizedVisit() as fv" (click)="closePostFinalize()">
+        <div class="modal-card" (click)="$event.stopPropagation()" style="max-width: 480px; text-align: center; padding: 2.5rem 2rem; border-radius: 1.25rem;">
+          <div style="color: #10b981; margin-bottom: 1.25rem; display: flex; justify-content: center; transform: scale(1.1);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 64px; height: 64px;">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+          </div>
+          
+          <h3 style="font-size: 1.35rem; font-weight: 800; color: var(--slate-800); margin: 0 0 0.5rem 0; letter-spacing: -0.5px;">Workspace Finalized!</h3>
+          <p style="font-size: 0.875rem; color: var(--slate-500); margin: 0 0 2rem 0; line-height: 1.5;">
+            Clinical results for <strong>{{ fv.patient.surname }}, {{ fv.patient.firstName }}</strong> have been successfully finalized and routed to the billing desk.
+          </p>
+
+          <div style="display: flex; flex-direction: column; gap: 0.75rem; width: 100%;">
+            <button class="btn btn-primary" (click)="printFinalizedReport(fv)" style="font-weight: 700; width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem 1rem; border-radius: 0.75rem; font-size: 0.95rem;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 16px; height: 16px;">
+                <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                <rect x="6" y="14" width="12" height="8"></rect>
+              </svg>
+              <span>Print Diagnostic Report</span>
+            </button>
+            
+            <button class="btn btn-secondary" (click)="closePostFinalize()" style="font-weight: 700; width: 100%; padding: 0.75rem 1rem; border-radius: 0.75rem; font-size: 0.95rem;">
+              Close & Go Back to Queue
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div>
   `,
   styleUrl: './department-worklist-page.component.scss',
@@ -501,6 +591,17 @@ export class WorklistQueuePageComponent implements OnInit {
 
   readonly deptCode = signal<'LAB' | 'SCAN'>('LAB');
   readonly visits = signal<any[]>([]);
+  readonly searchQuery = signal('');
+  readonly filteredVisits = computed(() => {
+    const query = this.searchQuery().toLowerCase().trim();
+    const list = this.visits();
+    if (!query) return list;
+    return list.filter(v => 
+      v.patient?.surname?.toLowerCase().includes(query) ||
+      v.patient?.firstName?.toLowerCase().includes(query) ||
+      v.patient?.patientCode?.toLowerCase().includes(query)
+    );
+  });
   readonly selectedVisit = signal<any | null>(null);
   
   // Active procedures to capture
@@ -515,8 +616,28 @@ export class WorklistQueuePageComponent implements OnInit {
   readonly prescriptionText = signal('');
   readonly isSubmitting = signal(false);
 
+  // Success dialog and printable cache
+  readonly showPostFinalize = signal(false);
+  readonly finalizedVisit = signal<any | null>(null);
+  readonly finalizedServiceLines = signal<ServiceLine[]>([]);
+  readonly settings = signal<any>({
+    clinicName: 'KELVIN CLINICAL DIAGNOSTICS & PHARMACY',
+    tagline: 'Pathology, Diagnostic Imaging, & Premium Pharmaceutical Care',
+    location: 'Accra, Ghana',
+    phone: '+233 (0) 30 220 9999',
+    email: 'billing@kelvinpharma.com',
+    tollFree: '0800-KELVIN',
+    labEmail: 'lab@kelvinpharma.com',
+    accreditationId: 'KPL-2026-991A',
+  });
+
   readonly deptName = computed(() => this.deptCode() === 'LAB' ? 'Laboratory' : 'Scanning');
   readonly deptColor = computed(() => this.deptCode() === 'LAB' ? '#0d9488' : '#3b82f6');
+
+  // Preloading state indicators
+  readonly isLoadingQueue = signal(false);
+  readonly isLoadingDetails = signal(false);
+  private loadedTemplatesCount = 0;
 
   ngOnInit(): void {
     // Infer department based on active route url segment
@@ -529,15 +650,40 @@ export class WorklistQueuePageComponent implements OnInit {
     
     this.loadQueue();
     this.loadCatalog();
+    this.loadSettings();
+  }
+
+  loadSettings(): void {
+    this.api.getSettings().subscribe({
+      next: (res) => {
+        if (res) this.settings.set(res);
+      },
+      error: (err) => console.error('Error fetching settings', err)
+    });
+  }
+
+  insertNotepadText(text: string): void {
+    const current = this.prescriptionText() || '';
+    const addition = text.trim();
+    if (current) {
+      this.prescriptionText.set(current + '\n' + addition);
+    } else {
+      this.prescriptionText.set(addition);
+    }
   }
 
   loadQueue(): void {
+    this.isLoadingQueue.set(true);
     this.api.getActiveVisits(this.deptCode()).subscribe({
       next: (res) => {
         // Exclude completely finalized visits that are paid or fully completed
         this.visits.set(res.filter(v => v.status === 'registered' || v.status === 'sent_to_department' || v.status === 'in_progress'));
+        this.isLoadingQueue.set(false);
       },
-      error: (err) => console.error('Error loading request queue', err)
+      error: (err) => {
+        console.error('Error loading request queue', err);
+        this.isLoadingQueue.set(false);
+      }
     });
   }
 
@@ -554,10 +700,19 @@ export class WorklistQueuePageComponent implements OnInit {
     });
   }
 
+  private checkDetailsLoadingProgress(totalLinesCount: number): void {
+    this.loadedTemplatesCount++;
+    if (this.loadedTemplatesCount >= totalLinesCount) {
+      this.isLoadingDetails.set(false);
+    }
+  }
+
   selectVisit(v: any): void {
     this.selectedVisit.set(v);
     this.prescriptionText.set('');
     this.serviceLines.set([]);
+    this.isLoadingDetails.set(true);
+    this.loadedTemplatesCount = 0;
     
     // Map services belonging to this department
     const rawServices = v.services || v.visitServices || [];
@@ -659,6 +814,11 @@ export class WorklistQueuePageComponent implements OnInit {
                 console.error('Error parsing service template layout', e);
               }
             }
+            this.checkDetailsLoadingProgress(lines.length);
+          },
+          error: (err) => {
+            console.error('Error loading dynamic template', err);
+            this.checkDetailsLoadingProgress(lines.length);
           }
         });
 
@@ -666,6 +826,9 @@ export class WorklistQueuePageComponent implements OnInit {
       });
 
     this.serviceLines.set(lines);
+    if (lines.length === 0) {
+      this.isLoadingDetails.set(false);
+    }
   }
 
   setLineStatus(s: ServiceLine, status: 'done' | 'not_done'): void {
@@ -811,10 +974,15 @@ export class WorklistQueuePageComponent implements OnInit {
       this.api.saveVisitResult(v.id, resultsPayload).subscribe({
         next: (res) => {
           this.isSubmitting.set(false);
+          this.toast.success('Procedure workspace saved and routed successfully.');
+          
+          this.finalizedVisit.set(v);
+          this.finalizedServiceLines.set(this.serviceLines());
+          this.showPostFinalize.set(true);
+
           this.selectedVisit.set(null);
           this.serviceLines.set([]);
           this.loadQueue();
-          this.toast.success('Procedure workspace saved and routed successfully.');
         },
         error: (err) => {
           console.error('Error saving result entries', err);
@@ -836,5 +1004,228 @@ export class WorklistQueuePageComponent implements OnInit {
     } else {
       saveResults();
     }
+  }
+
+  closePostFinalize(): void {
+    this.showPostFinalize.set(false);
+    this.finalizedVisit.set(null);
+    this.finalizedServiceLines.set([]);
+    this.prescriptionText.set('');
+  }
+
+  printFinalizedReport(v: any): void {
+    const s = this.settings();
+    const windowUrl = 'about:blank';
+    const uniqueName = new Date().getTime();
+    const printWindow = window.open(windowUrl, uniqueName.toString(), 'left=50,top=50,width=800,height=900,toolbar=0,scrollbars=1,status=0');
+    
+    if (!printWindow) {
+      this.toast.error('Pop-up blocker is preventing clinical sheet prints. Please allow popups.');
+      return;
+    }
+
+    const lines = this.finalizedServiceLines();
+    let servicesHtml = '';
+    lines.forEach(line => {
+      if (line.status === 'done') {
+        let rowsHtml = '';
+        if (line.template && line.template.columns && line.template.columns.length > 0) {
+          let headers = `<th class="text-left">Parameter</th>`;
+          line.template.columns.forEach((c: any) => {
+            headers += `<th style="text-align:${c.alignment}">${c.label}</th>`;
+          });
+          
+          let tableBody = '';
+          line.template.sections?.forEach((sec: any) => {
+            tableBody += `
+              <tr class="a4-sec-header">
+                <td colspan="${line.template.columns.length + 1}">${sec.name}</td>
+              </tr>
+            `;
+            const sectionRows = line.template.rows.filter((r: any) => r.sectionId === sec.id);
+            sectionRows.forEach((row: any) => {
+              const abnormalClass = line.resultValues[row.id]?.isAbnormal ? 'class="abnormal"' : '';
+              let colsHtml = `<td class="row-label">${row.label}</td>`;
+              line.template.columns.forEach((col: any) => {
+                const val = line.resultValues[row.id]?.[col.key] || '';
+                const unit = col.refUnit ? `&nbsp;${col.refUnit}` : '';
+                colsHtml += `<td><span class="cell-val">${val}</span><span class="cell-unit">${unit}</span></td>`;
+              });
+              tableBody += `<tr ${abnormalClass}>${colsHtml}</tr>`;
+            });
+          });
+
+          const generalRows = line.template.rows?.filter((r: any) => !r.sectionId || r.sectionId === '');
+          if (generalRows && generalRows.length > 0) {
+            if (line.template.sections?.length > 0) {
+              tableBody += `
+                <tr class="a4-sec-header">
+                  <td colspan="${line.template.columns.length + 1}">General parameters</td>
+                </tr>
+              `;
+            }
+            generalRows.forEach((row: any) => {
+              const abnormalClass = line.resultValues[row.id]?.isAbnormal ? 'class="abnormal"' : '';
+              let colsHtml = `<td class="row-label">${row.label}</td>`;
+              line.template.columns.forEach((col: any) => {
+                const val = line.resultValues[row.id]?.[col.key] || '';
+                const unit = col.refUnit ? `&nbsp;${col.refUnit}` : '';
+                colsHtml += `<td><span class="cell-val">${val}</span><span class="cell-unit">${unit}</span></td>`;
+              });
+              tableBody += `<tr ${abnormalClass}>${colsHtml}</tr>`;
+            });
+          }
+
+          rowsHtml = `
+            <table class="a4-result-table">
+              <thead><tr>${headers}</tr></thead>
+              <tbody>${tableBody}</tbody>
+            </table>
+          `;
+        } else {
+          rowsHtml = `
+            <div class="a4-narrative-box">
+              <p>${line.narrativeText || 'Remarks: Diagnostic procedure completed with normal clinical findings.'}</p>
+            </div>
+          `;
+        }
+
+        servicesHtml += `
+          <div class="a4-service-entry">
+            <h4 class="a4-service-title">${line.serviceName}</h4>
+            ${rowsHtml}
+          </div>
+        `;
+      } else if (line.status === 'not_done') {
+        servicesHtml += `
+          <div class="a4-service-entry cancelled">
+            <h4 class="a4-service-title">${line.serviceName}</h4>
+            <p class="a4-cancelled-reason">Procedure Cancelled. Reason: <strong>"${line.notDoneReason || 'Not stated'}"</strong></p>
+          </div>
+        `;
+      }
+    });
+
+    const rxText = this.prescriptionText().trim();
+    const rxHtml = rxText ? `
+      <div class="a4-prescription-section">
+        <h4 class="a4-section-hdr">Issued Prescriptions (Medication Guidelines)</h4>
+        <div class="a4-rx-notepad">
+          <p>${rxText}</p>
+        </div>
+      </div>
+    ` : '';
+
+    const todayStr = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Clinical Outcomes Report - ${s.clinicName}</title>
+          <style>
+            body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 25px; color: #1e293b; background: #fff; line-height: 1.5; font-size: 13px; }
+            h2, h3, h4 { margin: 0 0 5px 0; font-weight: 800; }
+            span { font-size: 11px; }
+            .a4-letterhead { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; border-bottom: 2px solid #0f172a; padding-bottom: 12px; }
+            .logo-space { display: flex; align-items: center; gap: 8px; }
+            .logo-space svg { width: 32px; height: 32px; stroke: #0f172a; fill: none; }
+            .logo-text h2 { font-size: 18px; letter-spacing: 0.5px; margin: 0; }
+            .logo-text span { font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase; }
+            .letterhead-contacts { text-align: right; font-size: 11px; }
+            .a4-patient-grid { display: flex; justify-content: space-between; margin: 15px 0; font-size: 12px; }
+            .meta-col strong { color: #0f172a; }
+            .text-right { text-align: right; }
+            .divider-double { border: double #0f172a 3px; border-left: none; border-right: none; margin: 12px 0; }
+            .divider-single { border: solid #e2e8f0 1px; margin: 10px 0; }
+            .a4-report-title { text-align: center; letter-spacing: 1px; font-size: 14px; color: #0f172a; border: 1.5px solid #0f172a; padding: 6px; margin: 20px 0 15px 0; background: #f8fafc; border-radius: 4px; }
+            .a4-service-entry { margin-bottom: 25px; page-break-inside: avoid; }
+            .a4-service-title { font-size: 12px; color: #0f172a; text-transform: uppercase; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-bottom: 8px; }
+            .a4-result-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-family: 'Courier New', monospace; font-size: 12px; }
+            .a4-result-table th { border: 1px solid #cbd5e1; padding: 6px 8px; background-color: #f1f5f9; font-weight: 700; text-align: left; }
+            .a4-result-table td { border: 1px solid #e2e8f0; padding: 5px 8px; }
+            .a4-sec-header td { font-weight: 700; background-color: #f8fafc; font-family: 'Helvetica Neue', Arial; font-size: 11px; text-transform: uppercase; color: #475569; }
+            .row-label { font-weight: 600; font-family: 'Helvetica Neue', Arial; }
+            .abnormal { background-color: #fef2f2 !important; color: #991b1b !important; }
+            .abnormal .cell-val { font-weight: 700; }
+            .a4-narrative-box { border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; background-color: #f8fafc; font-style: italic; }
+            .a4-cancelled-reason { color: #ef4444; font-size: 11px; margin: 5px 0 0 0; }
+            .a4-prescription-section { margin-top: 30px; border: 1.5px dashed #cbd5e1; border-radius: 4px; padding: 12px; page-break-inside: avoid; }
+            .a4-section-hdr { font-size: 11px; text-transform: uppercase; margin: 0 0 8px 0; color: #334155; }
+            .a4-rx-notepad { font-family: 'Courier New', monospace; white-space: pre-line; font-size: 12px; }
+            .a4-footer-signature { display: flex; justify-content: space-between; margin-top: 50px; page-break-inside: avoid; }
+            .sig-col { width: 45%; }
+            .sig-line { width: 100%; border-bottom: 1.5px solid #0f172a; margin-bottom: 6px; height: 35px; }
+            .sig-sub { font-size: 10px; color: #64748b; }
+            @media print {
+              body { padding: 15px; }
+              @page { size: A4 portrait; margin: 20mm; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="a4-letterhead">
+            <div class="logo-space">
+              ${s.logo ? `<img src="${s.logo}" alt="Clinic Logo" style="max-height: 48px; max-width: 150px; object-fit: contain; margin-right: 0.75rem;" />` : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>`}
+              <div class="logo-text">
+                <h2>${s.clinicName}</h2>
+                <span>${s.tagline}</span>
+              </div>
+            </div>
+            <div class="letterhead-contacts">
+              <span>Phone: ${s.phone}</span><br>
+              <span>Email: ${s.labEmail}</span><br>
+              <span>Accreditation ID: ${s.accreditationId}</span>
+            </div>
+          </div>
+
+          <hr class="divider-double" />
+
+          <div class="a4-patient-grid">
+            <div class="meta-col">
+              <span>Patient Name: <strong>${v.patient.surname}, ${v.patient.firstName}</strong></span><br>
+              <span>Patient Code: <strong>${v.patient.patientCode}</strong></span><br>
+              <span>Age / Sex: <strong>${v.patient.age} Years / ${v.patient.sex}</strong></span>
+            </div>
+            <div class="meta-col text-right">
+              <span>Visit Code: <strong>VIS-${v.id.slice(-6).toUpperCase()}</strong></span><br>
+              <span>Date Processed: <strong>${todayStr}</strong></span><br>
+              <span>Assigned Dept: <strong>${this.deptName()} Room</strong></span>
+            </div>
+          </div>
+
+          <hr class="divider-single" />
+
+          <h3 class="a4-report-title">OFFICIAL CLINICAL OUTCOMES REPORT</h3>
+
+          <div class="a4-results-container">
+            ${servicesHtml}
+          </div>
+
+          ${rxHtml}
+
+          <div class="a4-footer-signature">
+            <div class="sig-col">
+              <div class="sig-line"></div>
+              <span>${this.deptCode() === 'LAB' ? 'Laboratory Technologist' : 'Radiology Operator'}</span><br>
+              <span class="sig-sub">Compiled Date: ${todayStr}</span>
+            </div>
+            <div class="sig-col text-right">
+              <div class="sig-line" style="margin-left: auto;"></div>
+              <span>Director of Pathology & Radiology</span><br>
+              <span class="sig-sub">Verified & Approved</span>
+            </div>
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
   }
 }
