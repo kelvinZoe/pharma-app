@@ -1045,15 +1045,21 @@
 }
 
 .receipt-meta-grid {
-  display: grid !important;
-  grid-template-columns: 1fr 1fr !important;
-  gap: 2px 6px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
   font-size: 9px;
   margin-bottom: 4px;
   padding-bottom: 2px;
   border-bottom: 1px dashed #888;
 
-  > div { margin-bottom: 0; }
+  > div {
+    margin-bottom: 0;
+    flex: 1 !important;
+    min-width: 0 !important;
+    word-wrap: break-word !important;
+    word-break: break-all !important;
+  }
 
   strong {
     display: block;
@@ -1201,24 +1207,25 @@
     display: block !important;
   }
 
-  /* --- Page setup: 80mm wide auto-height continuous roll --- */
+  /* --- Page setup: auto-fit margins for POS receipt rolls --- */
   @page {
-    size: 80mm auto;
-    margin: 3mm 2mm;
+    size: auto;
+    margin: 4mm 2mm;
   }
 
-  /* Style cashier invoice receipt to fit 80mm thermal paper */
+  /* Style cashier invoice receipt to fit any thermal paper width (e.g. 58mm up to 80mm) */
   .invoice-print-container {
     display: block !important;
     position: static !important;
-    width: 76mm !important;
-    max-width: 76mm !important;
+    width: 100% !important;
+    max-width: 80mm !important; /* Cap at 80mm on larger paper but scale down to 58mm automatically */
     margin: 0 auto !important;
-    padding: 0 !important;
+    padding: 0 4px !important;
     border: none !important;
     box-shadow: none !important;
     border-radius: 0 !important;
     background: #fff !important;
+    box-sizing: border-box !important;
   }
 }
 
