@@ -570,8 +570,20 @@
     color: #000 !important;
     box-sizing: border-box !important;
 
-    * {
+    /* Force all text elements, borders, and layouts to solid bold black for high contrast thermal prints */
+    &, * {
       color: #000 !important;
+      border-color: #000 !important;
+      outline-color: #000 !important;
+      font-weight: bold !important; /* Increase weight to bold/deep black */
     }
+
+    /* Force borders to be slightly thicker solid/dashed black for thermal printers */
+    .header { border-bottom: 1.5px dashed #000 !important; }
+    .meta { border-bottom: 1.5px dashed #000 !important; }
+    .item-table th { border-bottom: 1.5px dashed #000 !important; }
+    .totals { border-top: 1.5px dashed #000 !important; }
+    .totals div.grand { border-top: 1.5px solid #000 !important; }
+    .footer { border-top: 1.5px dashed #000 !important; }
   }
 }

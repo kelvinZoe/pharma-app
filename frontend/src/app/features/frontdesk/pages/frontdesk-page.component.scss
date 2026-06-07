@@ -1246,8 +1246,30 @@
     color: #000 !important;
     box-sizing: border-box !important;
 
-    * {
+    /* Force all text elements, borders, and layouts to solid bold black for high contrast thermal prints */
+    &, * {
       color: #000 !important;
+      border-color: #000 !important;
+      outline-color: #000 !important;
+      font-weight: bold !important; /* Increase weight to bold/deep black */
+    }
+
+    /* Force borders to be slightly thicker solid/dashed black for thermal printers */
+    .receipt-header { border-bottom: 1.5px dashed #000 !important; }
+    .receipt-meta-grid { border-bottom: 1.5px dashed #000 !important; }
+    .receipt-table thead tr { border-bottom: 1.5px dashed #000 !important; }
+    .receipt-totals { border-top: 1.5px dashed #000 !important; }
+    .receipt-totals .grand { border-top: 1.5px solid #000 !important; }
+    .receipt-signatures .sig-line { border-bottom: 1.5px solid #000 !important; }
+    .receipt-footer { border-top: 1.5px dashed #000 !important; }
+
+    /* Force paper tear border effect to be deep black */
+    &::before, &::after {
+      background: repeating-linear-gradient(
+        90deg,
+        transparent 0px, transparent 5px,
+        #000 5px, #000 6px
+      ) !important;
     }
   }
 }
