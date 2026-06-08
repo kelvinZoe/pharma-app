@@ -481,7 +481,7 @@ interface ServiceHistoryLine {
           
           <div style="display: flex; align-items: center; gap: 0.5rem; margin-right: auto; margin-left: 2rem;">
             <label style="font-weight: 700; font-size: 0.8rem; color: var(--slate-300); margin: 0;">Report Template:</label>
-            <select (change)="onTemplateSelect($any($event.target).value)" class="form-control form-control-sm" style="width: auto; max-width: 220px; font-weight: 600; padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid var(--slate-300); background: #ffffff;">
+            <select [value]="selectedTemplateId() || ''" (change)="onTemplateSelect($any($event.target).value)" class="form-control form-control-sm" style="width: auto; max-width: 220px; font-weight: 600; padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid var(--slate-300); background: #ffffff; color: #0f172a !important;">
               <option value="">Individual Services (Default)</option>
               <option *ngFor="let t of generalTemplates()" [value]="t.id">{{ t.name }}</option>
             </select>
@@ -514,7 +514,7 @@ interface ServiceHistoryLine {
             <div class="letterhead-contacts">
               <span>Phone: {{ s.phone }}</span><br>
               <span>Email: {{ s.labEmail }}</span><br>
-              <span>Accreditation ID: {{ s.accreditationId }}</span>
+              <span>Location: {{ s.location }}</span>
             </div>
           </div>
 
@@ -606,13 +606,8 @@ interface ServiceHistoryLine {
           <div class="a4-footer-signature">
             <div class="sig-col">
               <div class="sig-line"></div>
-              <span>Laboratory Technologist</span><br>
+              <span>{{ deptCode() === 'SCAN' ? 'Medical Diagnostic Sonographer (MDS)' : 'Medical Lab Scientist' }}</span><br>
               <span class="sig-sub">Compiled Date: {{ today | date:'medium' }}</span>
-            </div>
-            <div class="sig-col text-right">
-              <div class="sig-line" style="margin-left: auto;"></div>
-              <span>Director of Pathology & Radiology</span><br>
-              <span class="sig-sub">Verified & Approved</span>
             </div>
           </div>
 
@@ -805,21 +800,8 @@ export class WorklistResultsPageComponent implements OnInit {
           }
         }
 
-        // Pull template if exists
-        this.api.getServiceTemplate(s.service.id).subscribe({
-          next: (res) => {
-            if (res && res.layoutJson) {
-              try {
-                const parsed = typeof res.layoutJson === 'string' ? JSON.parse(res.layoutJson) : res.layoutJson;
-                if (parsed && (parsed.columns || parsed.rows)) {
-                  line.template = parsed;
-                }
-              } catch (e) {
-                console.error('Error parsing template layout JSON', e);
-              }
-            }
-          }
-        });
+        // Pull template and trigger signal update
+        this.loadLineTemplate(line);
 
         return line;
       });
@@ -1022,39 +1004,39 @@ export class WorklistResultsPageComponent implements OnInit {
         <head>
           <title>Clinical Outcomes Report - ${s.clinicName}</title>
           <style>
-            body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 25px; color: #1e293b; background: #fff; line-height: 1.5; font-size: 13px; }
-            h2, h3, h4 { margin: 0 0 5px 0; font-weight: 800; }
-            span { font-size: 11px; }
-            .a4-letterhead { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; border-bottom: 2px solid #0f172a; padding-bottom: 12px; }
+            body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 25px; color: #000; background: #fff; line-height: 1.5; font-size: 13px; }
+            h2, h3, h4 { margin: 0 0 5px 0; font-weight: 800; color: #000; }
+            span { font-size: 11px; color: #000; }
+            .a4-letterhead { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 12px; }
             .logo-space { display: flex; align-items: center; gap: 8px; }
-            .logo-space svg { width: 32px; height: 32px; stroke: #0f172a; fill: none; }
-            .logo-text h2 { font-size: 18px; letter-spacing: 0.5px; }
-            .logo-text span { font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase; }
-            .letterhead-contacts { text-align: right; font-size: 11px; }
-            .a4-patient-grid { display: flex; justify-content: space-between; margin: 15px 0; font-size: 12px; }
-            .meta-col strong { color: #0f172a; }
+            .logo-space svg { width: 32px; height: 32px; stroke: #000; fill: none; }
+            .logo-text h2 { font-size: 18px; letter-spacing: 0.5px; color: #000; }
+            .logo-text span { font-size: 10px; color: #000; font-weight: 700; text-transform: uppercase; }
+            .letterhead-contacts { text-align: right; font-size: 11px; color: #000; }
+            .a4-patient-grid { display: flex; justify-content: space-between; margin: 15px 0; font-size: 12px; color: #000; }
+            .meta-col strong { color: #000; }
             .text-right { text-align: right; }
-            .divider-double { border: double #0f172a 3px; border-left: none; border-right: none; margin: 12px 0; }
-            .divider-single { border: solid #e2e8f0 1px; margin: 10px 0; }
-            .a4-report-title { text-align: center; letter-spacing: 1px; font-size: 14px; color: #0f172a; border: 1.5px solid #0f172a; padding: 6px; margin: 20px 0 15px 0; background: #f8fafc; border-radius: 4px; }
+            .divider-double { border: double #000 3px; border-left: none; border-right: none; margin: 12px 0; }
+            .divider-single { border: solid #000 1px; margin: 10px 0; }
+            .a4-report-title { text-align: center; letter-spacing: 1px; font-size: 14px; color: #000; border: 1.5px solid #000; padding: 6px; margin: 20px 0 15px 0; background: #f8fafc; border-radius: 4px; }
             .a4-service-entry { margin-bottom: 25px; page-break-inside: avoid; }
-            .a4-service-title { font-size: 12px; color: #0f172a; text-transform: uppercase; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-bottom: 8px; }
-            .a4-result-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-family: 'Courier New', monospace; font-size: 12px; }
-            .a4-result-table th { border: 1px solid #cbd5e1; padding: 6px 8px; background-color: #f1f5f9; font-weight: 700; text-align: left; }
-            .a4-result-table td { border: 1px solid #e2e8f0; padding: 5px 8px; }
-            .a4-sec-header td { font-weight: 700; background-color: #f8fafc; font-family: 'Helvetica Neue', Arial; font-size: 11px; text-transform: uppercase; color: #475569; }
-            .row-label { font-weight: 600; font-family: 'Helvetica Neue', Arial; }
-            .abnormal { background-color: #fef2f2 !important; color: #991b1b !important; }
+            .a4-service-title { font-size: 12px; color: #000; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 4px; margin-bottom: 8px; }
+            .a4-result-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-family: 'Courier New', monospace; font-size: 12px; color: #000; }
+            .a4-result-table th { border: 1px solid #000; padding: 6px 8px; background-color: #f1f5f9; font-weight: 700; text-align: left; color: #000; }
+            .a4-result-table td { border: 1px solid #000; padding: 5px 8px; color: #000; }
+            .a4-sec-header td { font-weight: 700; background-color: #f8fafc; font-family: 'Helvetica Neue', Arial; font-size: 11px; text-transform: uppercase; color: #000; }
+            .row-label { font-weight: 600; font-family: 'Helvetica Neue', Arial; color: #000; }
+            .abnormal { background-color: #fef2f2 !important; color: #dc2626 !important; }
             .abnormal .cell-val { font-weight: 700; }
-            .a4-narrative-box { border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; background-color: #f8fafc; font-style: italic; }
+            .a4-narrative-box { border: 1px solid #000; border-radius: 4px; padding: 10px; background-color: #f8fafc; font-style: italic; color: #000; }
             .a4-cancelled-reason { color: #ef4444; font-size: 11px; margin: 5px 0 0 0; }
-            .a4-prescription-section { margin-top: 30px; border: 1.5px dashed #cbd5e1; border-radius: 4px; padding: 12px; page-break-inside: avoid; }
-            .a4-section-hdr { font-size: 11px; text-transform: uppercase; margin: 0 0 8px 0; color: #334155; }
-            .a4-rx-notepad { font-family: 'Courier New', monospace; white-space: pre-line; font-size: 12px; }
-            .a4-footer-signature { display: flex; justify-content: space-between; margin-top: 50px; page-break-inside: avoid; }
-            .sig-col { width: 45%; }
-            .sig-line { width: 100%; border-bottom: 1.5px solid #0f172a; margin-bottom: 6px; height: 35px; }
-            .sig-sub { font-size: 10px; color: #64748b; }
+            .a4-prescription-section { margin-top: 30px; border: 1.5px dashed #000; border-radius: 4px; padding: 12px; page-break-inside: avoid; }
+            .a4-section-hdr { font-size: 11px; text-transform: uppercase; margin: 0 0 8px 0; color: #000; }
+            .a4-rx-notepad { font-family: 'Courier New', monospace; white-space: pre-line; font-size: 12px; color: #000; }
+            .a4-footer-signature { display: flex; justify-content: flex-end; margin-top: 60px; page-break-inside: avoid; color: #000; }
+            .sig-col { width: 250px; text-align: right; }
+            .sig-line { width: 100%; border-bottom: 1.5px solid #000; margin-bottom: 6px; height: 75px; }
+            .sig-sub { font-size: 10px; color: #000; }
             @media print {
               body { padding: 15px; }
               @page { size: A4 portrait; margin: 20mm; }

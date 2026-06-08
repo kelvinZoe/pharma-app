@@ -101,7 +101,12 @@ export class VisitsService {
       where: { patientId },
       include: {
         visitServices: {
-          include: { service: true },
+          include: {
+            service: {
+              include: { department: true },
+            },
+            results: true,
+          },
         },
         prescriptions: true,
         invoice: true,
