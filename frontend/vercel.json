@@ -5,7 +5,7 @@
       "destination": "https://pharma-app-oenk.onrender.com/api/:path*"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/|.*\\.[a-zA-Z0-9]{2,4}$).*)",
       "destination": "/index.html"
     }
   ]

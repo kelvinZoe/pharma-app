@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, catchError, firstValueFrom, map, of, tap } from 'rxjs';
+import { Observable, catchError, firstValueFrom, map, of, tap, timeout } from 'rxjs';
 
 export type UserRoleCode = 0 | 1 | 2 | 3 | 4 | 5;
 export type ModuleKey = 'admin' | 'frontdesk' | 'laboratory' | 'scanning' | 'pharmacy' | 'accounting';
@@ -125,6 +125,7 @@ export class SessionService {
     }
 
     return this.http.get<SessionUser>(`${API_URL}/auth/profile`).pipe(
+      timeout(4000),
       tap((user) => {
         this.currentUserState.set(user);
         localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(user));
