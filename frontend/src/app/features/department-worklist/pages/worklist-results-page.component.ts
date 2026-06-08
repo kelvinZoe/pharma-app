@@ -445,7 +445,7 @@ interface ServiceHistoryLine {
 
                 <!-- Print Diagnostic Outcomes Report -->
                 <div style="border-top: 1px solid var(--slate-200); padding-top: 0.75rem; margin-top: 0.5rem;">
-                  <button class="btn btn-primary" style="display: flex; width: 100%; align-items: center; justify-content: center; gap: 0.5rem; font-weight: 700; padding: 0.65rem 1rem;" (click)="openPrintPreview()">
+                  <button class="btn btn-primary" style="display: flex; width: 100%; align-items: center; justify-content: center; gap: 0.5rem; font-weight: 700; padding: 0.65rem 1rem;" (click)="triggerBrowserPrint()">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 16px; height: 16px;"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
                     <span>Print Diagnostic Report Sheet</span>
                   </button>
@@ -471,142 +471,114 @@ interface ServiceHistoryLine {
       </div>
     </div>
 
-    <!-- Elegant Simulated A4 Print Preview Modal Overlay -->
-    <div class="modal-overlay" *ngIf="printModalVisible()">
-      <div class="modal-dossier-print-container premium-glass-panel">
-        
-        <!-- Header Save/Action options bar -->
-        <div class="modal-actions-header no-print">
-          <h4>Diagnostic Sheet Preview</h4>
-          
-          <div style="display: flex; align-items: center; gap: 0.5rem; margin-right: auto; margin-left: 2rem;">
-            <label style="font-weight: 700; font-size: 0.8rem; color: var(--slate-300); margin: 0;">Report Template:</label>
-            <select [value]="selectedTemplateId() || ''" (change)="onTemplateSelect($any($event.target).value)" class="form-control form-control-sm" style="width: auto; max-width: 220px; font-weight: 600; padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid var(--slate-300); background: #ffffff; color: #0f172a !important;">
-              <option value="">Individual Services (Default)</option>
-              <option *ngFor="let t of generalTemplates()" [value]="t.id">{{ t.name }}</option>
-            </select>
+    <!-- Hidden Print Container -->
+    <div style="display: none;" *ngIf="selectedVisit()">
+      <!-- Simulated A4 Clinical Page -->
+      <div class="clinical-a4-sheet" id="print-sheet-content">
+        <!-- Letterhead Banner -->
+        <div class="a4-letterhead" *ngIf="settings() as s">
+          <div class="letterhead-brand-block">
+            <img *ngIf="s.logo" [src]="s.logo" alt="Clinic Logo" class="clinic-logo-img" style="max-height: 48px; max-width: 150px; object-fit: contain; margin-right: 0.75rem;" />
+            <svg *ngIf="!s.logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            <div class="brand-text-block">
+              <h2>{{ s.clinicName }}</h2>
+              <span>{{ s.tagline }}</span>
+            </div>
           </div>
-
-          <div class="header-action-btns">
-            <button class="btn btn-secondary btn-sm" (click)="triggerBrowserPrint()">
-              Print Document
-            </button>
-            <button class="btn btn-danger btn-sm" (click)="closePrintPreview()">
-              Close
-            </button>
+          <div class="letterhead-contacts-row">
+            <span>Phone: <strong>{{ s.phone }}</strong></span>
+            <span>Email: <strong>{{ s.labEmail }}</strong></span>
+            <span>Location: <strong>{{ s.location }}</strong></span>
           </div>
         </div>
 
-        <!-- Document Canvas (Grey background) -->
-        <div class="clinical-a4-canvas">
-          <!-- Simulated A4 Clinical Page -->
-          <div class="clinical-a4-sheet" id="print-sheet-content">
-          <!-- Letterhead Banner -->
-          <div class="a4-letterhead" *ngIf="settings() as s">
-            <div class="letterhead-brand-block">
-              <img *ngIf="s.logo" [src]="s.logo" alt="Clinic Logo" class="clinic-logo-img" style="max-height: 48px; max-width: 150px; object-fit: contain; margin-right: 0.75rem;" />
-              <svg *ngIf="!s.logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-              <div class="brand-text-block">
-                <h2>{{ s.clinicName }}</h2>
-                <span>{{ s.tagline }}</span>
-              </div>
-            </div>
-            <div class="letterhead-contacts-row">
-              <span>Phone: <strong>{{ s.phone }}</strong></span>
-              <span>Email: <strong>{{ s.labEmail }}</strong></span>
-              <span>Location: <strong>{{ s.location }}</strong></span>
-            </div>
+        <!-- Report Metadata strip -->
+        <div class="a4-patient-grid" *ngIf="selectedVisit() as v">
+          <div class="meta-col">
+            <span>Patient Name: <strong>{{ v.patient.surname }}, {{ v.patient.firstName }}</strong></span><br>
+            <span>Patient Code: <strong>{{ v.patient.patientCode }}</strong></span><br>
+            <span>Age / Sex: <strong>{{ v.patient.age }} Years / {{ v.patient.sex }}</strong></span>
           </div>
-
-          <!-- Report Metadata strip -->
-          <div class="a4-patient-grid" *ngIf="selectedVisit() as v">
-            <div class="meta-col">
-              <span>Patient Name: <strong>{{ v.patient.surname }}, {{ v.patient.firstName }}</strong></span><br>
-              <span>Patient Code: <strong>{{ v.patient.patientCode }}</strong></span><br>
-              <span>Age / Sex: <strong>{{ v.patient.age }} Years / {{ v.patient.sex }}</strong></span>
-            </div>
-            <div class="meta-col text-right">
-              <span>Visit Code: <strong>VIS-{{ v.id.slice(-6).toUpperCase() }}</strong></span><br>
-              <span>Date Processed: <strong>{{ v.createdAt | date:'mediumDate' }}</strong></span><br>
-              <span>Assigned Dept: <strong>{{ deptName() }} Room</strong></span>
-            </div>
+          <div class="meta-col text-right">
+            <span>Visit Code: <strong>VIS-{{ v.id.slice(-6).toUpperCase() }}</strong></span><br>
+            <span>Date Processed: <strong>{{ v.createdAt | date:'mediumDate' }}</strong></span><br>
+            <span>Assigned Dept: <strong>{{ deptName() }} Room</strong></span>
           </div>
+        </div>
 
-          <hr class="divider-single" />
+        <hr class="divider-single" />
 
-          <!-- Clinical results table -->
-          <div class="a4-results-container">
-            <div *ngFor="let s of serviceLines()" class="a4-service-wrapper">
-              <div *ngIf="s.status === 'done'" class="a4-service-entry">
-                <h4 class="a4-service-title">{{ s.serviceName }}</h4>
-                
-                <table *ngIf="s.template && s.template.columns && s.template.columns.length > 0; else a4Narrative" class="a4-result-table">
-                  <thead>
-                    <tr>
-                      <th class="text-left">Parameter</th>
-                      <th *ngFor="let col of s.template.columns" [style.textAlign]="col.alignment">{{ col.label }}</th>
+        <!-- Clinical results table -->
+        <div class="a4-results-container">
+          <div *ngFor="let s of serviceLines()" class="a4-service-wrapper">
+            <div *ngIf="s.status === 'done'" class="a4-service-entry">
+              <h4 class="a4-service-title">{{ s.serviceName }}</h4>
+              
+              <table *ngIf="s.template && s.template.columns && s.template.columns.length > 0; else a4Narrative" class="a4-result-table">
+                <thead>
+                  <tr>
+                    <th class="text-left">Parameter</th>
+                    <th *ngFor="let col of s.template.columns" [style.textAlign]="col.alignment">{{ col.label }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <ng-container *ngFor="let sec of s.template.sections">
+                    <tr class="a4-sec-header">
+                      <td [attr.colspan]="s.template.columns.length + 1">{{ sec.name }}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    <ng-container *ngFor="let sec of s.template.sections">
-                      <tr class="a4-sec-header">
-                        <td [attr.colspan]="s.template.columns.length + 1">{{ sec.name }}</td>
-                      </tr>
-                      <tr *ngFor="let row of getRowsForSection(s, sec.id)" [class.abnormal]="s.resultValues[row.id]?.isAbnormal">
-                        <td class="row-label">{{ row.label }}</td>
-                        <td *ngFor="let col of s.template.columns" [style.textAlign]="col.alignment">
-                          <span class="cell-val">{{ s.resultValues[row.id]?.[col.key] }}</span>
-                          <span class="cell-unit" *ngIf="col.refUnit && s.resultValues[row.id]?.[col.key]">&nbsp;{{ col.refUnit }}</span>
-                        </td>
-                      </tr>
-                    </ng-container>
-                    <ng-container *ngIf="getRowsForSection(s, null).length > 0">
-                      <tr class="a4-sec-header" *ngIf="s.template.sections?.length > 0">
-                        <td [attr.colspan]="s.template.columns.length + 1">General parameters</td>
-                      </tr>
-                      <tr *ngFor="let row of getRowsForSection(s, null)" [class.abnormal]="s.resultValues[row.id]?.isAbnormal">
-                        <td class="row-label">{{ row.label }}</td>
-                        <td *ngFor="let col of s.template.columns" [style.textAlign]="col.alignment">
-                          <span class="cell-val">{{ s.resultValues[row.id]?.[col.key] }}</span>
-                          <span class="cell-unit" *ngIf="col.refUnit && s.resultValues[row.id]?.[col.key]">&nbsp;{{ col.refUnit }}</span>
-                        </td>
-                      </tr>
-                    </ng-container>
-                  </tbody>
-                </table>
+                    <tr *ngFor="let row of getRowsForSection(s, sec.id)" [class.abnormal]="s.resultValues[row.id]?.isAbnormal">
+                      <td class="row-label">{{ row.label }}</td>
+                      <td *ngFor="let col of s.template.columns" [style.textAlign]="col.alignment">
+                        <span class="cell-val">{{ s.resultValues[row.id]?.[col.key] }}</span>
+                        <span class="cell-unit" *ngIf="col.refUnit && s.resultValues[row.id]?.[col.key]">&nbsp;{{ col.refUnit }}</span>
+                      </td>
+                    </tr>
+                  </ng-container>
+                  <ng-container *ngIf="getRowsForSection(s, null).length > 0">
+                    <tr class="a4-sec-header" *ngIf="s.template.sections?.length > 0">
+                      <td [attr.colspan]="s.template.columns.length + 1">General parameters</td>
+                    </tr>
+                    <tr *ngFor="let row of getRowsForSection(s, null)" [class.abnormal]="s.resultValues[row.id]?.isAbnormal">
+                      <td class="row-label">{{ row.label }}</td>
+                      <td *ngFor="let col of s.template.columns" [style.textAlign]="col.alignment">
+                        <span class="cell-val">{{ s.resultValues[row.id]?.[col.key] }}</span>
+                        <span class="cell-unit" *ngIf="col.refUnit && s.resultValues[row.id]?.[col.key]">&nbsp;{{ col.refUnit }}</span>
+                      </td>
+                    </tr>
+                  </ng-container>
+                </tbody>
+              </table>
 
-                <ng-template #a4Narrative>
-                  <div class="a4-narrative-box">
-                    <p>{{ s.narrativeText || 'Remarks: Diagnostic procedure completed with normal clinical findings.' }}</p>
-                  </div>
-                </ng-template>
-              </div>
+              <ng-template #a4Narrative>
+                <div class="a4-narrative-box">
+                  <p>{{ s.narrativeText || 'Remarks: Diagnostic procedure completed with normal clinical findings.' }}</p>
+                </div>
+              </ng-template>
+            </div>
 
-              <!-- Cancelled services -->
-              <div *ngIf="s.status === 'not_done'" class="a4-service-entry cancelled">
-                <h4 class="a4-service-title">{{ s.serviceName }}</h4>
-                <p class="a4-cancelled-reason">Procedure Cancelled. Reason: <strong>"{{ s.notDoneReason || 'Not stated' }}"</strong></p>
-              </div>
+            <!-- Cancelled services -->
+            <div *ngIf="s.status === 'not_done'" class="a4-service-entry cancelled">
+              <h4 class="a4-service-title">{{ s.serviceName }}</h4>
+              <p class="a4-cancelled-reason">Procedure Cancelled. Reason: <strong>"{{ s.notDoneReason || 'Not stated' }}"</strong></p>
             </div>
           </div>
+        </div>
 
-          <!-- Prescriptions pad in report -->
-          <div class="a4-prescription-section" *ngIf="hasPrescription()">
-            <h4 class="a4-section-hdr">Issued Prescriptions (Medication Guidelines)</h4>
-            <div class="a4-rx-notepad">
-              <p>{{ selectedVisit()?.prescriptions?.[0]?.medicationNotes || selectedVisit()?.prescriptionNotes }}</p>
-            </div>
+        <!-- Prescriptions pad in report -->
+        <div class="a4-prescription-section" *ngIf="hasPrescription()">
+          <h4 class="a4-section-hdr">Issued Prescriptions (Medication Guidelines)</h4>
+          <div class="a4-rx-notepad">
+            <p>{{ selectedVisit()?.prescriptions?.[0]?.medicationNotes || selectedVisit()?.prescriptionNotes }}</p>
           </div>
+        </div>
 
-          <!-- Signature block -->
-          <div class="a4-footer-signature">
-            <div class="sig-col">
-              <div class="sig-line"></div>
-              <span>{{ deptCode() === 'SCAN' ? 'Medical Diagnostic Sonographer (MDS)' : 'Medical Lab Scientist' }}</span><br>
-              <span class="sig-sub">Compiled Date: {{ today | date:'medium' }}</span>
-            </div>
+        <!-- Signature block -->
+        <div class="a4-footer-signature">
+          <div class="sig-col">
+            <div class="sig-line"></div>
+            <span>{{ deptCode() === 'SCAN' ? 'Medical Diagnostic Sonographer (MDS)' : 'Medical Lab Scientist' }}</span><br>
+            <span class="sig-sub">Compiled Date: {{ today | date:'medium' }}</span>
           </div>
-
         </div>
 
       </div>
@@ -651,11 +623,8 @@ export class WorklistResultsPageComponent implements OnInit {
   // Detailed clinical dossier fields
   readonly selectedVisit = signal<any | null>(null);
   readonly serviceLines = signal<ServiceHistoryLine[]>([]);
-  readonly generalTemplates = signal<any[]>([]);
-  readonly selectedTemplateId = signal<string | null>(null);
 
   // Print previews
-  readonly printModalVisible = signal(false);
   readonly today = new Date();
 
   readonly deptName = computed(() => this.deptCode() === 'LAB' ? 'Laboratory' : 'Scanning');
@@ -670,7 +639,6 @@ export class WorklistResultsPageComponent implements OnInit {
 
     this.loadTodayVisits();
     this.loadSettings();
-    this.loadGeneralTemplates();
   }
 
   loadSettings(): void {
@@ -844,81 +812,6 @@ export class WorklistResultsPageComponent implements OnInit {
     this.serviceLines.set([]);
   }
 
-  loadGeneralTemplates(): void {
-    this.api.getGeneralTemplates(this.deptCode()).subscribe({
-      next: (res) => {
-        this.generalTemplates.set(res);
-      },
-      error: (err) => console.error('Error fetching general templates', err)
-    });
-  }
-
-  onTemplateSelect(templateId: string): void {
-    this.selectedTemplateId.set(templateId || null);
-    const v = this.selectedVisit();
-    if (!v) return;
-
-    if (!templateId) {
-      this.selectVisit(v);
-      return;
-    }
-
-    this.api.getGeneralTemplate(templateId).subscribe({
-      next: (gt) => {
-        const rawServices = v.services || v.visitServices || [];
-        const lines: ServiceHistoryLine[] = [];
-
-        gt.items.forEach((item: any) => {
-          const svc = item.service;
-          const performed = rawServices.find((s: any) => s.service.id === svc.id);
-
-          if (performed) {
-            const line: ServiceHistoryLine = {
-              id: performed.id,
-              serviceId: svc.id,
-              serviceName: svc.name,
-              status: performed.status,
-              notDoneReason: performed.notDoneReason || '',
-              narrativeText: performed.results?.[0]?.narrativeNotes || performed.narrativeNotes || '',
-              resultValues: {}
-            };
-
-            const dbResultJson = performed.results?.[0]?.resultDataJson || performed.resultDataJson;
-            if (dbResultJson) {
-              try {
-                line.resultValues = typeof dbResultJson === 'string' ? JSON.parse(dbResultJson) : dbResultJson;
-              } catch (e) {
-                console.error('Error parsing resultDataJson', e);
-              }
-            }
-            
-            this.loadLineTemplate(line);
-            lines.push(line);
-          } else {
-            const line: ServiceHistoryLine = {
-              id: `dummy_${svc.id}`,
-              serviceId: svc.id,
-              serviceName: svc.name,
-              status: 'done',
-              notDoneReason: '',
-              narrativeText: '',
-              resultValues: {}
-            };
-
-            this.loadLineTemplate(line);
-            lines.push(line);
-          }
-        });
-
-        this.serviceLines.set(lines);
-      },
-      error: (err) => {
-        console.error('Error loading general template details', err);
-        this.toast.error('Failed to load selected report template layout.');
-      }
-    });
-  }
-
   loadLineTemplate(line: ServiceHistoryLine): void {
     this.api.getServiceTemplate(line.serviceId).subscribe({
       next: (res) => {
@@ -970,32 +863,25 @@ export class WorklistResultsPageComponent implements OnInit {
     return !!(v.prescriptionNotes || (v.prescriptions && v.prescriptions.length > 0 && v.prescriptions[0].medicationNotes));
   }
 
-  openPrintPreview(): void {
-    this.printModalVisible.set(true);
-  }
-
-  closePrintPreview(): void {
-    this.printModalVisible.set(false);
-  }
-
   triggerBrowserPrint(): void {
-    // Format browser printer window triggers
     const printContent = document.getElementById('print-sheet-content');
     if (!printContent) return;
 
-    const windowUrl = 'about:blank';
-    const uniqueName = new Date().getTime();
-    const printWindow = window.open(windowUrl, uniqueName.toString(), 'left=50,top=50,width=800,height=900,toolbar=0,scrollbars=1,status=0');
-    
-    if (!printWindow) {
-      this.toast.error('Pop-up blocker is preventing clinical sheet prints. Please allow popups.');
+    const s = this.settings();
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document || iframe.contentDocument;
+    if (!doc) {
+      document.body.removeChild(iframe);
       return;
     }
 
-    const s = this.settings();
-
-    // Reconstruct premium letterhead stylesheet links inside iframe/popup
-    printWindow.document.write(`
+    doc.write(`
       <html>
         <head>
           <title>Clinical Outcomes Report - ${s.clinicName}</title>
@@ -1005,6 +891,7 @@ export class WorklistResultsPageComponent implements OnInit {
             span { font-size: 11px; color: #000; }
             .a4-letterhead { display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 12px; width: 100%; }
             .letterhead-brand-block { display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 8px; }
+            .letterhead-brand-block img { max-height: 48px; max-width: 150px; object-fit: contain; margin-right: 0.75rem; }
             .letterhead-brand-block svg { width: 32px; height: 32px; stroke: #000; fill: none; flex-shrink: 0; }
             .brand-text-block { display: flex; flex-direction: column; justify-content: center; }
             .brand-text-block h2 { font-size: 18px; letter-spacing: 0.5px; color: #000; margin: 0; line-height: 1.2; }
@@ -1013,10 +900,9 @@ export class WorklistResultsPageComponent implements OnInit {
             .a4-patient-grid { display: flex; justify-content: space-between; margin: 15px 0; font-size: 12px; color: #000; }
             .meta-col strong { color: #000; }
             .text-right { text-align: right; }
-            .divider-double { border: double #000 3px; border-left: none; border-right: none; margin: 12px 0; }
             .divider-single { border: solid #000 1px; margin: 10px 0; }
-            .a4-report-title { text-align: center; letter-spacing: 1px; font-size: 14px; color: #000; border: 1.5px solid #000; padding: 6px; margin: 20px 0 15px 0; background: #f8fafc; border-radius: 4px; }
-            .a4-service-entry { margin-bottom: 25px; page-break-inside: avoid; }
+            .a4-service-entry { margin-bottom: 25px; page-break-inside: auto; }
+            tr { page-break-inside: avoid; }
             .a4-service-title { font-size: 12px; color: #000; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 4px; margin-bottom: 8px; }
             .a4-result-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-family: 'Courier New', monospace; font-size: 12px; color: #000; }
             .a4-result-table th { border: 1px solid #000; padding: 6px 8px; background-color: #f1f5f9; font-weight: 700; text-align: left; color: #000; }
@@ -1042,16 +928,17 @@ export class WorklistResultsPageComponent implements OnInit {
         </head>
         <body>
           ${printContent.innerHTML}
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            };
-          </script>
         </body>
       </html>
     `);
-    
-    printWindow.document.close();
+    doc.close();
+
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
+    }, 200);
   }
 }

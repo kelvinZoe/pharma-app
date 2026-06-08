@@ -1015,12 +1015,16 @@ export class WorklistQueuePageComponent implements OnInit {
 
   printFinalizedReport(v: any): void {
     const s = this.settings();
-    const windowUrl = 'about:blank';
-    const uniqueName = new Date().getTime();
-    const printWindow = window.open(windowUrl, uniqueName.toString(), 'left=50,top=50,width=800,height=900,toolbar=0,scrollbars=1,status=0');
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
     
-    if (!printWindow) {
-      this.toast.error('Pop-up blocker is preventing clinical sheet prints. Please allow popups.');
+    const doc = iframe.contentWindow?.document || iframe.contentDocument;
+    if (!doc) {
+      document.body.removeChild(iframe);
       return;
     }
 
@@ -1118,44 +1122,45 @@ export class WorklistQueuePageComponent implements OnInit {
 
     const todayStr = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-    printWindow.document.write(`
+    doc.write(`
       <html>
         <head>
           <title>Clinical Outcomes Report - ${s.clinicName}</title>
           <style>
-            body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 25px; color: #1e293b; background: #fff; line-height: 1.5; font-size: 13px; }
-            h2, h3, h4 { margin: 0 0 5px 0; font-weight: 800; }
-            span { font-size: 11px; }
-            .a4-letterhead { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; border-bottom: 2px solid #0f172a; padding-bottom: 12px; }
-            .logo-space { display: flex; align-items: center; gap: 8px; }
-            .logo-space svg { width: 32px; height: 32px; stroke: #0f172a; fill: none; }
-            .logo-text h2 { font-size: 18px; letter-spacing: 0.5px; margin: 0; }
-            .logo-text span { font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase; }
-            .letterhead-contacts { text-align: right; font-size: 11px; }
-            .a4-patient-grid { display: flex; justify-content: space-between; margin: 15px 0; font-size: 12px; }
-            .meta-col strong { color: #0f172a; }
+            body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 25px; color: #000; background: #fff; line-height: 1.5; font-size: 13px; }
+            h2, h3, h4 { margin: 0 0 5px 0; font-weight: 800; color: #000; }
+            span { font-size: 11px; color: #000; }
+            .a4-letterhead { display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 12px; width: 100%; }
+            .letterhead-brand-block { display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 8px; }
+            .letterhead-brand-block img { max-height: 48px; max-width: 150px; object-fit: contain; margin-right: 0.75rem; }
+            .letterhead-brand-block svg { width: 32px; height: 32px; stroke: #000; fill: none; flex-shrink: 0; }
+            .brand-text-block { display: flex; flex-direction: column; justify-content: center; }
+            .brand-text-block h2 { font-size: 18px; letter-spacing: 0.5px; color: #000; margin: 0; line-height: 1.2; }
+            .brand-text-block span { font-size: 10px; color: #000; font-weight: 700; text-transform: uppercase; margin-top: 2px; line-height: 1.2; }
+            .letterhead-contacts-row { display: flex; gap: 20px; font-size: 11px; color: #000; width: 100%; flex-wrap: wrap; margin-top: 6px; }
+            .a4-patient-grid { display: flex; justify-content: space-between; margin: 15px 0; font-size: 12px; color: #000; }
+            .meta-col strong { color: #000; }
             .text-right { text-align: right; }
-            .divider-double { border: double #0f172a 3px; border-left: none; border-right: none; margin: 12px 0; }
-            .divider-single { border: solid #e2e8f0 1px; margin: 10px 0; }
-            .a4-report-title { text-align: center; letter-spacing: 1px; font-size: 14px; color: #0f172a; border: 1.5px solid #0f172a; padding: 6px; margin: 20px 0 15px 0; background: #f8fafc; border-radius: 4px; }
-            .a4-service-entry { margin-bottom: 25px; page-break-inside: avoid; }
-            .a4-service-title { font-size: 12px; color: #0f172a; text-transform: uppercase; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-bottom: 8px; }
-            .a4-result-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-family: 'Courier New', monospace; font-size: 12px; }
-            .a4-result-table th { border: 1px solid #cbd5e1; padding: 6px 8px; background-color: #f1f5f9; font-weight: 700; text-align: left; }
-            .a4-result-table td { border: 1px solid #e2e8f0; padding: 5px 8px; }
-            .a4-sec-header td { font-weight: 700; background-color: #f8fafc; font-family: 'Helvetica Neue', Arial; font-size: 11px; text-transform: uppercase; color: #475569; }
-            .row-label { font-weight: 600; font-family: 'Helvetica Neue', Arial; }
-            .abnormal { background-color: #fef2f2 !important; color: #991b1b !important; }
+            .divider-single { border: solid #000 1px; margin: 10px 0; }
+            .a4-service-entry { margin-bottom: 25px; page-break-inside: auto; }
+            tr { page-break-inside: avoid; }
+            .a4-service-title { font-size: 12px; color: #000; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 4px; margin-bottom: 8px; }
+            .a4-result-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-family: 'Courier New', monospace; font-size: 12px; color: #000; }
+            .a4-result-table th { border: 1px solid #000; padding: 6px 8px; background-color: #f1f5f9; font-weight: 700; text-align: left; color: #000; }
+            .a4-result-table td { border: 1px solid #000; padding: 5px 8px; color: #000; }
+            .a4-sec-header td { font-weight: 700; background-color: #f8fafc; font-family: 'Helvetica Neue', Arial; font-size: 11px; text-transform: uppercase; color: #000; }
+            .row-label { font-weight: 600; font-family: 'Helvetica Neue', Arial; color: #000; }
+            .abnormal { background-color: #fef2f2 !important; color: #dc2626 !important; }
             .abnormal .cell-val { font-weight: 700; }
-            .a4-narrative-box { border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; background-color: #f8fafc; font-style: italic; }
+            .a4-narrative-box { border: 1px solid #000; border-radius: 4px; padding: 10px; background-color: #f8fafc; font-style: italic; color: #000; }
             .a4-cancelled-reason { color: #ef4444; font-size: 11px; margin: 5px 0 0 0; }
-            .a4-prescription-section { margin-top: 30px; border: 1.5px dashed #cbd5e1; border-radius: 4px; padding: 12px; page-break-inside: avoid; }
-            .a4-section-hdr { font-size: 11px; text-transform: uppercase; margin: 0 0 8px 0; color: #334155; }
-            .a4-rx-notepad { font-family: 'Courier New', monospace; white-space: pre-line; font-size: 12px; }
-            .a4-footer-signature { display: flex; justify-content: space-between; margin-top: 50px; page-break-inside: avoid; }
-            .sig-col { width: 45%; }
-            .sig-line { width: 100%; border-bottom: 1.5px solid #0f172a; margin-bottom: 6px; height: 35px; }
-            .sig-sub { font-size: 10px; color: #64748b; }
+            .a4-prescription-section { margin-top: 30px; border: 1.5px dashed #000; border-radius: 4px; padding: 12px; page-break-inside: avoid; }
+            .a4-section-hdr { font-size: 11px; text-transform: uppercase; margin: 0 0 8px 0; color: #000; }
+            .a4-rx-notepad { font-family: 'Courier New', monospace; white-space: pre-line; font-size: 12px; color: #000; }
+            .a4-footer-signature { display: flex; justify-content: flex-end; margin-top: 60px; page-break-inside: avoid; color: #000; }
+            .sig-col { width: 250px; text-align: right; }
+            .sig-line { width: 100%; border-bottom: 1.5px solid #000; margin-bottom: 6px; height: 75px; }
+            .sig-sub { font-size: 10px; color: #000; }
             @media print {
               body { padding: 15px; }
               @page { size: A4 portrait; margin: 20mm; }
@@ -1164,21 +1169,19 @@ export class WorklistQueuePageComponent implements OnInit {
         </head>
         <body>
           <div class="a4-letterhead">
-            <div class="logo-space">
-              ${s.logo ? `<img src="${s.logo}" alt="Clinic Logo" style="max-height: 48px; max-width: 150px; object-fit: contain; margin-right: 0.75rem;" />` : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>`}
-              <div class="logo-text">
+            <div class="letterhead-brand-block">
+              ${s.logo ? `<img src="${s.logo}" alt="Clinic Logo" />` : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>`}
+              <div class="brand-text-block">
                 <h2>${s.clinicName}</h2>
                 <span>${s.tagline}</span>
               </div>
             </div>
-            <div class="letterhead-contacts">
-              <span>Phone: ${s.phone}</span><br>
-              <span>Email: ${s.labEmail}</span><br>
-              <span>Accreditation ID: ${s.accreditationId}</span>
+            <div class="letterhead-contacts-row">
+              <span>Phone: <strong>${s.phone}</strong></span>
+              <span>Email: <strong>${s.labEmail}</strong></span>
+              <span>Location: <strong>${s.location}</strong></span>
             </div>
           </div>
-
-          <hr class="divider-double" />
 
           <div class="a4-patient-grid">
             <div class="meta-col">
@@ -1195,8 +1198,6 @@ export class WorklistQueuePageComponent implements OnInit {
 
           <hr class="divider-single" />
 
-          <h3 class="a4-report-title">OFFICIAL CLINICAL OUTCOMES REPORT</h3>
-
           <div class="a4-results-container">
             ${servicesHtml}
           </div>
@@ -1206,26 +1207,21 @@ export class WorklistQueuePageComponent implements OnInit {
           <div class="a4-footer-signature">
             <div class="sig-col">
               <div class="sig-line"></div>
-              <span>${this.deptCode() === 'LAB' ? 'Laboratory Technologist' : 'Radiology Operator'}</span><br>
+              <span>${this.deptCode() === 'SCAN' ? 'Medical Diagnostic Sonographer (MDS)' : 'Medical Lab Scientist'}</span><br>
               <span class="sig-sub">Compiled Date: ${todayStr}</span>
             </div>
-            <div class="sig-col text-right">
-              <div class="sig-line" style="margin-left: auto;"></div>
-              <span>Director of Pathology & Radiology</span><br>
-              <span class="sig-sub">Verified & Approved</span>
-            </div>
           </div>
-
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            };
-          </script>
         </body>
       </html>
     `);
-    
-    printWindow.document.close();
+    doc.close();
+
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
+    }, 200);
   }
 }
