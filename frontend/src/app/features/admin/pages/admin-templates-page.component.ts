@@ -400,9 +400,14 @@ interface ServiceItem {
                 Required field
               </label>
             </div>
-            <div class="popover-actions">
-              <button class="btn btn-danger btn-sm" (click)="removeColumnByIndex(activeColPopover()!); closeColPopover()" style="font-size: 0.7rem;">
-                Delete Column
+            <div class="popover-actions" style="display: flex; gap: 0.5rem; justify-content: space-between; margin-top: 1rem; border-top: 1px solid var(--slate-200); padding-top: 0.75rem;">
+              <button type="button" class="btn btn-primary btn-sm" (click)="closeColPopover()" style="font-size: 0.75rem; padding: 0.25rem 0.75rem; display: inline-flex; align-items: center; gap: 0.25rem; font-weight: 700;">
+                <svg viewBox="0 0 24 24" style="width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                Save
+              </button>
+              <button type="button" class="btn btn-danger btn-sm" (click)="removeColumnByIndex(activeColPopover()!); closeColPopover()" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; display: inline-flex; align-items: center; gap: 0.25rem; font-weight: 700;">
+                <svg viewBox="0 0 24 24" style="width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                Delete
               </button>
             </div>
           </ng-container>
@@ -710,9 +715,8 @@ export class AdminTemplatesPageComponent implements OnInit {
         if (!loaded) {
           // Starter template for first-time users
           this.columns.set([
-            { key: 'result', label: 'Result', dataType: 'decimal', width: 140, alignment: 'right', isRequired: true, isReadonly: false, defaultValue: '', refUnit: '', validationRules: '', formula: '' },
-            { key: 'unit', label: 'Unit', dataType: 'readonly', width: 90, alignment: 'left', isRequired: false, isReadonly: true, defaultValue: '', refUnit: '', validationRules: '', formula: '' },
-            { key: 'referenceRange', label: 'Reference Range', dataType: 'readonly', width: 160, alignment: 'left', isRequired: false, isReadonly: true, defaultValue: '', refUnit: '', validationRules: '', formula: '' }
+            { key: 'result', label: 'Result', dataType: 'text', width: 140, alignment: 'left', isRequired: true, isReadonly: false, defaultValue: '', refUnit: '', validationRules: '', formula: '' },
+            { key: 'referenceRange', label: 'Reference Range', dataType: 'text', width: 160, alignment: 'left', isRequired: false, isReadonly: false, defaultValue: '', refUnit: '', validationRules: '', formula: '' }
           ]);
           this.sections.set([
             { id: 'sec_default', code: 'default_panel', name: 'Panel', sortOrder: 1 }

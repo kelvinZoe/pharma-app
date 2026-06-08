@@ -59,6 +59,7 @@ export class ApiService {
   createUser(data: any): Observable<any> {
     const payload = {
       fullName: data.name,
+      email: data.email,
       username: data.username,
       password: data.password,
       role: data.role,
@@ -75,6 +76,7 @@ export class ApiService {
   updateUser(id: string, data: any): Observable<any> {
     const payload: any = {};
     if (data.name !== undefined) payload.fullName = data.name;
+    if (data.email !== undefined) payload.email = data.email;
     if (data.username !== undefined) payload.username = data.username;
     if (data.password !== undefined && data.password !== '') payload.password = data.password;
     if (data.role !== undefined) {

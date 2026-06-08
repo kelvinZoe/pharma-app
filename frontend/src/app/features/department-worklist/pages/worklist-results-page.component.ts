@@ -503,22 +503,20 @@ interface ServiceHistoryLine {
           <div class="clinical-a4-sheet" id="print-sheet-content">
           <!-- Letterhead Banner -->
           <div class="a4-letterhead" *ngIf="settings() as s">
-            <div class="logo-space">
+            <div class="letterhead-brand-block">
               <img *ngIf="s.logo" [src]="s.logo" alt="Clinic Logo" class="clinic-logo-img" style="max-height: 48px; max-width: 150px; object-fit: contain; margin-right: 0.75rem;" />
               <svg *ngIf="!s.logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-              <div class="logo-text">
+              <div class="brand-text-block">
                 <h2>{{ s.clinicName }}</h2>
                 <span>{{ s.tagline }}</span>
               </div>
             </div>
-            <div class="letterhead-contacts">
-              <span>Phone: {{ s.phone }}</span><br>
-              <span>Email: {{ s.labEmail }}</span><br>
-              <span>Location: {{ s.location }}</span>
+            <div class="letterhead-contacts-row">
+              <span>Phone: <strong>{{ s.phone }}</strong></span>
+              <span>Email: <strong>{{ s.labEmail }}</strong></span>
+              <span>Location: <strong>{{ s.location }}</strong></span>
             </div>
           </div>
-
-          <hr class="divider-double" />
 
           <!-- Report Metadata strip -->
           <div class="a4-patient-grid" *ngIf="selectedVisit() as v">
@@ -535,8 +533,6 @@ interface ServiceHistoryLine {
           </div>
 
           <hr class="divider-single" />
-
-          <h3 class="a4-report-title">OFFICIAL CLINICAL OUTCOMES REPORT</h3>
 
           <!-- Clinical results table -->
           <div class="a4-results-container">
@@ -1007,12 +1003,13 @@ export class WorklistResultsPageComponent implements OnInit {
             body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 25px; color: #000; background: #fff; line-height: 1.5; font-size: 13px; }
             h2, h3, h4 { margin: 0 0 5px 0; font-weight: 800; color: #000; }
             span { font-size: 11px; color: #000; }
-            .a4-letterhead { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 12px; }
-            .logo-space { display: flex; align-items: center; gap: 8px; }
-            .logo-space svg { width: 32px; height: 32px; stroke: #000; fill: none; }
-            .logo-text h2 { font-size: 18px; letter-spacing: 0.5px; color: #000; }
-            .logo-text span { font-size: 10px; color: #000; font-weight: 700; text-transform: uppercase; }
-            .letterhead-contacts { text-align: right; font-size: 11px; color: #000; }
+            .a4-letterhead { display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 12px; width: 100%; }
+            .letterhead-brand-block { display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 8px; }
+            .letterhead-brand-block svg { width: 32px; height: 32px; stroke: #000; fill: none; flex-shrink: 0; }
+            .brand-text-block { display: flex; flex-direction: column; justify-content: center; }
+            .brand-text-block h2 { font-size: 18px; letter-spacing: 0.5px; color: #000; margin: 0; line-height: 1.2; }
+            .brand-text-block span { font-size: 10px; color: #000; font-weight: 700; text-transform: uppercase; margin-top: 2px; line-height: 1.2; }
+            .letterhead-contacts-row { display: flex; gap: 20px; font-size: 11px; color: #000; width: 100%; flex-wrap: wrap; margin-top: 6px; }
             .a4-patient-grid { display: flex; justify-content: space-between; margin: 15px 0; font-size: 12px; color: #000; }
             .meta-col strong { color: #000; }
             .text-right { text-align: right; }
