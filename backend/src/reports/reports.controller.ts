@@ -10,9 +10,23 @@ export class ReportsController {
   @Get('dashboard')
   async getDashboard(@Req() req: any, @Query('module') module?: string) {
     const user = req.user;
-    // Admins (role 0) can query any module dashboard they are viewing.
-    // Non-admins are restricted to their assigned user module.
-    const targetModule = (user.role === 0 && module) ? module : user.module;
+    // Admins (role 0) can query any module dashboard.
+    // Multi-role users can view any module assigned to them.
+    const userRoles: number[] = user.roles
+      ? (Array.isArray(user.roles) ? user.roles : user.roles.split(',').map(Number))
+      : [user.role];
+
+    let targetModule = user.module;
+    if (module) {
+      const moduleRoleMap: Record<string, number> = {
+        admin: 0, frontdesk: 1, laboratory: 2, scanning: 3, pharmacy: 4, accounting: 5
+      };
+      const requestedRole = moduleRoleMap[module];
+      if (userRoles.includes(0) || (requestedRole !== undefined && userRoles.includes(requestedRole))) {
+        targetModule = module;
+      }
+    }
+
     return this.reportsService.getDashboardAnalytics(targetModule, user.id);
   }
 

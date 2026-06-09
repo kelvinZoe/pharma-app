@@ -89,24 +89,27 @@ interface ServiceItem {
 
           <div class="form-row">
             <div class="form-group">
-              <label for="referralCenter">Referral Center / Doctor <span class="text-muted">(Optional)</span></label>
+              <label for="referralCenter">Referral Center / Doctor <span class="text-danger">*</span></label>
               <input id="referralCenter" type="text" formControlName="referralCenter" class="form-control" placeholder="e.g. Ridge Hospital" />
+              <div *ngIf="form.get('referralCenter')?.touched && form.get('referralCenter')?.invalid" class="text-danger small mt-1">
+                Referral center is required.
+              </div>
             </div>
 
             <div class="form-group">
-              <label for="reasonForVisit">Reason for Visit <span class="text-muted">(Optional)</span></label>
+              <label for="reasonForVisit">Reason for Visit</label>
               <input id="reasonForVisit" type="text" formControlName="reasonForVisit" class="form-control" placeholder="e.g. Routine Checkup, Persistent Cough" />
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
-              <label for="emergencyContactName">Emergency Contact Name <span class="text-muted">(Optional)</span></label>
+              <label for="emergencyContactName">Emergency Contact Name</label>
               <input id="emergencyContactName" type="text" formControlName="emergencyContactName" class="form-control" placeholder="e.g. Mary Mensah" />
             </div>
 
             <div class="form-group">
-              <label for="emergencyContactPhone">Emergency Contact Phone <span class="text-muted">(Optional)</span></label>
+              <label for="emergencyContactPhone">Emergency Contact Phone</label>
               <input id="emergencyContactPhone" type="text" formControlName="emergencyContactPhone" class="form-control" placeholder="e.g. 0201122334" />
             </div>
           </div>
@@ -212,7 +215,7 @@ export class FrontdeskRegistrationPageComponent implements OnInit {
     sex: ['', [Validators.required]],
     age: [null as number | null, [Validators.required, Validators.min(0)]],
     phone: ['', [Validators.required]],
-    referralCenter: [''],
+    referralCenter: ['', [Validators.required]],
     reasonForVisit: [''],
     emergencyContactName: [''],
     emergencyContactPhone: [''],

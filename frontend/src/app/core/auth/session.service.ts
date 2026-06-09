@@ -10,6 +10,7 @@ export interface SessionUser {
   readonly name: string;
   readonly username: string;
   readonly role: UserRoleCode;
+  readonly roles: UserRoleCode[];
   readonly module: ModuleKey;
   readonly tenantId?: string;
   readonly tenantSlug?: string;
@@ -67,13 +68,25 @@ export class SessionService {
     return user ? (Number(user.role) === 0 || user.username === 'admin') : false;
   });
   readonly availableModules = computed(() => {
+    const user = this.currentUser();
+    if (!user) return [];
+
+    // Admin always sees all modules
     if (this.isAdmin()) {
       return MODULE_OPTIONS;
     }
 
-    const moduleKey = this.currentUser()?.module;
+    // For multi-role users, show all modules matching their assigned roles
+    const userRoles: number[] = Array.isArray(user.roles) ? user.roles : [user.role];
+    const roleToModule: Record<number, ModuleKey> = {
+      0: 'admin', 1: 'frontdesk', 2: 'laboratory', 3: 'scanning', 4: 'pharmacy', 5: 'accounting'
+    };
 
-    return MODULE_OPTIONS.filter((moduleItem) => moduleItem.key === moduleKey);
+    const assignedModuleKeys = userRoles
+      .map(r => roleToModule[r])
+      .filter((k): k is ModuleKey => !!k);
+
+    return MODULE_OPTIONS.filter(m => assignedModuleKeys.includes(m.key));
   });
 
   getDefaultRoute(role: UserRoleCode): string {
@@ -162,7 +175,16 @@ export class SessionService {
       return true;
     }
 
-    return this.currentUser()?.module === moduleKey;
+    const user = this.currentUser();
+    if (!user) return false;
+
+    const userRoles: number[] = Array.isArray(user.roles) ? user.roles : [user.role];
+    const moduleRoleMap: Record<ModuleKey, number> = {
+      admin: 0, frontdesk: 1, laboratory: 2, scanning: 3, pharmacy: 4, accounting: 5
+    };
+    const requiredRole = moduleRoleMap[moduleKey];
+
+    return userRoles.includes(requiredRole);
   }
 
   private restore(): SessionUser | null {

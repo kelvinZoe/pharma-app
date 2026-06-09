@@ -1,19 +1,27 @@
-import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../common/email/email.service';
+import { TenantContextService } from '../common/multitenancy/tenant-context.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
   ) {}
 
   async findAll(page?: number, limit?: number, search?: string) {
+    const rolesMapper = (u: any) => ({
+      ...u,
+      roles: u.roles ? u.roles.split(',').map(Number) : [u.role],
+    });
+
     if (page === undefined && limit === undefined && search === undefined) {
-      return this.prisma.user.findMany({
+      const data = await this.prisma.user.findMany({
         select: {
           id: true,
           fullName: true,
@@ -21,6 +29,7 @@ export class UsersService {
           phone: true,
           email: true,
           role: true,
+          roles: true,
           module: true,
           isActive: true,
           createdAt: true,
@@ -28,6 +37,7 @@ export class UsersService {
         },
         orderBy: { createdAt: 'desc' },
       });
+      return data.map(rolesMapper);
     }
 
     const pageNum = page ? Math.max(1, Number(page)) : 1;
@@ -54,6 +64,7 @@ export class UsersService {
           phone: true,
           email: true,
           role: true,
+          roles: true,
           module: true,
           isActive: true,
           createdAt: true,
@@ -67,7 +78,7 @@ export class UsersService {
     ]);
 
     return {
-      data,
+      data: data.map(rolesMapper),
       total,
       page: pageNum,
       limit: limitNum,
@@ -92,6 +103,16 @@ export class UsersService {
     // Generate dummy password hash so it can't be logged into until verified
     const dummyPasswordHash = await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 10);
 
+    // Resolve roles array to primary role and module
+    let primaryRole = Number(data.role ?? 1);
+    let rolesArray: number[] = [primaryRole];
+    if (Array.isArray(data.roles) && data.roles.length > 0) {
+      rolesArray = data.roles.map(Number);
+      primaryRole = rolesArray[0];
+    }
+    const rolesStr = rolesArray.join(',');
+    const moduleResolved = this.resolveModule(primaryRole);
+
     let newUser: any;
     try {
       newUser = await this.prisma.user.create({
@@ -101,8 +122,9 @@ export class UsersService {
           username: data.username ?? data.email.split('@')[0],
           passwordHash: dummyPasswordHash,
           phone: data.phone ?? null,
-          role: Number(data.role ?? 1),
-          module: data.module ?? 'frontdesk',
+          role: primaryRole,
+          roles: rolesStr,
+          module: moduleResolved,
           isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
           isVerified: false,
           inviteToken,
@@ -115,6 +137,7 @@ export class UsersService {
           phone: true,
           email: true,
           role: true,
+          roles: true,
           module: true,
           isActive: true,
           inviteToken: true,
@@ -138,11 +161,17 @@ export class UsersService {
     // Send the email invite
     await this.emailService.sendStaffInvitation(data.email, data.fullName, inviteToken);
 
-    return newUser;
+    return {
+      ...newUser,
+      roles: rolesStr.split(',').map(Number),
+    };
   }
 
   async remove(id: string) {
-    const user = await this.prisma.user.findUnique({ where: { id } });
+    const tenantId = TenantContextService.getTenantId();
+    this.logger.log(`Deleting user ${id}${tenantId ? ` in tenant ${tenantId}` : ''}`);
+
+    const user = await this.prisma.user.findFirst({ where: { id } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -155,7 +184,10 @@ export class UsersService {
       }
     }
 
-    await this.prisma.user.delete({ where: { id } });
+    const deleted = await this.prisma.user.deleteMany({ where: { id } });
+    if (deleted.count === 0) {
+      throw new NotFoundException('User not found');
+    }
     return { message: 'Staff account removed successfully' };
   }
 
@@ -168,9 +200,21 @@ export class UsersService {
     const updateData: any = {};
     if (data.fullName !== undefined) updateData.fullName = data.fullName;
     if (data.phone !== undefined) updateData.phone = data.phone;
-    if (data.role !== undefined) updateData.role = Number(data.role);
-    if (data.module !== undefined) updateData.module = data.module;
     if (data.isActive !== undefined) updateData.isActive = Boolean(data.isActive);
+
+    // Handle roles array update
+    if (Array.isArray(data.roles) && data.roles.length > 0) {
+      const rolesArray = data.roles.map(Number);
+      const primaryRole = rolesArray[0];
+      updateData.roles = rolesArray.join(',');
+      updateData.role = primaryRole;
+      updateData.module = this.resolveModule(primaryRole);
+    } else if (data.role !== undefined) {
+      updateData.role = Number(data.role);
+      updateData.roles = String(data.role);
+      updateData.module = this.resolveModule(Number(data.role));
+    }
+    if (data.module !== undefined) updateData.module = data.module;
 
     if (data.password) {
       updateData.passwordHash = await bcrypt.hash(data.password, 10);
@@ -191,7 +235,7 @@ export class UsersService {
       updateData.username = data.username;
     }
 
-    return this.prisma.user.update({
+    const updated = await this.prisma.user.update({
       where: { id },
       data: updateData,
       select: {
@@ -201,9 +245,27 @@ export class UsersService {
         phone: true,
         email: true,
         role: true,
+        roles: true,
         module: true,
         isActive: true,
       },
     });
+
+    return {
+      ...updated,
+      roles: updated.roles ? String(updated.roles).split(',').map(Number) : [updated.role],
+    };
+  }
+
+  private resolveModule(role: number): string {
+    switch (role) {
+      case 0: return 'admin';
+      case 1: return 'frontdesk';
+      case 2: return 'laboratory';
+      case 3: return 'scanning';
+      case 4: return 'pharmacy';
+      case 5:
+      default: return 'accounting';
+    }
   }
 }

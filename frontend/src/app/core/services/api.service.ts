@@ -57,18 +57,22 @@ export class ApiService {
   }
 
   createUser(data: any): Observable<any> {
+    const primaryRole = Array.isArray(data.roles) && data.roles.length > 0
+      ? Number(data.roles[0])
+      : Number(data.role);
     const payload = {
       fullName: data.name,
       email: data.email,
       username: data.username,
       password: data.password,
-      role: data.role,
+      role: primaryRole,
+      roles: Array.isArray(data.roles) ? data.roles.map(Number) : [primaryRole],
       isActive: data.active !== undefined ? data.active : true,
-      module: data.role === 0 ? 'admin' : 
-              data.role === 1 ? 'frontdesk' : 
-              data.role === 2 ? 'laboratory' : 
-              data.role === 3 ? 'scanning' : 
-              data.role === 4 ? 'pharmacy' : 'accounting'
+      module: primaryRole === 0 ? 'admin' :
+              primaryRole === 1 ? 'frontdesk' :
+              primaryRole === 2 ? 'laboratory' :
+              primaryRole === 3 ? 'scanning' :
+              primaryRole === 4 ? 'pharmacy' : 'accounting'
     };
     return this.http.post<any>(`${API_URL}/users`, payload);
   }
@@ -79,13 +83,17 @@ export class ApiService {
     if (data.email !== undefined) payload.email = data.email;
     if (data.username !== undefined) payload.username = data.username;
     if (data.password !== undefined && data.password !== '') payload.password = data.password;
-    if (data.role !== undefined) {
-      payload.role = data.role;
-      payload.module = data.role === 0 ? 'admin' : 
-                       data.role === 1 ? 'frontdesk' : 
-                       data.role === 2 ? 'laboratory' : 
-                       data.role === 3 ? 'scanning' : 
-                       data.role === 4 ? 'pharmacy' : 'accounting';
+    const primaryRole = Array.isArray(data.roles) && data.roles.length > 0
+      ? Number(data.roles[0])
+      : Number(data.role);
+    if (data.role !== undefined || Array.isArray(data.roles)) {
+      payload.role = primaryRole;
+      payload.roles = Array.isArray(data.roles) ? data.roles.map(Number) : [primaryRole];
+      payload.module = primaryRole === 0 ? 'admin' :
+                       primaryRole === 1 ? 'frontdesk' :
+                       primaryRole === 2 ? 'laboratory' :
+                       primaryRole === 3 ? 'scanning' :
+                       primaryRole === 4 ? 'pharmacy' : 'accounting';
     }
     if (data.active !== undefined) payload.isActive = data.active;
     return this.http.put<any>(`${API_URL}/users/${id}`, payload);
@@ -358,4 +366,3 @@ export class ApiService {
     return this.http.post<any>(`${API_URL}/pharmacy/sessions/open`, { openingFloat });
   }
 }
-

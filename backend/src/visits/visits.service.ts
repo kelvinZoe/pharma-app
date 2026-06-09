@@ -32,8 +32,8 @@ export class VisitsService {
 
 
   async createPatient(data: any) {
-    if (!data.surname || !data.firstName || !data.phone || !data.referralCenter || !data.reasonForVisit || !data.emergencyContactName || !data.emergencyContactPhone) {
-      throw new BadRequestException('Demographics, phone, referral, reason, and emergency contact details are required');
+    if (!data.surname || !data.firstName || !data.phone || !data.referralCenter) {
+      throw new BadRequestException('Demographics, phone, and referral center are required');
     }
 
     // Generate CL-xxxxx patient code
@@ -61,10 +61,10 @@ export class VisitsService {
         phone: data.phone,
         referralCenter: data.referralCenter,
         insuranceStatus: data.insuranceStatus ?? 'uninsured',
-        reasonForVisit: data.reasonForVisit,
-        emergencyContactName: data.emergencyContactName,
-        emergencyContactPhone: data.emergencyContactPhone,
-        emergencyContactRel: data.emergencyContactRel ?? null,
+        reasonForVisit: data.reasonForVisit?.trim() ?? '',
+        emergencyContactName: data.emergencyContactName?.trim() ?? '',
+        emergencyContactPhone: data.emergencyContactPhone?.trim() ?? '',
+        emergencyContactRel: data.emergencyContactRel?.trim() ?? '',
         isMinor: data.age && Number(data.age) < 18,
       },
     });

@@ -61,6 +61,7 @@ model User {
   phone                 String?
   email                 String                  @unique
   role                  Int                     @default(1)
+  roles                 String                  @default("1")
   module                String                  @default("frontdesk")
   isActive              Boolean                 @default(true)
   createdAt             DateTime                @default(now())
@@ -97,9 +98,9 @@ model Patient {
   phone                 String
   referralCenter        String
   insuranceStatus       String
-  reasonForVisit        String
-  emergencyContactName  String
-  emergencyContactPhone String
+  reasonForVisit        String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
   emergencyContactRel   String?
   isMinor               Boolean  @default(false)
   createdAt             DateTime @default(now())

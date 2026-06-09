@@ -19,19 +19,35 @@ export class AuthController {
     // Role-based check
     if (body.role !== undefined) {
       const selectedRole = Number(body.role);
+      // Parse user's roles array
+      const userRoles: number[] = user.roles
+        ? (typeof user.roles === 'string' ? user.roles.split(',').map(Number) : user.roles)
+        : [user.role];
+
       // Admin (role 0) can log into any module/role for administration/testing override
-      if (user.role !== 0 && user.role !== selectedRole) {
+      // Other users can only log into their assigned roles
+      if (!userRoles.includes(0) && !userRoles.includes(selectedRole)) {
         throw new UnauthorizedException('You do not have access to this module');
       }
       
       // If admin logs in as another role, we temporarily map their active session module/role
-      if (user.role === 0 && selectedRole !== 0) {
+      if (userRoles.includes(0) && selectedRole !== 0) {
         const adminAsOther = {
           ...user,
           role: selectedRole,
           module: this.resolveModule(selectedRole)
         };
         return this.authService.login(adminAsOther);
+      }
+
+      // If multi-role user selects a specific role, set that as their active session role
+      if (!userRoles.includes(0) && userRoles.includes(selectedRole) && selectedRole !== user.role) {
+        const asSelectedRole = {
+          ...user,
+          role: selectedRole,
+          module: this.resolveModule(selectedRole)
+        };
+        return this.authService.login(asSelectedRole);
       }
     }
 
@@ -46,6 +62,12 @@ export class AuthController {
 
     const token = authHeader.split(' ')[1];
     const user = await this.authService.verifyToken(token);
+    const rolesRaw = (user as any).roles;
+    const roles = Array.isArray(rolesRaw)
+      ? rolesRaw.map(Number)
+      : rolesRaw
+        ? String(rolesRaw).split(',').map(Number)
+        : [user.role];
     
     return {
       id: user.id,
@@ -53,6 +75,7 @@ export class AuthController {
       email: user.email,
       username: user.username,
       role: user.role,
+      roles,
       module: user.module,
       tenantId: user.tenantId,
       tenantSlug: user.tenant?.slug ?? 'default',

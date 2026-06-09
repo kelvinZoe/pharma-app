@@ -29,10 +29,15 @@ export class AuthService {
   }
 
   async login(user: any) {
+    const rolesArray: number[] = user.roles
+      ? (typeof user.roles === 'string' ? user.roles.split(',').map(Number) : user.roles)
+      : [user.role];
+
     const payload = {
       email: user.email,
       sub: user.id,
       role: user.role,
+      roles: rolesArray,
       module: user.module,
       tenantId: user.tenantId,
       tenantSlug: user.tenant?.slug ?? 'default',
@@ -46,6 +51,7 @@ export class AuthService {
         name: user.fullName,
         email: user.email,
         role: user.role,
+        roles: rolesArray,
         module: user.module,
         tenantId: user.tenantId,
         tenantSlug: user.tenant?.slug ?? 'default',
@@ -68,7 +74,11 @@ export class AuthService {
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { passwordHash, ...result } = user;
-      return result;
+      const rolesRaw = (result as any).roles;
+      return {
+        ...result,
+        roles: rolesRaw ? String(rolesRaw).split(',').map(Number) : [result.role],
+      };
     } catch {
       throw new UnauthorizedException('Invalid token');
     }

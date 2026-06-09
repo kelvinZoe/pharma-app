@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, FormsModule, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
 import { AppTableComponent, TableColumn } from '../../../shared/ui/app-table/app-table.component';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
@@ -12,8 +12,26 @@ interface StaffUser {
   email: string;
   username: string;
   role: number;
+  roles: number[];
   active: boolean;
+  roleLevelText?: string;
+  roleName?: string;
 }
+
+const ROLE_OPTIONS = [
+  { code: 0, label: 'Full Administrator' },
+  { code: 1, label: 'Frontdesk & Reception' },
+  { code: 2, label: 'Laboratory Department' },
+  { code: 3, label: 'Radiography Scanning' },
+  { code: 4, label: 'Pharmacy & POS Clerk' },
+  { code: 5, label: 'Financial Accountant' }
+] as const;
+
+const selectedRolesValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
+  const formGroup = control as any;
+  const hasSelectedRole = ROLE_OPTIONS.some(({ code }) => !!formGroup.get(`role_${code}`)?.value);
+  return hasSelectedRole ? null : { rolesRequired: true };
+};
 
 @Component({
   selector: 'app-admin-users-page',
@@ -103,16 +121,16 @@ interface StaffUser {
               </div>
 
               <div class="form-group">
-                <label for="role">Clinic Module Authorization <span class="text-danger">*</span></label>
-                <select id="role" formControlName="role" class="form-control">
-                  <option value="">-- Choose Module --</option>
-                  <option value="0">Role 0 - Full Administrator</option>
-                  <option value="1">Role 1 - Frontdesk & Reception</option>
-                  <option value="2">Role 2 - Laboratory Department</option>
-                  <option value="3">Role 3 - Radiography Scanning</option>
-                  <option value="4">Role 4 - Pharmacy & POS Clerk</option>
-                  <option value="5">Role 5 - Financial Accountant</option>
-                </select>
+                <label>Clinic Module Authorization <span class="text-danger">*</span></label>
+                <div class="role-grid">
+                  <label *ngFor="let role of roleOptions" class="role-chip">
+                    <input type="checkbox" [formControlName]="'role_' + role.code" />
+                    <span>Role {{ role.code }} - {{ role.label }}</span>
+                  </label>
+                </div>
+                <div *ngIf="userForm.touched && userForm.errors?.['rolesRequired']" class="text-danger small mt-1">
+                  Select at least one role for this staff account.
+                </div>
               </div>
 
               <div class="form-group" *ngIf="editingUser()">
@@ -237,9 +255,16 @@ export class AdminUsersPageComponent implements OnInit {
     email: ['', [Validators.required, Validators.email]],
     username: ['', [Validators.required, Validators.minLength(3)]],
     password: ['', []],
-    role: ['', [Validators.required]],
-    active: [true]
-  });
+    active: [true],
+    role_0: [false],
+    role_1: [false],
+    role_2: [false],
+    role_3: [false],
+    role_4: [false],
+    role_5: [false]
+  }, { validators: [selectedRolesValidator] });
+
+  readonly roleOptions = ROLE_OPTIONS;
 
   ngOnInit(): void {
     this.loadUsers();
@@ -263,7 +288,7 @@ export class AdminUsersPageComponent implements OnInit {
         const mapped = list.map(u => ({
           ...u,
           roleLevelText: `Role Level ${u.role}`,
-          roleName: this.getRoleName(u.role)
+          roleName: this.getRoleNames(u.roles?.length ? u.roles : [u.role])
         }));
         this.users.set(mapped);
       },
@@ -286,6 +311,18 @@ export class AdminUsersPageComponent implements OnInit {
     }
   }
 
+  getRoleNames(roles: number[]): string {
+    return roles
+      .map((role) => this.getRoleName(role))
+      .join(', ');
+  }
+
+  private getCheckedRoles(): number[] {
+    return this.roleOptions
+      .filter(({ code }) => !!this.userForm.get(`role_${code}`)?.value)
+      .map(({ code }) => code);
+  }
+
   openNewStaffModal(): void {
     this.cancelEdit();
     this.isModalOpen.set(true);
@@ -296,14 +333,18 @@ export class AdminUsersPageComponent implements OnInit {
     this.userForm.get('password')?.clearValidators();
     this.userForm.get('password')?.setValidators([Validators.minLength(4)]);
     
+    const roles = u.roles?.length ? u.roles : [u.role];
     this.userForm.patchValue({
       name: u.name,
       email: u.email ?? '',
       username: u.username,
       password: '',
-      role: String(u.role),
       active: u.active
     });
+    this.roleOptions.forEach(({ code }) => {
+      this.userForm.get(`role_${code}`)?.setValue(roles.includes(code));
+    });
+    this.userForm.updateValueAndValidity();
     this.isModalOpen.set(true);
   }
 
@@ -315,9 +356,15 @@ export class AdminUsersPageComponent implements OnInit {
       email: '',
       username: '',
       password: '',
-      role: '',
-      active: true
+      active: true,
+      role_0: false,
+      role_1: false,
+      role_2: false,
+      role_3: false,
+      role_4: false,
+      role_5: false
     });
+    this.userForm.updateValueAndValidity();
   }
 
   onPageChange(page: number): void {
@@ -363,15 +410,20 @@ export class AdminUsersPageComponent implements OnInit {
   }
 
   submitUser(): void {
-    if (this.userForm.invalid) return;
+    if (this.userForm.invalid) {
+      this.userForm.markAllAsTouched();
+      return;
+    }
 
     this.isSubmitting.set(true);
     const formVal = this.userForm.getRawValue();
+    const selectedRoles = this.getCheckedRoles();
 
     const payload: any = {
       name: (formVal.name ?? '').trim(),
       email: (formVal.email ?? '').trim().toLowerCase(),
-      role: Number(formVal.role),
+      roles: selectedRoles,
+      role: selectedRoles[0] ?? 1,
       active: !!formVal.active
     };
 
@@ -426,4 +478,3 @@ export class AdminUsersPageComponent implements OnInit {
     });
   }
 }
-
