@@ -555,68 +555,6 @@
 }
 
 // ----------------------------------------------------
-// Footer quick accounts lists
-// ----------------------------------------------------
-.login-card-footer {
-  margin-top: 2.2rem;
-  border-top: 1px solid #f1f5f9;
-  padding-top: 1.5rem;
-
-  .footer-title {
-    margin: 0 0 0.8rem 0;
-    font-size: 0.72rem;
-    font-weight: 750;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #64748b;
-  }
-}
-
-.reference-accounts {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.5rem;
-}
-
-.account-badge {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  padding: 0.45rem 0.65rem;
-  border-radius: 0.6rem;
-  font-size: 0.76rem;
-  font-family: monospace;
-
-  .label {
-    color: #64748b;
-  }
-
-  .val {
-    color: #334155;
-    font-weight: 700;
-  }
-}
-
-.footer-password {
-  margin: 0.85rem 0 0 0;
-  font-size: 0.78rem;
-  color: #64748b;
-  text-align: center;
-
-  span {
-    font-family: monospace;
-    font-weight: 700;
-    color: var(--app-primary-color);
-    background: var(--app-primary-soft-color);
-    padding: 0.15rem 0.4rem;
-    border-radius: 0.4rem;
-    border: 1px solid color-mix(in srgb, var(--app-primary-color), white 85%);
-  }
-}
-
-// ----------------------------------------------------
 // Keyframe Animations
 // ----------------------------------------------------
 @keyframes ripple {
