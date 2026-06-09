@@ -14,8 +14,10 @@ interface StaffUser {
   role: number;
   roles: number[];
   active: boolean;
+  isVerified?: boolean;
   roleLevelText?: string;
   roleName?: string;
+  inviteStatus?: string;
 }
 
 const ROLE_OPTIONS = [
@@ -104,14 +106,6 @@ const selectedRolesValidator: ValidatorFn = (control: AbstractControl): Validati
                 </div>
               </div>
 
-              <div class="form-group">
-                <label for="username">System Username <span class="text-danger">*</span></label>
-                <input id="username" type="text" formControlName="username" class="form-control" placeholder="e.g. fboateng" [readOnly]="editingUser() !== null" />
-                <div *ngIf="userForm.get('username')?.touched && userForm.get('username')?.invalid" class="text-danger small mt-1">
-                  Username must be at least 3 characters.
-                </div>
-              </div>
-
               <div class="form-group" *ngIf="editingUser()">
                 <label for="password">Reset Password</label>
                 <input id="password" type="password" formControlName="password" class="form-control" placeholder="Leave blank to keep current password" />
@@ -124,7 +118,7 @@ const selectedRolesValidator: ValidatorFn = (control: AbstractControl): Validati
                 <label>Clinic Module Authorization <span class="text-danger">*</span></label>
                 <div class="role-grid">
                   <label *ngFor="let role of roleOptions" class="role-chip">
-                    <input type="checkbox" [formControlName]="'role_' + role.code" />
+                    <input type="checkbox" [formControlName]="'role_' + role.code" (change)="onRoleToggle(role.code)" />
                     <span>Role {{ role.code }} - {{ role.label }}</span>
                   </label>
                 </div>
@@ -247,13 +241,27 @@ export class AdminUsersPageComponent implements OnInit {
     { key: 'roleLevelText', label: 'Clinic Role Level', type: 'text' },
     { key: 'roleName', label: 'Access Boundaries', type: 'badge' },
     { key: 'active', label: 'Access status', type: 'status' },
-    { key: 'actions', label: 'Actions', type: 'actions', actionLabel: 'Edit Access', showDelete: true }
+    { key: 'inviteStatus', label: 'Invite', type: 'badge' },
+    {
+      key: 'actions',
+      label: 'Actions',
+      type: 'actions',
+      actionLabel: 'Edit Access',
+      showDelete: true,
+      extraActions: [
+        {
+          action: 'resend-invitation',
+          label: 'Resend Invite',
+          color: 'var(--app-primary-color)',
+          showWhen: (row: StaffUser) => !row.isVerified
+        }
+      ]
+    }
   ];
 
   readonly userForm = this.fb.group({
     name: ['', [Validators.required]],
     email: ['', [Validators.required, Validators.email]],
-    username: ['', [Validators.required, Validators.minLength(3)]],
     password: ['', []],
     active: [true],
     role_0: [false],
@@ -288,7 +296,8 @@ export class AdminUsersPageComponent implements OnInit {
         const mapped = list.map(u => ({
           ...u,
           roleLevelText: `Role Level ${u.role}`,
-          roleName: this.getRoleNames(u.roles?.length ? u.roles : [u.role])
+          roleName: this.getRoleNames(u.roles?.length ? u.roles : [u.role]),
+          inviteStatus: u.isVerified ? 'Verified' : 'Pending'
         }));
         this.users.set(mapped);
       },
@@ -323,6 +332,24 @@ export class AdminUsersPageComponent implements OnInit {
       .map(({ code }) => code);
   }
 
+  onRoleToggle(roleCode: number): void {
+    const selected = !!this.userForm.get(`role_${roleCode}`)?.value;
+    if (!selected) {
+      this.userForm.updateValueAndValidity();
+      return;
+    }
+
+    if (roleCode === 0) {
+      this.roleOptions
+        .filter(({ code }) => code !== 0)
+        .forEach(({ code }) => this.userForm.get(`role_${code}`)?.setValue(false, { emitEvent: false }));
+    } else {
+      this.userForm.get('role_0')?.setValue(false, { emitEvent: false });
+    }
+
+    this.userForm.updateValueAndValidity();
+  }
+
   openNewStaffModal(): void {
     this.cancelEdit();
     this.isModalOpen.set(true);
@@ -337,7 +364,6 @@ export class AdminUsersPageComponent implements OnInit {
     this.userForm.patchValue({
       name: u.name,
       email: u.email ?? '',
-      username: u.username,
       password: '',
       active: u.active
     });
@@ -354,7 +380,6 @@ export class AdminUsersPageComponent implements OnInit {
     this.userForm.reset({
       name: '',
       email: '',
-      username: '',
       password: '',
       active: true,
       role_0: false,
@@ -381,6 +406,8 @@ export class AdminUsersPageComponent implements OnInit {
   onActionClick(event: { action: string, row: any }): void {
     if (event.action === 'click') {
       this.editUser(event.row);
+    } else if (event.action === 'resend-invitation') {
+      this.resendInvitation(event.row);
     } else if (event.action === 'delete') {
       const currentUser = this.session.currentUser();
       if (currentUser && currentUser.id === event.row.id) {
@@ -389,6 +416,28 @@ export class AdminUsersPageComponent implements OnInit {
       }
       this.confirmDeleteUser.set(event.row);
     }
+  }
+
+  resendInvitation(user: StaffUser): void {
+    if (user.isVerified) {
+      this.toast.error('This staff account is already verified.');
+      return;
+    }
+
+    this.api.resendUserInvitation(user.id).subscribe({
+      next: (res) => {
+        if (res?.inviteToken) {
+          const inviteLink = `${window.location.origin}/auth/verify-invite?token=${res.inviteToken}`;
+          this.activeInviteLink.set(inviteLink);
+        }
+        this.toast.success(`Invitation resent to ${user.email}.`);
+        this.loadUsers();
+      },
+      error: (err) => {
+        console.error('Error resending invitation', err);
+        this.toast.error(err?.error?.message ?? 'Failed to resend invitation.');
+      }
+    });
   }
 
   removeUser(): void {
@@ -447,7 +496,6 @@ export class AdminUsersPageComponent implements OnInit {
         }
       });
     } else {
-      payload.username = (formVal.username ?? '').trim();
       this.api.createUser(payload).subscribe({
         next: (res) => {
           this.isSubmitting.set(false);

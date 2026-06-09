@@ -32,6 +32,7 @@ export class UsersService {
           roles: true,
           module: true,
           isActive: true,
+          isVerified: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -67,6 +68,7 @@ export class UsersService {
           roles: true,
           module: true,
           isActive: true,
+          isVerified: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -112,6 +114,7 @@ export class UsersService {
     }
     const rolesStr = rolesArray.join(',');
     const moduleResolved = this.resolveModule(primaryRole);
+    const username = await this.generateUsername(data.fullName);
 
     let newUser: any;
     try {
@@ -119,7 +122,7 @@ export class UsersService {
         data: {
           fullName: data.fullName,
           email: data.email,
-          username: data.username ?? data.email.split('@')[0],
+          username,
           passwordHash: dummyPasswordHash,
           phone: data.phone ?? null,
           role: primaryRole,
@@ -148,7 +151,7 @@ export class UsersService {
       if (err?.code === 'P2002') {
         const fields: string[] = err?.meta?.constraint?.fields ?? [];
         if (fields.some((f: string) => f.includes('username'))) {
-          throw new ConflictException(`Username "${data.username}" is already taken. Please choose a different one.`);
+          throw new ConflictException('Could not generate a unique username. Please try again.');
         }
         if (fields.some((f: string) => f.includes('email'))) {
           throw new ConflictException('A staff account with this email already exists.');
@@ -164,6 +167,45 @@ export class UsersService {
     return {
       ...newUser,
       roles: rolesStr.split(',').map(Number),
+    };
+  }
+
+  async resendInvitation(id: string) {
+    const inviteToken = crypto.randomBytes(32).toString('hex');
+    const inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        isVerified: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.isVerified) {
+      throw new BadRequestException('This staff account has already been verified.');
+    }
+
+    await this.prisma.user.update({
+      where: { id },
+      data: {
+        inviteToken,
+        inviteExpires,
+      },
+    });
+
+    await this.emailService.sendStaffInvitation(user.email, user.fullName, inviteToken);
+
+    return {
+      message: 'Staff invitation resent successfully.',
+      inviteToken,
+      inviteExpires,
     };
   }
 
@@ -231,10 +273,6 @@ export class UsersService {
       updateData.email = data.email;
     }
 
-    if (data.username !== undefined) {
-      updateData.username = data.username;
-    }
-
     const updated = await this.prisma.user.update({
       where: { id },
       data: updateData,
@@ -267,5 +305,55 @@ export class UsersService {
       case 5:
       default: return 'accounting';
     }
+  }
+
+  private async generateUsername(fullName: string): Promise<string> {
+    const tenantId = TenantContextService.getTenantId();
+    const tenantSlug = TenantContextService.getTenantSlug();
+    const tenant = tenantId
+      ? await this.prisma.tenant.findUnique({
+          where: { id: tenantId },
+          select: { name: true, slug: true },
+        })
+      : null;
+    const tenantCode = this.buildTenantCode(tenantSlug ?? tenant?.slug ?? tenant?.name ?? 'clinic');
+    const nameCode = this.buildNameCode(fullName);
+    const baseUsername = `${tenantCode}-${nameCode}`;
+
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const candidate = attempt === 0 ? baseUsername : `${baseUsername}${attempt + 1}`;
+      const existing = await this.prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "User" WHERE "username" = ${candidate} LIMIT 1
+      `;
+      if (existing.length === 0) {
+        return candidate;
+      }
+    }
+
+    return `${baseUsername}-${crypto.randomBytes(3).toString('hex')}`;
+  }
+
+  private buildTenantCode(value: string): string {
+    const normalized = this.slugify(value);
+    const parts = normalized.split('-').filter(Boolean);
+    const code = parts.length > 1
+      ? parts.map((part) => part[0]).join('')
+      : normalized.slice(0, 5);
+    return code.slice(0, 6) || 'clinic';
+  }
+
+  private buildNameCode(fullName: string): string {
+    const parts = this.slugify(fullName).split('-').filter(Boolean);
+    if (parts.length === 0) return 'staff';
+    if (parts.length === 1) return parts[0].slice(0, 12);
+    return `${parts[0][0]}${parts[parts.length - 1]}`.slice(0, 16);
+  }
+
+  private slugify(value: string): string {
+    return value
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
   }
 }

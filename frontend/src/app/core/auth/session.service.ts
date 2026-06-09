@@ -93,7 +93,7 @@ export class SessionService {
     return ROLE_HOME[role];
   }
 
-  login(payload: { readonly email: string; readonly password?: string }): Observable<SessionUser> {
+  login(payload: { readonly identifier: string; readonly password?: string }): Observable<SessionUser> {
     return this.http.post<{ accessToken: string; user: SessionUser }>(`${API_URL}/auth/login`, payload).pipe(
       tap((res) => {
         this.currentUserState.set(res.user);

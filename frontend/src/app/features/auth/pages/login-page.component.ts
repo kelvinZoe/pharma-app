@@ -23,7 +23,7 @@ export class LoginPageComponent {
   readonly successMessage = signal<string | null>(null);
 
   readonly loginForm = this.formBuilder.nonNullable.group({
-    email: ['', [Validators.required, Validators.email]],
+    email: ['', [Validators.required]],
     password: ['', [Validators.required, Validators.minLength(4)]]
   });
 
@@ -73,7 +73,7 @@ export class LoginPageComponent {
       const formValue = this.loginForm.getRawValue();
       const sessionUser = await firstValueFrom(
         this.session.login({
-          email: formValue.email.trim().toLowerCase(),
+          identifier: formValue.email.trim().toLowerCase(),
           password: formValue.password
         })
       );

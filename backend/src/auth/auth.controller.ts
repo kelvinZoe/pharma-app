@@ -7,13 +7,14 @@ export class AuthController {
 
   @Post('login')
   async login(@Body() body: any) {
-    if (!body.email || !body.password) {
-      throw new UnauthorizedException('Email and password are required');
+    const identifier = body.identifier ?? body.email ?? body.username;
+    if (!identifier || !body.password) {
+      throw new UnauthorizedException('Email/username and password are required');
     }
 
-    const user = await this.authService.validateUser(body.email, body.password);
+    const user = await this.authService.validateUser(identifier, body.password);
     if (!user) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('Invalid email/username or password');
     }
 
     // Role-based check

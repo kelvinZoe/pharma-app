@@ -67,18 +67,18 @@
         </div>
 
         <form class="login-form" [formGroup]="loginForm" (ngSubmit)="submitLogin()">
-          <!-- Email Address input -->
+          <!-- Email or Username input -->
           <div class="input-block" [class.input-block--error]="loginForm.controls.email.touched && loginForm.controls.email.invalid">
-            <span class="input-label">Email Address</span>
+            <span class="input-label">Email Address or Username</span>
             <div class="input-wrapper">
               <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                 <polyline points="22,6 12,13 2,6" />
               </svg>
-              <input formControlName="email" type="email" placeholder="clinician@example.com" autocomplete="email" />
+              <input formControlName="email" type="text" placeholder="clinician@example.com or sfc-karthur" autocomplete="username" />
             </div>
             @if (loginForm.controls.email.touched && loginForm.controls.email.invalid) {
-              <span class="error-msg">A valid email address is required.</span>
+              <span class="error-msg">Email address or username is required.</span>
             }
           </div>
 

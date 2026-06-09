@@ -26,6 +26,12 @@ export class UsersController {
     return this.usersService.create(body);
   }
 
+  @Post(':id/resend-invitation')
+  async resendInvitation(@Req() req: any, @Param('id') id: string) {
+    this.ensureAdmin(req.user);
+    return this.usersService.resendInvitation(id);
+  }
+
   @Put(':id')
   async update(@Req() req: any, @Param('id') id: string, @Body() body: any) {
     this.ensureAdmin(req.user);

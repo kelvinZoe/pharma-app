@@ -11,6 +11,13 @@ export interface TableColumn {
   type?: 'text' | 'code' | 'badge' | 'status' | 'price' | 'employee' | 'actions';
   actionLabel?: string;
   showDelete?: boolean;
+  extraActions?: Array<{
+    action: string;
+    label: string;
+    showWhen?: (row: any) => boolean;
+    appearance?: string;
+    color?: string;
+  }>;
 }
 
 @Component({
@@ -161,6 +168,16 @@ export interface TableColumn {
                           <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                         </svg>
                         {{ col.actionLabel || 'Action' }}
+                      </button>
+                      <button 
+                        *ngFor="let action of getExtraActions(col, row)"
+                        tuiButton
+                        type="button"
+                        [appearance]="action.appearance || 'secondary'" 
+                        size="s" 
+                        [style.color]="action.color || null"
+                        (click)="$event.stopPropagation(); onAction(action.action, row)">
+                        {{ action.label }}
                       </button>
                       <button 
                         *ngIf="col.showDelete"
@@ -539,6 +556,10 @@ export class AppTableComponent implements OnInit {
 
   onAction(action: string, row: any): void {
     this.actionClick.emit({ action, row });
+  }
+
+  getExtraActions(col: TableColumn, row: any): NonNullable<TableColumn['extraActions']> {
+    return (col.extraActions ?? []).filter((action) => !action.showWhen || action.showWhen(row));
   }
 
   onRowClick(row: any): void {

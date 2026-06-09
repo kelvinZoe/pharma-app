@@ -63,7 +63,6 @@ export class ApiService {
     const payload = {
       fullName: data.name,
       email: data.email,
-      username: data.username,
       password: data.password,
       role: primaryRole,
       roles: Array.isArray(data.roles) ? data.roles.map(Number) : [primaryRole],
@@ -101,6 +100,10 @@ export class ApiService {
 
   deleteUser(id: string): Observable<any> {
     return this.http.delete<any>(`${API_URL}/users/${id}`);
+  }
+
+  resendUserInvitation(id: string): Observable<any> {
+    return this.http.post<any>(`${API_URL}/users/${id}/resend-invitation`, {});
   }
 
   // --- Departments & Services ---

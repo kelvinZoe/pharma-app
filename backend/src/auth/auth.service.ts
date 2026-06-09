@@ -11,11 +11,17 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async validateUser(email: string, pass: string): Promise<any> {
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-      include: { tenant: true },
-    });
+  async validateUser(identifier: string, pass: string): Promise<any> {
+    const normalizedIdentifier = identifier.trim().toLowerCase();
+    const user = normalizedIdentifier.includes('@')
+      ? await this.prisma.user.findUnique({
+          where: { email: normalizedIdentifier },
+          include: { tenant: true },
+        })
+      : await this.prisma.user.findFirst({
+          where: { username: normalizedIdentifier },
+          include: { tenant: true },
+        });
 
     if (user && user.isActive && user.isVerified) {
       const isMatch = await bcrypt.compare(pass, user.passwordHash);
@@ -35,6 +41,7 @@ export class AuthService {
 
     const payload = {
       email: user.email,
+      username: user.username,
       sub: user.id,
       role: user.role,
       roles: rolesArray,
@@ -50,6 +57,7 @@ export class AuthService {
         id: user.id,
         name: user.fullName,
         email: user.email,
+        username: user.username,
         role: user.role,
         roles: rolesArray,
         module: user.module,
