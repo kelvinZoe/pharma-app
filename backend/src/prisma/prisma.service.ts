@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -28,17 +28,24 @@ const isTenantModel = (model: string): boolean => TENANT_MODELS.has(model);
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly extendedClient: any;
+  private heartbeatTimer: NodeJS.Timeout | null = null;
+  private readonly logger = new Logger(PrismaService.name);
 
   constructor() {
     const isProduction = process.env.DATABASE_URL && !process.env.DATABASE_URL.startsWith('file:');
     let adapter: any;
 
     if (isProduction) {
-      const pool = new Pool({ 
+      const pool = new Pool({
         connectionString: process.env.DATABASE_URL,
-        max: 5, // Allow up to 5 concurrent connections to handle simultaneous API calls
-        idleTimeoutMillis: 30000, // Automatically close idle connections after 30 seconds
-        connectionTimeoutMillis: 5000, // Timeout after 5 seconds if connection cannot be established
+        max: 5,
+        idleTimeoutMillis: 120000,       // Release idle connections after 2 minutes
+        connectionTimeoutMillis: 10000,  // Wait up to 10s to acquire a connection
+        keepAlive: true,
+        keepAliveInitialDelayMillis: 10000,
+      });
+      pool.on('error', (err) => {
+        this.logger.warn(`[PgPool] Pool client error: ${err.message}`);
       });
       adapter = new PrismaPg(pool);
     } else {
@@ -116,9 +123,27 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   async onModuleInit() {
     await this.$connect();
+
+    // Send a keepalive ping every 90 seconds so the pool connection
+    // to Supabase never sits idle long enough to be terminated.
+    const isProduction = process.env.DATABASE_URL && !process.env.DATABASE_URL.startsWith('file:');
+    if (isProduction) {
+      this.heartbeatTimer = setInterval(async () => {
+        try {
+          await this.$queryRaw`SELECT 1`;
+        } catch (err: any) {
+          this.logger.warn(`[Heartbeat] Keepalive ping failed (will reconnect on next query): ${err?.message}`);
+        }
+      }, 90_000);
+    }
   }
 
   async onModuleDestroy() {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
     await this.$disconnect();
   }
 }
+

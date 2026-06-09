@@ -91,6 +91,10 @@ export class ApiService {
     return this.http.put<any>(`${API_URL}/users/${id}`, payload);
   }
 
+  deleteUser(id: string): Observable<any> {
+    return this.http.delete<any>(`${API_URL}/users/${id}`);
+  }
+
   // --- Departments & Services ---
   getDepartments(): Observable<any[]> {
     return this.http.get<any[]>(`${API_URL}/departments`);

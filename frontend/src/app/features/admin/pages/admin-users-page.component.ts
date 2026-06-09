@@ -4,6 +4,7 @@ import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angu
 import { ApiService } from '../../../core/services/api.service';
 import { AppTableComponent, TableColumn } from '../../../shared/ui/app-table/app-table.component';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
+import { SessionService } from '../../../core/auth/session.service';
 
 interface StaffUser {
   id: string;
@@ -134,6 +135,65 @@ interface StaffUser {
         </div>
       </div>
 
+      <!-- Delete Confirmation Modal -->
+      <div class="modal-backdrop" *ngIf="confirmDeleteUser() as target" (click)="confirmDeleteUser.set(null)">
+        <div class="modal-card" (click)="$event.stopPropagation()" style="max-width: 420px; text-align: center; padding: 2rem 1.75rem; border-radius: 1.25rem;">
+          <div style="color: #ef4444; margin-bottom: 1.25rem; display: flex; justify-content: center;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 52px; height: 52px; background: #fee2e2; border-radius: 50%; padding: 12px;">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              <line x1="10" y1="11" x2="10" y2="17"></line>
+              <line x1="14" y1="11" x2="14" y2="17"></line>
+            </svg>
+          </div>
+          <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--slate-800); margin: 0 0 0.5rem 0;">Remove Staff Account?</h3>
+          <p style="font-size: 0.875rem; color: var(--slate-500); margin: 0 0 1.75rem 0; line-height: 1.6;">
+            You are about to permanently remove <strong style="color: var(--slate-700);">{{ target.name }}</strong>'s account.
+            This action cannot be undone.
+          </p>
+          <div class="d-flex gap-2 justify-content-center">
+            <button class="btn btn-secondary" (click)="confirmDeleteUser.set(null)">Cancel</button>
+            <button class="btn btn-danger" (click)="removeUser()" style="background: #ef4444; border-color: #ef4444; color: #fff;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; margin-right: 5px;">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              Remove Account
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Success / Invite Link Copy Dialog Modal -->
+      <div class="modal-backdrop" *ngIf="activeInviteLink() as link" (click)="activeInviteLink.set(null)">
+        <div class="modal-card" (click)="$event.stopPropagation()" style="max-width: 480px; text-align: center; padding: 2.5rem 2rem; border-radius: 1.25rem;">
+          <div style="color: var(--app-primary-color); margin-bottom: 1.25rem; display: flex; justify-content: center; transform: scale(1.1);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 64px; height: 64px;">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+          </div>
+          
+          <h3 style="font-size: 1.35rem; font-weight: 800; color: var(--slate-800); margin: 0 0 0.5rem 0; letter-spacing: -0.5px;">Staff Account Created!</h3>
+          <p style="font-size: 0.875rem; color: var(--slate-500); margin: 0 0 1.5rem 0; line-height: 1.5;">
+            An onboarding email has been queued. You can also copy the activation link below and share it directly with the staff member:
+          </p>
+
+          <div style="display: flex; gap: 0.5rem; width: 100%; background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 0.5rem; padding: 0.5rem; align-items: center; justify-content: space-between; margin-bottom: 2rem;">
+            <span style="font-family: monospace; font-size: 0.775rem; color: var(--slate-600); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; text-align: left; padding: 0 0.25rem;">
+              {{ link }}
+            </span>
+            <button class="btn btn-secondary btn-sm" (click)="copyInviteLink(link)" style="flex-shrink: 0; padding: 0.35rem 0.65rem;">
+              Copy
+            </button>
+          </div>
+
+          <button class="btn btn-primary" (click)="activeInviteLink.set(null)" style="width: 100%; font-weight: 700; padding: 0.75rem 1rem; border-radius: 0.75rem; font-size: 0.95rem;">
+            Close & Refresh
+          </button>
+        </div>
+      </div>
+
     </div>
   `,
   styleUrl: './admin-page.component.scss',
@@ -143,6 +203,7 @@ export class AdminUsersPageComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly fb = inject(FormBuilder);
   private readonly toast = inject(ToastService);
+  private readonly session = inject(SessionService);
 
   // Table source signals
   readonly users = signal<StaffUser[]>([]);
@@ -156,6 +217,10 @@ export class AdminUsersPageComponent implements OnInit {
   readonly isModalOpen = signal(false);
   readonly editingUser = signal<StaffUser | null>(null);
   readonly isSubmitting = signal(false);
+  readonly activeInviteLink = signal<string | null>(null);
+
+  // Remove confirmation signal
+  readonly confirmDeleteUser = signal<StaffUser | null>(null);
 
   readonly columns: TableColumn[] = [
     { key: 'name', label: 'Employee Name', type: 'employee' },
@@ -164,7 +229,7 @@ export class AdminUsersPageComponent implements OnInit {
     { key: 'roleLevelText', label: 'Clinic Role Level', type: 'text' },
     { key: 'roleName', label: 'Access Boundaries', type: 'badge' },
     { key: 'active', label: 'Access status', type: 'status' },
-    { key: 'actions', label: 'Actions', type: 'actions', actionLabel: 'Edit Access' }
+    { key: 'actions', label: 'Actions', type: 'actions', actionLabel: 'Edit Access', showDelete: true }
   ];
 
   readonly userForm = this.fb.group({
@@ -269,7 +334,32 @@ export class AdminUsersPageComponent implements OnInit {
   onActionClick(event: { action: string, row: any }): void {
     if (event.action === 'click') {
       this.editUser(event.row);
+    } else if (event.action === 'delete') {
+      const currentUser = this.session.currentUser();
+      if (currentUser && currentUser.id === event.row.id) {
+        this.toast.error('You cannot remove your own account.');
+        return;
+      }
+      this.confirmDeleteUser.set(event.row);
     }
+  }
+
+  removeUser(): void {
+    const target = this.confirmDeleteUser();
+    if (!target) return;
+
+    this.api.deleteUser(target.id).subscribe({
+      next: () => {
+        this.confirmDeleteUser.set(null);
+        this.loadUsers();
+        this.toast.success(`${target.name}'s account has been removed.`);
+      },
+      error: (err) => {
+        console.error('Error removing user', err);
+        this.confirmDeleteUser.set(null);
+        this.toast.error(err?.error?.message ?? 'Failed to remove staff account.');
+      }
+    });
   }
 
   submitUser(): void {
@@ -311,7 +401,12 @@ export class AdminUsersPageComponent implements OnInit {
           this.isSubmitting.set(false);
           this.cancelEdit();
           this.loadUsers();
-          this.toast.success('Staff invitation email sent successfully.');
+          if (res && res.inviteToken) {
+            const inviteLink = `${window.location.origin}/auth/verify-invite?token=${res.inviteToken}`;
+            this.activeInviteLink.set(inviteLink);
+          } else {
+            this.toast.success('Staff invitation email sent successfully.');
+          }
         },
         error: (err) => {
           console.error('Error creating user', err);
@@ -320,6 +415,15 @@ export class AdminUsersPageComponent implements OnInit {
         }
       });
     }
+  }
+
+  copyInviteLink(link: string): void {
+    navigator.clipboard.writeText(link).then(() => {
+      this.toast.success('Activation link copied to clipboard!');
+    }).catch(err => {
+      console.error('Failed to copy link', err);
+      this.toast.error('Failed to copy to clipboard.');
+    });
   }
 }
 

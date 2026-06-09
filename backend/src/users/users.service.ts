@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../common/email/email.service';
 import * as bcrypt from 'bcrypt';
@@ -92,36 +92,71 @@ export class UsersService {
     // Generate dummy password hash so it can't be logged into until verified
     const dummyPasswordHash = await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 10);
 
-    const newUser = await this.prisma.user.create({
-      data: {
-        fullName: data.fullName,
-        email: data.email,
-        username: data.username ?? data.email.split('@')[0],
-        passwordHash: dummyPasswordHash,
-        phone: data.phone ?? null,
-        role: Number(data.role ?? 1),
-        module: data.module ?? 'frontdesk',
-        isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
-        isVerified: false,
-        inviteToken,
-        inviteExpires,
-      },
-      select: {
-        id: true,
-        fullName: true,
-        username: true,
-        phone: true,
-        email: true,
-        role: true,
-        module: true,
-        isActive: true,
-      },
-    });
+    let newUser: any;
+    try {
+      newUser = await this.prisma.user.create({
+        data: {
+          fullName: data.fullName,
+          email: data.email,
+          username: data.username ?? data.email.split('@')[0],
+          passwordHash: dummyPasswordHash,
+          phone: data.phone ?? null,
+          role: Number(data.role ?? 1),
+          module: data.module ?? 'frontdesk',
+          isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
+          isVerified: false,
+          inviteToken,
+          inviteExpires,
+        },
+        select: {
+          id: true,
+          fullName: true,
+          username: true,
+          phone: true,
+          email: true,
+          role: true,
+          module: true,
+          isActive: true,
+          inviteToken: true,
+        },
+      });
+    } catch (err: any) {
+      // Prisma unique constraint violation
+      if (err?.code === 'P2002') {
+        const fields: string[] = err?.meta?.constraint?.fields ?? [];
+        if (fields.some((f: string) => f.includes('username'))) {
+          throw new ConflictException(`Username "${data.username}" is already taken. Please choose a different one.`);
+        }
+        if (fields.some((f: string) => f.includes('email'))) {
+          throw new ConflictException('A staff account with this email already exists.');
+        }
+        throw new ConflictException('A duplicate value was detected. Please check the username and email.');
+      }
+      throw err;
+    }
 
     // Send the email invite
     await this.emailService.sendStaffInvitation(data.email, data.fullName, inviteToken);
 
     return newUser;
+  }
+
+  async remove(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Safeguard: prevent deleting the last admin account
+    if (user.role === 0) {
+      const adminCount = await this.prisma.user.count({ where: { role: 0 } });
+      if (adminCount <= 1) {
+        throw new BadRequestException('Cannot remove the last administrator account');
+      }
+    }
+
+    await this.prisma.user.delete({ where: { id } });
+    return { message: 'Staff account removed successfully' };
   }
 
   async update(id: string, data: any) {

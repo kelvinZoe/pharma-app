@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards, Req, ForbiddenException, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req, ForbiddenException, Query } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -30,6 +30,16 @@ export class UsersController {
   async update(@Req() req: any, @Param('id') id: string, @Body() body: any) {
     this.ensureAdmin(req.user);
     return this.usersService.update(id, body);
+  }
+
+  @Delete(':id')
+  async remove(@Req() req: any, @Param('id') id: string) {
+    this.ensureAdmin(req.user);
+    // Prevent admins from deleting their own account
+    if (req.user.userId === id || req.user.sub === id) {
+      throw new ForbiddenException('You cannot delete your own account');
+    }
+    return this.usersService.remove(id);
   }
 
   private ensureAdmin(user: any) {
