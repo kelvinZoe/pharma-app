@@ -5,7 +5,7 @@ export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private readonly resendApiKey = process.env.RESEND_API_KEY;
   private readonly resendFromEmail = process.env.EMAIL_FROM || process.env.RESEND_FROM_EMAIL || 'Clinical Suite <onboarding@resend.dev>';
-  private readonly frontendUrl = process.env.FRONTEND_URL || 'http://localhost:4202';
+  private readonly frontendUrl = (process.env.FRONTEND_URL || 'https://pharma-app-inky.vercel.app').replace(/\/$/, '');
 
   async sendStaffInvitation(email: string, fullName: string, token: string) {
     const inviteLink = `${this.frontendUrl}/auth/verify-invite?token=${token}`;
