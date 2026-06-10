@@ -3,6 +3,7 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { ApiService } from '../../../core/services/api.service';
 import { AppTableComponent, TableColumn } from '../../../shared/ui/app-table/app-table.component';
 import { FormsModule } from '@angular/forms';
+import { ToastService } from '../../../shared/ui/toast/toast.service';
 
 @Component({
   selector: 'app-frontdesk-visits-page',
@@ -67,6 +68,48 @@ import { FormsModule } from '@angular/forms';
         ></app-table>
 
       </div>
+
+      <!-- Delete Visit Confirmation Modal -->
+      <div class="modal-backdrop" *ngIf="confirmDeleteVisit() !== null" (click)="confirmDeleteVisit.set(null)">
+        <div class="modal-card" (click)="$event.stopPropagation()" style="max-width: 480px;">
+          <div class="modal-card-header" style="border-bottom: none; padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <h3 style="color: #ef4444; display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 24px; height: 24px;">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+              Confirm Visit Deletion
+            </h3>
+            <button class="modal-close-btn" (click)="confirmDeleteVisit.set(null)" style="background: none; border: none; cursor: pointer; color: var(--app-muted-text-color);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px;">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <div class="modal-body" style="padding: 0.5rem 1.5rem 1.5rem;">
+            <p style="margin: 0 0 1rem 0; font-size: 0.95rem; line-height: 1.5; color: var(--app-text-color);">
+              Are you sure you want to delete the visit registration for <strong>{{ confirmDeleteVisit()?.patientName }}</strong> ({{ confirmDeleteVisit()?.visitCode }})?
+            </p>
+            <div style="background-color: #fee2e2; border: 1px solid #fecaca; border-radius: 0.5rem; padding: 0.75rem 1rem; margin-bottom: 1.5rem; font-size: 0.825rem; color: #991b1b; display: flex; flex-direction: column; gap: 0.35rem;">
+              <div style="font-weight: 700; display: flex; align-items: center; gap: 0.25rem;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                Warning: Critical Action
+              </div>
+              <div>This will soft-delete the registration and cascade to voiding any invoices and payment receipts generated for this visit. Audit logs will record this transaction.</div>
+            </div>
+            <div style="display: flex; gap: 0.75rem; justify-content: flex-end; width: 100%;">
+              <button class="btn btn-secondary" (click)="confirmDeleteVisit.set(null)" style="font-weight: 700;">Cancel</button>
+              <button class="btn" style="background-color: #ef4444; color: #ffffff; border: 1px solid #ef4444; font-weight: 700;" (click)="deleteVisitConfirmed()">Delete Registration</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   `,
   styleUrl: './frontdesk-page.component.scss',
@@ -75,11 +118,13 @@ import { FormsModule } from '@angular/forms';
 export class FrontdeskVisitsPageComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly datePipe = inject(DatePipe);
+  private readonly toast = inject(ToastService);
 
   readonly visits = signal<any[]>([]);
   readonly loading = signal(false);
   readonly searchQuery = signal('');
   readonly showAll = signal(false);
+  readonly confirmDeleteVisit = signal<any | null>(null);
 
   // Pagination signals
   readonly page = signal(1);
@@ -92,7 +137,7 @@ export class FrontdeskVisitsPageComponent implements OnInit {
     { key: 'services', label: 'Requested Services', type: 'text' },
     { key: 'statusLabel', label: 'Status', type: 'badge' },
     { key: 'total', label: 'Est. Bill', type: 'price' },
-    { key: 'actions', label: 'Actions', type: 'actions', actionLabel: 'Manage' }
+    { key: 'actions', label: 'Actions', type: 'actions', actionLabel: 'Manage', showDelete: true }
   ];
 
   ngOnInit(): void {
@@ -154,9 +199,30 @@ export class FrontdeskVisitsPageComponent implements OnInit {
   }
 
   onAction(event: { action: string, row: any }): void {
-    // Handling table action clicks. For now, it could route to the billing desk or visit details.
-    console.log('Action clicked for visit:', event.row.visitCode);
-    alert(`Opening management view for ${event.row.patientName}`);
+    if (event.action === 'delete') {
+      this.confirmDeleteVisit.set(event.row);
+    } else {
+      console.log('Action clicked for visit:', event.row.visitCode);
+      alert(`Opening management view for ${event.row.patientName}`);
+    }
+  }
+
+  deleteVisitConfirmed(): void {
+    const target = this.confirmDeleteVisit();
+    if (!target) return;
+
+    this.api.deleteVisit(target.id).subscribe({
+      next: () => {
+        this.toast.success(`Visit ${target.visitCode} has been successfully deleted.`);
+        this.confirmDeleteVisit.set(null);
+        this.loadVisits();
+      },
+      error: (err) => {
+        console.error('Error deleting visit', err);
+        this.toast.error(err?.error?.message ?? 'Failed to delete visit.');
+        this.confirmDeleteVisit.set(null);
+      }
+    });
   }
 
   getStatusLabel(status: string): string {

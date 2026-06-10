@@ -368,4 +368,12 @@ export class ApiService {
   openSession(openingFloat: number): Observable<any> {
     return this.http.post<any>(`${API_URL}/pharmacy/sessions/open`, { openingFloat });
   }
+
+  deleteVisit(id: string): Observable<any> {
+    return this.http.delete<any>(`${API_URL}/visits/${id}`);
+  }
+
+  getAuditLogs(page: number, limit: number): Observable<any> {
+    return this.http.get<any>(`${API_URL}/reports/audit-logs?page=${page}&limit=${limit}`);
+  }
 }

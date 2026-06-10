@@ -123,6 +123,10 @@ export class VisitsService {
       whereClause.status = {
         in: ['registered', 'sent_to_department', 'in_progress', 'completed', 'awaiting_payment'],
       };
+    } else {
+      whereClause.status = {
+        not: 'deleted',
+      };
     }
 
 
@@ -679,6 +683,77 @@ export class VisitsService {
         createdByUserId: userId,
         status: 'active',
       },
+    });
+  }
+
+  async deleteVisit(id: string, userId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const visit = await tx.visit.findUnique({
+        where: { id },
+        include: {
+          patient: true,
+          invoice: {
+            include: { payments: true }
+          }
+        },
+      });
+
+      if (!visit) {
+        throw new NotFoundException('Visit not found');
+      }
+
+      if (visit.status === 'deleted') {
+        throw new BadRequestException('Visit is already deleted');
+      }
+
+      // 1. Set Visit status to 'deleted'
+      await tx.visit.update({
+        where: { id },
+        data: { status: 'deleted' },
+      });
+
+      // 2. Set the associated ClinicInvoice.status = 'voided' (if exists)
+      if (visit.invoice) {
+        await tx.clinicInvoice.update({
+          where: { id: visit.invoice.id },
+          data: { status: 'voided' },
+        });
+
+        // 3. Set associated ClinicPayment.status = 'voided'
+        if (visit.invoice.payments && visit.invoice.payments.length > 0) {
+          for (const payment of visit.invoice.payments) {
+            if (payment.status !== 'voided') {
+              await tx.clinicPayment.update({
+                where: { id: payment.id },
+                data: {
+                  status: 'voided',
+                  voidReason: 'Registration deleted by Frontdesk',
+                  voidedByUserId: userId,
+                  voidedAt: new Date(),
+                },
+              });
+            }
+          }
+        }
+      }
+
+      // 4. Create AuditLog entry
+      await tx.auditLog.create({
+        data: {
+          actionType: 'delete_visit',
+          entityType: 'visit',
+          entityId: id,
+          beforeData: JSON.stringify({
+            patientName: `${visit.patient.surname}, ${visit.patient.firstName}`,
+            visitNumber: visit.visitNumber,
+            date: visit.createdAt,
+          }),
+          actorUserId: userId,
+          tenantId: visit.tenantId,
+        },
+      });
+
+      return { success: true };
     });
   }
 }

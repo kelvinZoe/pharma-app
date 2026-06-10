@@ -71,5 +71,12 @@ export class ReportsController {
   async voidPharmacy(@Req() req: any, @Param('id') id: string, @Body('reason') reason: string) {
     return this.reportsService.voidPharmacySale(id, req.user.id, reason);
   }
+
+  @Get('audit-logs')
+  async getAuditLogs(@Query('page') page?: string, @Query('limit') limit?: string) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 20;
+    return this.reportsService.getAuditLogs(pageNum, limitNum);
+  }
 }
 

@@ -8,6 +8,11 @@ export class ReportsService {
   async getClinicStream(startDate?: string, endDate?: string, page?: number, limit?: number) {
     const whereClause: any = {
       status: { not: 'voided' },
+      invoice: {
+        visit: {
+          status: { not: 'deleted' },
+        },
+      },
     };
     if (startDate || endDate) {
       whereClause.paidAt = {};
@@ -294,7 +299,7 @@ export class ReportsService {
       const totalRev = clinicRev + pharmRev;
 
       const pendingReviews = await this.prisma.visitService.count({
-        where: { status: 'pending' },
+        where: { status: 'pending', visit: { status: { not: 'deleted' } } },
       });
 
       stats['activeStaff'] = String(staffCount);
@@ -319,7 +324,7 @@ export class ReportsService {
       });
 
       const totalVisitsToday = await this.prisma.visit.count({
-        where: { createdAt: { gte: startOfToday, lte: endOfToday } },
+        where: { createdAt: { gte: startOfToday, lte: endOfToday }, status: { not: 'deleted' } },
       });
       const paidVisitsToday = await this.prisma.visit.count({
         where: { createdAt: { gte: startOfToday, lte: endOfToday }, status: 'paid' },
@@ -385,13 +390,13 @@ export class ReportsService {
 
     } else if (module === 'frontdesk') {
       const todayCheckins = await this.prisma.visit.count({
-        where: { createdAt: { gte: startOfToday, lte: endOfToday } },
+        where: { createdAt: { gte: startOfToday, lte: endOfToday }, status: { not: 'deleted' } },
       });
 
       const openVisits = await this.prisma.visit.count({
         where: {
           createdAt: { gte: startOfToday, lte: endOfToday },
-          status: { notIn: ['paid', 'not_done'] },
+          status: { notIn: ['paid', 'not_done', 'deleted'] },
         },
       });
 
@@ -400,7 +405,7 @@ export class ReportsService {
       });
 
       const receiptsIssued = await this.prisma.clinicPayment.count({
-        where: { paidAt: { gte: startOfToday, lte: endOfToday } },
+        where: { paidAt: { gte: startOfToday, lte: endOfToday }, invoice: { visit: { status: { not: 'deleted' } } } },
       });
 
       stats['todayCheckins'] = String(todayCheckins);
@@ -409,7 +414,7 @@ export class ReportsService {
       stats['receiptsIssued'] = String(receiptsIssued);
 
       const visitsWeek = await this.prisma.visit.findMany({
-        where: { createdAt: { gte: startOfWeek, lte: endOfWeek } },
+        where: { createdAt: { gte: startOfWeek, lte: endOfWeek }, status: { not: 'deleted' } },
       });
       visitsWeek.forEach((v) => {
         const idx = getDayIndex(v.createdAt);
@@ -427,6 +432,7 @@ export class ReportsService {
         orderBy: { createdAt: 'desc' },
       });
       const recentVisits = await this.prisma.visit.findMany({
+        where: { status: { not: 'deleted' } },
         include: { patient: true },
         take: 5,
         orderBy: { createdAt: 'desc' },
@@ -476,6 +482,7 @@ export class ReportsService {
           createdAt: { gte: startOfToday, lte: endOfToday },
           service: { departmentId: deptId },
           status: 'pending',
+          visit: { status: { not: 'deleted' } },
         },
       });
 
@@ -483,6 +490,7 @@ export class ReportsService {
         where: {
           service: { departmentId: deptId },
           status: 'in_progress',
+          visit: { status: { not: 'deleted' } },
         },
       });
 
@@ -491,6 +499,7 @@ export class ReportsService {
           createdAt: { gte: startOfToday, lte: endOfToday },
           service: { departmentId: deptId },
           source: 'department_added',
+          visit: { status: { not: 'deleted' } },
         },
       });
 
@@ -499,6 +508,7 @@ export class ReportsService {
           createdAt: { gte: startOfToday, lte: endOfToday },
           service: { departmentId: deptId },
           status: 'not_done',
+          visit: { status: { not: 'deleted' } },
         },
       });
 
@@ -512,6 +522,7 @@ export class ReportsService {
           createdAt: { gte: startOfWeek, lte: endOfWeek },
           service: { departmentId: deptId },
           status: { in: ['done', 'not_done'] },
+          visit: { status: { not: 'deleted' } },
         },
       });
       testsWeek.forEach((t) => {
@@ -523,6 +534,7 @@ export class ReportsService {
         where: {
           createdAt: { gte: startOfToday, lte: endOfToday },
           service: { departmentId: deptId },
+          visit: { status: { not: 'deleted' } },
         },
       });
       const completedLabToday = await this.prisma.visitService.count({
@@ -530,6 +542,7 @@ export class ReportsService {
           createdAt: { gte: startOfToday, lte: endOfToday },
           service: { departmentId: deptId },
           status: { in: ['done', 'not_done'] },
+          visit: { status: { not: 'deleted' } },
         },
       });
       completionPercent = totalLabToday > 0 ? Math.round((completedLabToday / totalLabToday) * 100) : 100;
@@ -598,6 +611,7 @@ export class ReportsService {
           createdAt: { gte: startOfToday, lte: endOfToday },
           service: { departmentId: deptId },
           status: 'pending',
+          visit: { status: { not: 'deleted' } },
         },
       });
 
@@ -606,6 +620,7 @@ export class ReportsService {
           createdAt: { gte: startOfToday, lte: endOfToday },
           service: { departmentId: deptId },
           source: 'department_added',
+          visit: { status: { not: 'deleted' } },
         },
       });
 
@@ -614,6 +629,7 @@ export class ReportsService {
           createdAt: { gte: startOfToday, lte: endOfToday },
           service: { departmentId: deptId },
           status: { in: ['done', 'not_done'] },
+          visit: { status: { not: 'deleted' } },
         },
       });
 
@@ -622,6 +638,7 @@ export class ReportsService {
           createdAt: { gte: startOfToday, lte: endOfToday },
           service: { departmentId: deptId },
           status: 'done',
+          visit: { status: { not: 'deleted' } },
         },
       });
 
@@ -635,6 +652,7 @@ export class ReportsService {
           createdAt: { gte: startOfWeek, lte: endOfWeek },
           service: { departmentId: deptId },
           status: { in: ['done', 'not_done'] },
+          visit: { status: { not: 'deleted' } },
         },
       });
       scansWeek.forEach((s) => {
@@ -646,6 +664,7 @@ export class ReportsService {
         where: {
           createdAt: { gte: startOfToday, lte: endOfToday },
           service: { departmentId: deptId },
+          visit: { status: { not: 'deleted' } },
         },
       });
       completionPercent = totalScanToday > 0 ? Math.round((completedTodayCount / totalScanToday) * 100) : 100;
@@ -1062,6 +1081,20 @@ export class ReportsService {
 
       return updatedSale;
     });
+  }
+
+  async getAuditLogs(page: number, limit: number) {
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        skip,
+        take: limit,
+        include: { actorUser: { select: { fullName: true, username: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.auditLog.count(),
+    ]);
+    return { data, total, page, limit };
   }
 }
 

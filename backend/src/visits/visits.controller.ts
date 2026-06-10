@@ -46,6 +46,11 @@ export class VisitsController {
     return this.visitsService.createVisit(body, req.user.id);
   }
 
+  @Delete('visits/:id')
+  async deleteRegistration(@Req() req: any, @Param('id') id: string) {
+    return this.visitsService.deleteVisit(id, req.user.id);
+  }
+
   // --- Department Actions ---
   @Post('visits/:id/services')
   async addExtra(@Param('id') visitId: string, @Body() body: any) {

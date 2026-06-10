@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
+import { ToastService } from '../../../shared/ui/toast/toast.service';
 
 interface ServiceItem {
   id: string;
@@ -166,13 +167,87 @@ interface ServiceItem {
           </div>
 
           <div class="modal-body" *ngIf="selectedPatient() as p">
-            <!-- Demographics Card -->
-            <div class="patient-header-card" style="margin-bottom: 1.5rem;">
-              <div class="patient-title">
-                <h3>{{ p.surname }}, {{ p.firstName }} {{ p.middleName || '' }}</h3>
-                <span class="insurance-badge" [class.insured]="p.insuranceStatus === 'insured'">
-                  {{ p.insuranceStatus === 'insured' ? 'Insured (GHS)' : 'Self-Pay (GHS)' }}
-                </span>
+            <!-- Demographics Card (Edit Mode) -->
+            <div class="patient-header-card" style="margin-bottom: 1.5rem;" *ngIf="isEditingDemographics()">
+              <div class="patient-title" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <h3 style="margin: 0;">Edit Patient Demographics</h3>
+                <div style="display: flex; gap: 0.5rem;">
+                  <button class="btn btn-secondary btn-sm" (click)="isEditingDemographics.set(false)" style="font-weight: 700;">Cancel</button>
+                  <button class="btn btn-primary btn-sm" (click)="saveDemographics()" style="font-weight: 700;">Save Changes</button>
+                </div>
+              </div>
+              
+              <div class="demographics-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem;">
+                <div class="demo-item" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                  <label style="font-size: 0.75rem; color: rgba(255, 255, 255, 0.75); font-weight: 600;">Surname *</label>
+                  <input type="text" class="form-control form-control-sm" [ngModel]="editSurname()" (ngModelChange)="editSurname.set($event)" />
+                </div>
+                <div class="demo-item" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                  <label style="font-size: 0.75rem; color: rgba(255, 255, 255, 0.75); font-weight: 600;">First Name *</label>
+                  <input type="text" class="form-control form-control-sm" [ngModel]="editFirstName()" (ngModelChange)="editFirstName.set($event)" />
+                </div>
+                <div class="demo-item" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                  <label style="font-size: 0.75rem; color: rgba(255, 255, 255, 0.75); font-weight: 600;">Middle Name</label>
+                  <input type="text" class="form-control form-control-sm" [ngModel]="editMiddleName()" (ngModelChange)="editMiddleName.set($event)" />
+                </div>
+                <div class="demo-item" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                  <label style="font-size: 0.75rem; color: rgba(255, 255, 255, 0.75); font-weight: 600;">Sex *</label>
+                  <select class="form-control form-control-sm" [ngModel]="editSex()" (ngModelChange)="editSex.set($event)">
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div class="demo-item" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                  <label style="font-size: 0.75rem; color: rgba(255, 255, 255, 0.75); font-weight: 600;">Age *</label>
+                  <input type="number" class="form-control form-control-sm" [ngModel]="editAge()" (ngModelChange)="editAge.set($event)" />
+                </div>
+                <div class="demo-item" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                  <label style="font-size: 0.75rem; color: rgba(255, 255, 255, 0.75); font-weight: 600;">Phone Number *</label>
+                  <input type="text" class="form-control form-control-sm" [ngModel]="editPhone()" (ngModelChange)="editPhone.set($event)" />
+                </div>
+                <div class="demo-item" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                  <label style="font-size: 0.75rem; color: rgba(255, 255, 255, 0.75); font-weight: 600;">Referral Center *</label>
+                  <input type="text" class="form-control form-control-sm" [ngModel]="editReferralCenter()" (ngModelChange)="editReferralCenter.set($event)" />
+                </div>
+                <div class="demo-item" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                  <label style="font-size: 0.75rem; color: rgba(255, 255, 255, 0.75); font-weight: 600;">Insurance Status *</label>
+                  <select class="form-control form-control-sm" [ngModel]="editInsuranceStatus()" (ngModelChange)="editInsuranceStatus.set($event)">
+                    <option value="uninsured">Self-Pay</option>
+                    <option value="insured">Insured</option>
+                  </select>
+                </div>
+                <div class="demo-item" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                  <label style="font-size: 0.75rem; color: rgba(255, 255, 255, 0.75); font-weight: 600;">Emergency Contact Name</label>
+                  <input type="text" class="form-control form-control-sm" [ngModel]="editEmergencyContactName()" (ngModelChange)="editEmergencyContactName.set($event)" />
+                </div>
+                <div class="demo-item" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                  <label style="font-size: 0.75rem; color: rgba(255, 255, 255, 0.75); font-weight: 600;">Emergency Contact Phone</label>
+                  <input type="text" class="form-control form-control-sm" [ngModel]="editEmergencyContactPhone()" (ngModelChange)="editEmergencyContactPhone.set($event)" />
+                </div>
+                <div class="demo-item" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                  <label style="font-size: 0.75rem; color: rgba(255, 255, 255, 0.75); font-weight: 600;">Emergency Contact Relation</label>
+                  <input type="text" class="form-control form-control-sm" [ngModel]="editEmergencyContactRel()" (ngModelChange)="editEmergencyContactRel.set($event)" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Demographics Card (View Mode) -->
+            <div class="patient-header-card" style="margin-bottom: 1.5rem;" *ngIf="!isEditingDemographics()">
+              <div class="patient-title" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div>
+                  <h3 style="margin: 0;">{{ p.surname }}, {{ p.firstName }} {{ p.middleName || '' }}</h3>
+                  <span class="insurance-badge" [class.insured]="p.insuranceStatus === 'insured'" style="margin-top: 0.25rem; display: inline-block;">
+                    {{ p.insuranceStatus === 'insured' ? 'Insured (GHS)' : 'Self-Pay (GHS)' }}
+                  </span>
+                </div>
+                <button class="btn btn-secondary btn-sm" (click)="editDemographics(p)" style="display: inline-flex; align-items: center; gap: 0.25rem; font-weight: 700;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                  </svg>
+                  <span>Edit Demographics</span>
+                </button>
               </div>
               
               <div class="demographics-grid">
@@ -191,6 +266,10 @@ interface ServiceItem {
                 <div class="demo-item">
                   <label>Emergency Contact</label>
                   <div class="value">{{ p.emergencyContactName || 'N/A' }} ({{ p.emergencyContactPhone || 'N/A' }})</div>
+                </div>
+                <div class="demo-item" *ngIf="p.referralCenter">
+                  <label>Referral Center</label>
+                  <div class="value">{{ p.referralCenter }}</div>
                 </div>
               </div>
             </div>
@@ -312,6 +391,20 @@ interface ServiceItem {
 export class FrontdeskClientsPageComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
+  private readonly toast = inject(ToastService);
+
+  readonly isEditingDemographics = signal(false);
+  readonly editSurname = signal('');
+  readonly editFirstName = signal('');
+  readonly editMiddleName = signal('');
+  readonly editSex = signal('other');
+  readonly editAge = signal(0);
+  readonly editPhone = signal('');
+  readonly editReferralCenter = signal('');
+  readonly editInsuranceStatus = signal('uninsured');
+  readonly editEmergencyContactName = signal('');
+  readonly editEmergencyContactPhone = signal('');
+  readonly editEmergencyContactRel = signal('');
 
   readonly searchQuery = signal('');
   readonly patients = signal<any[]>([]);
@@ -418,6 +511,59 @@ export class FrontdeskClientsPageComponent implements OnInit {
     this.loadingHistory.set(false);
     this.services.update(list => list.map(s => ({ ...s, selected: false })));
     this.serviceFilter.set('');
+    this.isEditingDemographics.set(false);
+  }
+
+  editDemographics(p: any): void {
+    this.editSurname.set(p.surname || '');
+    this.editFirstName.set(p.firstName || '');
+    this.editMiddleName.set(p.middleName || '');
+    this.editSex.set(p.sex || 'other');
+    this.editAge.set(p.age || 0);
+    this.editPhone.set(p.phone || '');
+    this.editReferralCenter.set(p.referralCenter || '');
+    this.editInsuranceStatus.set(p.insuranceStatus || 'uninsured');
+    this.editEmergencyContactName.set(p.emergencyContactName || '');
+    this.editEmergencyContactPhone.set(p.emergencyContactPhone || '');
+    this.editEmergencyContactRel.set(p.emergencyContactRel || '');
+    this.isEditingDemographics.set(true);
+  }
+
+  saveDemographics(): void {
+    const p = this.selectedPatient();
+    if (!p) return;
+
+    if (!this.editSurname().trim() || !this.editFirstName().trim() || !this.editPhone().trim() || !this.editReferralCenter().trim()) {
+      this.toast.error('Surname, First Name, Phone, and Referral Center are required.');
+      return;
+    }
+
+    const payload = {
+      surname: this.editSurname().trim(),
+      firstName: this.editFirstName().trim(),
+      middleName: this.editMiddleName()?.trim() || null,
+      sex: this.editSex(),
+      age: Number(this.editAge()),
+      phone: this.editPhone().trim(),
+      referralCenter: this.editReferralCenter().trim(),
+      insuranceStatus: this.editInsuranceStatus(),
+      emergencyContactName: this.editEmergencyContactName()?.trim() || '',
+      emergencyContactPhone: this.editEmergencyContactPhone()?.trim() || '',
+      emergencyContactRel: this.editEmergencyContactRel()?.trim() || ''
+    };
+
+    this.api.updatePatient(p.id, payload).subscribe({
+      next: (updatedPatient) => {
+        this.selectedPatient.set(updatedPatient);
+        this.patients.update(list => list.map(item => item.id === p.id ? updatedPatient : item));
+        this.isEditingDemographics.set(false);
+        this.toast.success('Patient demographics updated successfully.');
+      },
+      error: (err) => {
+        console.error('Error updating demographics', err);
+        this.toast.error(err?.error?.message ?? 'Failed to update demographics.');
+      }
+    });
   }
 
   toggleService(s: ServiceItem): void {

@@ -309,9 +309,22 @@ interface ServiceHistoryLine {
                 
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid var(--slate-200); padding-bottom: 0.5rem; margin-bottom: 0.75rem;">
                   <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700;">Diagnostic Outcomes Summary</h4>
-                  <span class="status-pill" [class]="v.status" style="font-size: 0.65rem; padding: 0.15rem 0.45rem;">
-                    {{ getStatusLabel(v.status) }}
-                  </span>
+                  <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button *ngIf="!isEditing() && serviceLines().length > 0" class="btn btn-secondary btn-sm" (click)="startEditing()" style="font-weight: 700; font-size: 0.725rem; padding: 0.2rem 0.5rem;">
+                      Edit Results
+                    </button>
+                    <div *ngIf="isEditing()" style="display: flex; gap: 0.35rem;">
+                      <button class="btn btn-secondary btn-sm" (click)="cancelEditing()" [disabled]="isSaving()" style="font-weight: 700; font-size: 0.725rem; padding: 0.2rem 0.5rem;">
+                        Cancel
+                      </button>
+                      <button class="btn btn-success btn-sm" (click)="saveEditedResults()" [disabled]="isSaving()" style="font-weight: 700; font-size: 0.725rem; padding: 0.2rem 0.5rem; background-color: var(--app-success-color); color: #fff;">
+                        {{ isSaving() ? 'Saving...' : 'Save' }}
+                      </button>
+                    </div>
+                    <span class="status-pill" [class]="v.status" style="font-size: 0.65rem; padding: 0.15rem 0.45rem;">
+                      {{ getStatusLabel(v.status) }}
+                    </span>
+                  </div>
                 </div>
 
                 <div style="flex: 1; overflow-y: auto; max-height: 380px; padding-right: 0.25rem;">
@@ -353,11 +366,25 @@ interface ServiceHistoryLine {
                                 </tr>
                                 <tr *ngFor="let row of getRowsForSection(s, sec.id)" [style.backgroundColor]="s.resultValues[row.id]?.isAbnormal ? '#fee2e2' : 'transparent'">
                                   <td style="border: 1px solid var(--slate-300); padding: 0.35rem 0.45rem; font-weight: 700; color: var(--slate-800); font-family: 'Inter', sans-serif;">
-                                    {{ row.label }}
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%;">
+                                      <span>{{ row.label }}</span>
+                                      <label *ngIf="isEditing()" style="font-size: 0.65rem; color: #dc2626; display: flex; align-items: center; gap: 0.15rem; cursor: pointer; user-select: none;">
+                                        <input type="checkbox" [(ngModel)]="s.resultValues[row.id].isAbnormal" />
+                                        Abnormal
+                                      </label>
+                                    </div>
                                   </td>
                                   <td *ngFor="let col of s.template.columns" style="border: 1px solid var(--slate-300); padding: 0.25rem 0.35rem;" [style.textAlign]="col.alignment">
                                     <div style="display: flex; align-items: center; justify-content: flex-start; gap: 0.2rem;">
+                                      <input 
+                                        *ngIf="isEditing()"
+                                        type="text" 
+                                        class="form-control"
+                                        style="font-family: inherit; font-size: 0.75rem; padding: 0.15rem 0.35rem; width: 100%; border: 1px solid var(--app-border-color); border-radius: 0.25rem; text-align: inherit;"
+                                        [(ngModel)]="s.resultValues[row.id][col.key]" 
+                                      />
                                       <span 
+                                        *ngIf="!isEditing()"
                                         [style.fontWeight]="'700'"
                                         [style.color]="s.resultValues[row.id]?.[col.key] === 'HIGH' || s.resultValues[row.id]?.[col.key] === 'ABNORMAL' || s.resultValues[row.id]?.[col.key] === 'LOW' || s.resultValues[row.id]?.isAbnormal ? '#dc2626' : '#1e293b'"
                                       >
@@ -380,11 +407,25 @@ interface ServiceHistoryLine {
                                 </tr>
                                 <tr *ngFor="let row of getRowsForSection(s, null)" [style.backgroundColor]="s.resultValues[row.id]?.isAbnormal ? '#fee2e2' : 'transparent'">
                                   <td style="border: 1px solid var(--slate-300); padding: 0.35rem 0.45rem; font-weight: 700; color: var(--slate-800);">
-                                    {{ row.label }}
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%;">
+                                      <span>{{ row.label }}</span>
+                                      <label *ngIf="isEditing()" style="font-size: 0.65rem; color: #dc2626; display: flex; align-items: center; gap: 0.15rem; cursor: pointer; user-select: none;">
+                                        <input type="checkbox" [(ngModel)]="s.resultValues[row.id].isAbnormal" />
+                                        Abnormal
+                                      </label>
+                                    </div>
                                   </td>
                                   <td *ngFor="let col of s.template.columns" style="border: 1px solid var(--slate-300); padding: 0.25rem 0.35rem;" [style.textAlign]="col.alignment">
                                     <div style="display: flex; align-items: center; justify-content: flex-start; gap: 0.2rem;">
+                                      <input 
+                                        *ngIf="isEditing()"
+                                        type="text" 
+                                        class="form-control"
+                                        style="font-family: inherit; font-size: 0.75rem; padding: 0.15rem 0.35rem; width: 100%; border: 1px solid var(--app-border-color); border-radius: 0.25rem; text-align: inherit;"
+                                        [(ngModel)]="s.resultValues[row.id][col.key]" 
+                                      />
                                       <span 
+                                        *ngIf="!isEditing()"
                                         [style.fontWeight]="'700'"
                                         [style.color]="s.resultValues[row.id]?.[col.key] === 'HIGH' || s.resultValues[row.id]?.[col.key] === 'ABNORMAL' || s.resultValues[row.id]?.[col.key] === 'LOW' || s.resultValues[row.id]?.isAbnormal ? '#dc2626' : '#1e293b'"
                                       >
@@ -405,7 +446,15 @@ interface ServiceHistoryLine {
                       <ng-template #noTemplateFallbacks>
                         <div class="narrative-findings" style="font-size: 0.8rem;">
                           <h5 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.25rem;">Procedure Findings</h5>
-                          <p style="background: var(--slate-50); border: 1px solid var(--slate-200); padding: 0.5rem; border-radius: 0.25rem; font-style: italic;">
+                          <div *ngIf="isEditing()">
+                            <textarea 
+                              class="form-control" 
+                              style="width: 100%; font-family: inherit; font-size: 0.8rem; font-style: normal; padding: 0.5rem; min-height: 80px; border: 1px solid var(--app-border-color); border-radius: 0.375rem;" 
+                              [(ngModel)]="s.narrativeText"
+                              placeholder="Write procedure findings here..."
+                            ></textarea>
+                          </div>
+                          <p *ngIf="!isEditing()" style="background: var(--slate-50); border: 1px solid var(--slate-200); padding: 0.5rem; border-radius: 0.25rem; font-style: italic;">
                             {{ s.narrativeText || 'Remarks: Diagnostic procedure completed with normal clinical findings.' }}
                           </p>
                         </div>
@@ -414,7 +463,15 @@ interface ServiceHistoryLine {
                       <ng-template #narrativeOnly>
                         <div class="narrative-findings" style="font-size: 0.8rem;">
                           <h5 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.25rem;">Procedure Findings</h5>
-                          <p style="background: var(--slate-50); border: 1px solid var(--slate-200); padding: 0.5rem; border-radius: 0.25rem; font-style: italic;">
+                          <div *ngIf="isEditing()">
+                            <textarea 
+                              class="form-control" 
+                              style="width: 100%; font-family: inherit; font-size: 0.8rem; font-style: normal; padding: 0.5rem; min-height: 80px; border: 1px solid var(--app-border-color); border-radius: 0.375rem;" 
+                              [(ngModel)]="s.narrativeText"
+                              placeholder="Write procedure findings here..."
+                            ></textarea>
+                          </div>
+                          <p *ngIf="!isEditing()" style="background: var(--slate-50); border: 1px solid var(--slate-200); padding: 0.5rem; border-radius: 0.25rem; font-style: italic;">
                             {{ s.narrativeText || 'Remarks: Diagnostic procedure completed with normal clinical findings.' }}
                           </p>
                         </div>
@@ -623,6 +680,9 @@ export class WorklistResultsPageComponent implements OnInit {
   // Detailed clinical dossier fields
   readonly selectedVisit = signal<any | null>(null);
   readonly serviceLines = signal<ServiceHistoryLine[]>([]);
+  readonly isEditing = signal(false);
+  readonly isSaving = signal(false);
+  private originalServiceLines = '';
 
   // Print previews
   readonly today = new Date();
@@ -810,6 +870,58 @@ export class WorklistResultsPageComponent implements OnInit {
     this.searchResults.set([]);
     this.searchQuery.set('');
     this.serviceLines.set([]);
+    this.isEditing.set(false);
+    this.isSaving.set(false);
+  }
+
+  startEditing(): void {
+    this.originalServiceLines = JSON.stringify(this.serviceLines());
+    this.isEditing.set(true);
+  }
+
+  cancelEditing(): void {
+    if (this.originalServiceLines) {
+      this.serviceLines.set(JSON.parse(this.originalServiceLines));
+    }
+    this.isEditing.set(false);
+  }
+
+  saveEditedResults(): void {
+    const v = this.selectedVisit();
+    if (!v) return;
+
+    this.isSaving.set(true);
+
+    const payload = {
+      services: this.serviceLines().map(s => ({
+        visitServiceId: s.id,
+        resultDataJson: JSON.stringify(s.resultValues),
+        narrativeNotes: s.narrativeText?.trim() || null,
+        status: s.status,
+        templateId: (s as any).templateId || undefined
+      }))
+    };
+
+    this.api.saveVisitResult(v.id, payload).subscribe({
+      next: () => {
+        this.isSaving.set(false);
+        this.isEditing.set(false);
+        this.toast.success('Clinical outcomes updated successfully.');
+        
+        // Refresh outcome preview
+        this.api.getVisit(v.id).subscribe({
+          next: (updatedVisit) => {
+            this.selectedVisit.set(updatedVisit);
+            this.selectVisit(updatedVisit);
+          }
+        });
+      },
+      error: (err) => {
+        console.error('Error saving updated clinical results', err);
+        this.toast.error(err?.error?.message ?? 'Failed to update clinical results.');
+        this.isSaving.set(false);
+      }
+    });
   }
 
   loadLineTemplate(line: ServiceHistoryLine): void {
@@ -820,6 +932,7 @@ export class WorklistResultsPageComponent implements OnInit {
             const parsed = typeof res.layoutJson === 'string' ? JSON.parse(res.layoutJson) : res.layoutJson;
             if (parsed && (parsed.columns || parsed.rows)) {
               line.template = parsed;
+              (line as any).templateId = res.id;
               this.serviceLines.set([...this.serviceLines()]);
             }
           } catch (e) {

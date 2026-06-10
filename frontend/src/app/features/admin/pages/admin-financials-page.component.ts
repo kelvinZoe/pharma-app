@@ -244,6 +244,20 @@ import { ApiService } from '../../../core/services/api.service';
             {{ (summary()?.lowStockAlertsCount || 0) + (summary()?.expiryAlertsCount || 0) }}
           </span>
         </button>
+
+        <button
+          class="tab-segment-btn"
+          [class.active]="activeTab() === 'audit-logs'"
+          (click)="selectTab('audit-logs')"
+        >
+          <svg class="tab-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+          </svg>
+          Audit Logs
+        </button>
       </div>
 
       <!-- Shimmer Loading / Spinner Indicator -->
@@ -858,6 +872,82 @@ import { ApiService } from '../../../core/services/api.service';
         </div>
       </div>
 
+      <!-- Tab Content: Audit Logs -->
+      <div class="panel full-width premium-panel-layout" *ngIf="!isLoading() && activeTab() === 'audit-logs'">
+        <div class="panel-header-reconciled">
+          <div class="panel-title-block">
+            <h2>System Audit Logs</h2>
+            <p class="section-desc">Inspect all key administrative operations, deleted patient registrations, payment voids, and security updates.</p>
+          </div>
+        </div>
+
+        <div class="premium-table-container" *ngIf="auditLogs().length > 0; else emptyAudit">
+          <table class="premium-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Actor Staff</th>
+                <th>Action Type</th>
+                <th>Entity Type</th>
+                <th>Entity ID</th>
+                <th>Change Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let log of auditLogs()">
+                <td class="text-secondary-label" style="white-space: nowrap;">{{ log.createdAt | date:'medium' }}</td>
+                <td>
+                  <strong class="patient-name-span">{{ log.actorUser?.fullName || 'System' }}</strong>
+                  <div class="small-text-meta">&#64;{{ log.actorUser?.username || 'system' }}</div>
+                </td>
+                <td>
+                  <span class="status-badge-pill" [class.danger]="log.actionType.includes('delete') || log.actionType.includes('void')" [class.warning]="log.actionType === 'update'" [class.success]="log.actionType === 'create'">
+                    {{ log.actionType | uppercase }}
+                  </span>
+                </td>
+                <td>
+                  <span class="status-badge-pill referred">{{ log.entityType | uppercase }}</span>
+                </td>
+                <td><code class="clinical-code font-muted">{{ log.entityId }}</code></td>
+                <td>
+                  <div style="font-size: 0.8rem; line-height: 1.4; max-width: 450px; overflow-wrap: break-word;">
+                    <div *ngIf="log.beforeData">
+                      <span style="font-weight: 700; color: var(--app-danger-color); font-size: 0.725rem;">Before:</span>
+                      <code style="font-size: 0.75rem; background-color: var(--slate-100); padding: 0.1rem 0.25rem; border-radius: 0.25rem; display: block; margin-top: 0.15rem; word-break: break-all; font-family: monospace;">{{ log.beforeData }}</code>
+                    </div>
+                    <div *ngIf="log.afterData" style="margin-top: 0.35rem;">
+                      <span style="font-weight: 700; color: var(--app-success-color); font-size: 0.725rem;">After:</span>
+                      <code style="font-size: 0.75rem; background-color: var(--slate-100); padding: 0.1rem 0.25rem; border-radius: 0.25rem; display: block; margin-top: 0.15rem; word-break: break-all; font-family: monospace;">{{ log.afterData }}</code>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Pagination control bar -->
+          <div class="pagination-footer">
+            <div>
+              Showing {{ (auditLogPage() - 1) * 10 + 1 }} to {{ Math.min(auditLogPage() * 10, auditLogTotal()) }} of {{ auditLogTotal() }} entries
+            </div>
+            <div class="pagination-actions">
+              <button class="pg-btn" [disabled]="auditLogPage() === 1" (click)="changeAuditPage(auditLogPage() - 1)">Previous</button>
+              <button class="pg-btn" [disabled]="auditLogPage() * 10 >= auditLogTotal()" (click)="changeAuditPage(auditLogPage() + 1)">Next</button>
+            </div>
+          </div>
+        </div>
+        <ng-template #emptyAudit>
+          <div class="empty-state-illustrate">
+            <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="17"></line>
+            </svg>
+            <p>No audit log entries recorded in the system.</p>
+          </div>
+        </ng-template>
+      </div>
+
       <!-- Audit Drilldown Drawer Panel -->
       <div class="audit-drawer-backdrop" *ngIf="showAuditDrawer() && selectedClosure()" (click)="showAuditDrawer.set(false)">
         <div class="audit-drawer-content" (click)="$event.stopPropagation()">
@@ -1375,7 +1465,7 @@ export class AdminFinancialsPageComponent implements OnInit {
   readonly Math = Math;
 
   // Search & Navigation signals
-  readonly activeTab = signal<'dashboard' | 'clinic' | 'pharmacy' | 'closures' | 'inventory' | 'expenses'>('dashboard');
+  readonly activeTab = signal<'dashboard' | 'clinic' | 'pharmacy' | 'closures' | 'inventory' | 'expenses' | 'audit-logs'>('dashboard');
   readonly startDate = signal<string>('');
   readonly endDate = signal<string>('');
   readonly searchQuery = signal<string>('');
@@ -1387,6 +1477,7 @@ export class AdminFinancialsPageComponent implements OnInit {
   readonly pharmacySales = signal<any[]>([]);
   readonly closures = signal<any[]>([]);
   readonly expenses = signal<any[]>([]);
+  readonly auditLogs = signal<any[]>([]);
 
   // Pagination signals
   readonly clinicPage = signal<number>(1);
@@ -1395,6 +1486,8 @@ export class AdminFinancialsPageComponent implements OnInit {
   readonly pharmacyTotal = signal<number>(0);
   readonly expensePage = signal<number>(1);
   readonly expenseTotal = signal<number>(0);
+  readonly auditLogPage = signal<number>(1);
+  readonly auditLogTotal = signal<number>(0);
 
   // Drawer / Drilldown signals
   readonly showAuditDrawer = signal<boolean>(false);
@@ -1458,12 +1551,18 @@ export class AdminFinancialsPageComponent implements OnInit {
     this.loadData();
   }
 
-  selectTab(tab: 'dashboard' | 'clinic' | 'pharmacy' | 'closures' | 'inventory' | 'expenses'): void {
+  selectTab(tab: 'dashboard' | 'clinic' | 'pharmacy' | 'closures' | 'inventory' | 'expenses' | 'audit-logs'): void {
     this.activeTab.set(tab);
     // Reset pages on tab switch
     this.clinicPage.set(1);
     this.pharmacyPage.set(1);
     this.expensePage.set(1);
+    this.auditLogPage.set(1);
+    this.loadData();
+  }
+
+  changeAuditPage(page: number): void {
+    this.auditLogPage.set(page);
     this.loadData();
   }
 
@@ -1580,6 +1679,18 @@ export class AdminFinancialsPageComponent implements OnInit {
         },
         error: (err) => {
           console.error('Error fetching expenses', err);
+          this.isLoading.set(false);
+        }
+      });
+    } else if (tab === 'audit-logs') {
+      this.api.getAuditLogs(this.auditLogPage(), 10).subscribe({
+        next: (res) => {
+          this.auditLogs.set(res.data);
+          this.auditLogTotal.set(res.total);
+          this.isLoading.set(false);
+        },
+        error: (err) => {
+          console.error('Error fetching audit logs', err);
           this.isLoading.set(false);
         }
       });
