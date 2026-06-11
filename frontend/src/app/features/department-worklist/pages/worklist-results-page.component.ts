@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService } from '../../../core/services/api.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { getInternetDate } from '../../../core/utils/clock';
+import { SessionService } from '../../../core/auth/session.service';
 
 interface ServiceHistoryLine {
   id: string;
@@ -633,8 +635,8 @@ interface ServiceHistoryLine {
         <div class="a4-footer-signature">
           <div class="sig-col">
             <div class="sig-line"></div>
-            <span>{{ deptCode() === 'SCAN' ? 'Medical Diagnostic Sonographer (MDS)' : 'Medical Lab Scientist' }}</span><br>
-            <span class="sig-sub">Compiled Date: {{ today | date:'medium' }}</span>
+            <strong>{{ getScientistName() }}</strong><br>
+            <span>{{ deptCode() === 'SCAN' ? 'Medical Diagnostic Sonographer (MDS)' : 'Medical Lab Scientist' }}</span>
           </div>
         </div>
 
@@ -648,6 +650,7 @@ export class WorklistResultsPageComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  private readonly session = inject(SessionService);
 
   readonly settings = signal<any>({
     clinicName: 'KELVIN CLINICAL DIAGNOSTICS & PHARMACY',
@@ -685,7 +688,7 @@ export class WorklistResultsPageComponent implements OnInit {
   private originalServiceLines = '';
 
   // Print previews
-  readonly today = new Date();
+  readonly today = getInternetDate();
 
   readonly deptName = computed(() => this.deptCode() === 'LAB' ? 'Laboratory' : 'Scanning');
 
@@ -976,6 +979,19 @@ export class WorklistResultsPageComponent implements OnInit {
     return !!(v.prescriptionNotes || (v.prescriptions && v.prescriptions.length > 0 && v.prescriptions[0].medicationNotes));
   }
 
+  getScientistName(): string {
+    const v = this.selectedVisit();
+    if (!v) return '';
+    const rawServices = v.services || v.visitServices || [];
+    for (const s of rawServices) {
+      if (s.results && s.results.length > 0) {
+        const scientist = s.results[0].enteredByUser?.fullName;
+        if (scientist) return scientist;
+      }
+    }
+    return this.session.currentUser()?.name || '';
+  }
+
   triggerBrowserPrint(): void {
     const printContent = document.getElementById('print-sheet-content');
     if (!printContent) return;
@@ -1034,8 +1050,8 @@ export class WorklistResultsPageComponent implements OnInit {
             .sig-line { width: 100%; border-bottom: 1.5px solid #000; margin-bottom: 6px; height: 75px; }
             .sig-sub { font-size: 10px; color: #000; }
             @media print {
-              body { padding: 15px; }
-              @page { size: A4 portrait; margin: 20mm; }
+              body { margin: 20mm; padding: 0; }
+              @page { size: A4 portrait; margin: 0; }
             }
           </style>
         </head>

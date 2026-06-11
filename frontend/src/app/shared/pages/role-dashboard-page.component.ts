@@ -3,6 +3,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { SessionService } from '../../core/auth/session.service';
 import { ApiService } from '../../core/services/api.service';
+import { getInternetDate } from '../../core/utils/clock';
 
 export interface DashboardPageData {
   readonly eyebrow: string;
@@ -83,7 +84,7 @@ export class RoleDashboardPageComponent implements OnInit {
   // Personal greeting details
   readonly clinicianName = computed(() => this.currentUser()?.name ?? 'Clinician');
   readonly currentDate = computed(() => {
-    return new Date().toLocaleDateString('en-US', {
+    return getInternetDate().toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',

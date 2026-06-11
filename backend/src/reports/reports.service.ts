@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { getInternetDate } from '../common/clock';
 
 @Injectable()
 export class ReportsService {
@@ -130,7 +131,7 @@ export class ReportsService {
     const chartData: any[] = [];
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     for (let i = 6; i >= 0; i--) {
-      const d = new Date();
+      const d = getInternetDate();
       d.setDate(d.getDate() - i);
       const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
       const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
@@ -186,8 +187,8 @@ export class ReportsService {
 
     const lowStockAlerts: any[] = [];
     const expiryAlerts: any[] = [];
-    const now = new Date();
-    const threeMonthsFromNow = new Date();
+    const now = getInternetDate();
+    const threeMonthsFromNow = getInternetDate();
     threeMonthsFromNow.setMonth(now.getMonth() + 3);
 
     products.forEach((p) => {
@@ -243,7 +244,7 @@ export class ReportsService {
   }
 
   private getRelativeTime(date: Date): string {
-    const now = new Date();
+    const now = getInternetDate();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
@@ -259,7 +260,7 @@ export class ReportsService {
   }
 
   async getDashboardAnalytics(module: string, userId: string) {
-    const now = new Date();
+    const now = getInternetDate();
     // Start/End of Today in server local time
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
     const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
@@ -955,7 +956,7 @@ export class ReportsService {
           status: 'voided',
           voidReason: reason,
           voidedByUserId: userId,
-          voidedAt: new Date(),
+          voidedAt: getInternetDate(),
         },
       });
 
@@ -1022,7 +1023,7 @@ export class ReportsService {
           status: 'voided',
           voidReason: reason,
           voidedByUserId: userId,
-          voidedAt: new Date(),
+          voidedAt: getInternetDate(),
         },
       });
 

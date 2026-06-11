@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, signal, computed } 
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
+import { getInternetDate } from '../../../core/utils/clock';
 
 @Component({
   selector: 'app-admin-financials-page',
@@ -1514,7 +1515,7 @@ export class AdminFinancialsPageComponent implements OnInit {
   readonly expenseCategory = signal<string>('utilities');
   readonly expenseAmount = signal<number>(0);
   readonly expenseNotes = signal<string>('');
-  readonly expenseDate = signal<string>(new Date().toISOString().split('T')[0]);
+  readonly expenseDate = signal<string>(getInternetDate().toISOString().split('T')[0]);
 
   readonly filteredClinicPayments = computed(() => {
     const query = this.searchQuery().toLowerCase().trim();

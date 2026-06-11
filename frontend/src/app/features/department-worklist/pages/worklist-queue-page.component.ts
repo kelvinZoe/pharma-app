@@ -6,6 +6,8 @@ import { ApiService } from '../../../core/services/api.service';
 import { evaluateFormula } from '../../../shared/utils/formula-parser';
 import { ToastService } from '../../../core/services/toast.service';
 import { AppDropdownComponent } from '../../../shared/ui/app-dropdown/app-dropdown.component';
+import { getInternetDate } from '../../../core/utils/clock';
+import { SessionService } from '../../../core/auth/session.service';
 
 interface ServiceLine {
   id: string;
@@ -588,6 +590,7 @@ export class WorklistQueuePageComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  private readonly session = inject(SessionService);
 
   readonly deptCode = signal<'LAB' | 'SCAN'>('LAB');
   readonly visits = signal<any[]>([]);
@@ -1120,7 +1123,7 @@ export class WorklistQueuePageComponent implements OnInit {
       </div>
     ` : '';
 
-    const todayStr = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const todayStr = getInternetDate().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
     doc.write(`
       <html>
@@ -1162,8 +1165,8 @@ export class WorklistQueuePageComponent implements OnInit {
             .sig-line { width: 100%; border-bottom: 1.5px solid #000; margin-bottom: 6px; height: 75px; }
             .sig-sub { font-size: 10px; color: #000; }
             @media print {
-              body { padding: 15px; }
-              @page { size: A4 portrait; margin: 20mm; }
+              body { margin: 20mm; padding: 0; }
+              @page { size: A4 portrait; margin: 0; }
             }
           </style>
         </head>
@@ -1207,8 +1210,8 @@ export class WorklistQueuePageComponent implements OnInit {
           <div class="a4-footer-signature">
             <div class="sig-col">
               <div class="sig-line"></div>
-              <span>${this.deptCode() === 'SCAN' ? 'Medical Diagnostic Sonographer (MDS)' : 'Medical Lab Scientist'}</span><br>
-              <span class="sig-sub">Compiled Date: ${todayStr}</span>
+              <strong>${this.session.currentUser()?.name || ''}</strong><br>
+              <span>${this.deptCode() === 'SCAN' ? 'Medical Diagnostic Sonographer (MDS)' : 'Medical Lab Scientist'}</span>
             </div>
           </div>
         </body>

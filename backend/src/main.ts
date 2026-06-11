@@ -2,8 +2,10 @@ import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { json, urlencoded } from 'express';
+import { initInternetTime } from './common/clock';
 
 async function bootstrap() {
+  await initInternetTime();
   const app = await NestFactory.create(AppModule);
   app.use(json({ limit: '10mb' }));
   app.use(urlencoded({ limit: '10mb', extended: true }));

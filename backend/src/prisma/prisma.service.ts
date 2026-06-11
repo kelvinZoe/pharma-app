@@ -5,6 +5,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import * as path from 'path';
 import { TenantContextService } from '../common/multitenancy/tenant-context.service';
+import { getInternetDate } from '../common/clock';
 
 const TENANT_MODELS = new Set([
   'User',
@@ -21,6 +22,21 @@ const TENANT_MODELS = new Set([
   'Prescription',
   'GeneralTemplate',
   'Expense'
+]);
+
+const MODELS_WITH_CREATED_AT = new Set([
+  'Tenant', 'Department', 'User', 'Patient', 'Visit', 'Service', 'VisitService',
+  'ServiceResultTemplate', 'VisitResult', 'Prescription', 'ClinicInvoice',
+  'ClinicPayment', 'PharmacyProduct', 'PharmacyBatch', 'PharmacyStockMovement',
+  'PharmacySale', 'PharmacySaleItem', 'AuditLog', 'PharmacyDailyClosure',
+  'GeneralTemplate', 'Expense'
+]);
+
+const MODELS_WITH_UPDATED_AT = new Set([
+  'Tenant', 'Department', 'User', 'Patient', 'Visit', 'Service', 'VisitService',
+  'ServiceResultTemplate', 'VisitResult', 'Prescription', 'ClinicInvoice',
+  'ClinicPayment', 'PharmacyProduct', 'PharmacyBatch', 'PharmacyStockMovement',
+  'PharmacySale', 'AuditLog', 'PharmacyDailyClosure', 'GeneralTemplate', 'Expense'
 ]);
 
 const isTenantModel = (model: string): boolean => TENANT_MODELS.has(model);
@@ -64,6 +80,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
             const tenantId = TenantContextService.getTenantId();
             const anyArgs = args as any;
 
+            // 1. Inject Tenant ID
             if (tenantId && isTenantModel(model)) {
               if (operation === 'create') {
                 anyArgs.data = anyArgs.data || {};
@@ -75,7 +92,6 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
                   anyArgs.data.tenantId = tenantId;
                 }
               } else if (operation === 'findUnique' || operation === 'findUniqueOrThrow') {
-                // Convert findUnique to findFirst to allow filtering by tenantId (non-unique composite constraint)
                 const findFirstOperation = operation === 'findUnique' ? 'findFirst' : 'findFirstOrThrow';
                 const currentWhere = anyArgs.where || {};
                 const newArgs = {
@@ -100,6 +116,75 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
               ) {
                 anyArgs.where = anyArgs.where || {};
                 anyArgs.where.tenantId = tenantId;
+              }
+            }
+
+            // 2. Inject Internet Time for Timestamps
+            const internetTime = getInternetDate();
+
+            if (operation === 'create' || operation === 'createMany') {
+              if (operation === 'create') {
+                anyArgs.data = anyArgs.data || {};
+                
+                // standard timestamps
+                if (MODELS_WITH_CREATED_AT.has(model) && anyArgs.data.createdAt === undefined) {
+                  anyArgs.data.createdAt = internetTime;
+                }
+                if (MODELS_WITH_UPDATED_AT.has(model) && anyArgs.data.updatedAt === undefined) {
+                  anyArgs.data.updatedAt = internetTime;
+                }
+
+                // other model-specific default timestamps
+                if (model === 'Visit' && anyArgs.data.visitDate === undefined) {
+                  anyArgs.data.visitDate = internetTime;
+                }
+                if ((model === 'ClinicPayment' || model === 'PharmacySale') && anyArgs.data.paidAt === undefined) {
+                  anyArgs.data.paidAt = internetTime;
+                }
+                if (model === 'PharmacyDailyClosure' && anyArgs.data.closureDate === undefined) {
+                  anyArgs.data.closureDate = internetTime;
+                }
+                if (model === 'Expense' && anyArgs.data.expenseDate === undefined) {
+                  anyArgs.data.expenseDate = internetTime;
+                }
+
+              } else if (operation === 'createMany') {
+                if (Array.isArray(anyArgs.data)) {
+                  anyArgs.data = anyArgs.data.map((item: any) => {
+                    const newItem = { ...item };
+                    if (MODELS_WITH_CREATED_AT.has(model) && newItem.createdAt === undefined) {
+                      newItem.createdAt = internetTime;
+                    }
+                    if (MODELS_WITH_UPDATED_AT.has(model) && newItem.updatedAt === undefined) {
+                      newItem.updatedAt = internetTime;
+                    }
+                    if (model === 'Visit' && newItem.visitDate === undefined) {
+                      newItem.visitDate = internetTime;
+                    }
+                    if ((model === 'ClinicPayment' || model === 'PharmacySale') && newItem.paidAt === undefined) {
+                      newItem.paidAt = internetTime;
+                    }
+                    if (model === 'PharmacyDailyClosure' && newItem.closureDate === undefined) {
+                      newItem.closureDate = internetTime;
+                    }
+                    if (model === 'Expense' && newItem.expenseDate === undefined) {
+                      newItem.expenseDate = internetTime;
+                    }
+                    return newItem;
+                  });
+                }
+              }
+            } else if (operation === 'update' || operation === 'updateMany') {
+              if (operation === 'update') {
+                anyArgs.data = anyArgs.data || {};
+                if (MODELS_WITH_UPDATED_AT.has(model) && anyArgs.data.updatedAt === undefined) {
+                  anyArgs.data.updatedAt = internetTime;
+                }
+              } else if (operation === 'updateMany') {
+                anyArgs.data = anyArgs.data || {};
+                if (MODELS_WITH_UPDATED_AT.has(model) && anyArgs.data.updatedAt === undefined) {
+                  anyArgs.data.updatedAt = internetTime;
+                }
               }
             }
 

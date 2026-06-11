@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { getInternetDate } from '../common/clock';
 
 @Injectable()
 export class ExpensesService {
@@ -28,7 +29,7 @@ export class ExpensesService {
         category,
         amount: numAmount,
         notes: notes || null,
-        expenseDate: expenseDate ? new Date(expenseDate) : new Date(),
+        expenseDate: expenseDate ? new Date(expenseDate) : getInternetDate(),
         createdById: userId,
       },
     });

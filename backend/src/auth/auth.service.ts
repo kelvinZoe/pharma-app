@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import { getInternetDate } from '../common/clock';
 
 @Injectable()
 export class AuthService {
@@ -171,7 +172,7 @@ export class AuthService {
       throw new NotFoundException('Invitation token is invalid');
     }
 
-    if (user.inviteExpires && user.inviteExpires < new Date()) {
+    if (user.inviteExpires && user.inviteExpires < getInternetDate()) {
       throw new BadRequestException('Invitation has expired');
     }
 
@@ -195,7 +196,7 @@ export class AuthService {
       throw new NotFoundException('Invitation token is invalid');
     }
 
-    if (user.inviteExpires && user.inviteExpires < new Date()) {
+    if (user.inviteExpires && user.inviteExpires < getInternetDate()) {
       throw new BadRequestException('Invitation has expired');
     }
 

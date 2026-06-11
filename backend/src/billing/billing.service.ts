@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { getInternetDate } from '../common/clock';
 
 @Injectable()
 export class BillingService {
@@ -102,7 +103,7 @@ export class BillingService {
           amountPaid: Number(invoice.amountPaid) + paymentAmount,
           balanceDue: 0.00,
           status: 'paid',
-          paidAt: new Date(),
+          paidAt: getInternetDate(),
         },
       });
 

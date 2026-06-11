@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { getInternetDate } from '../common/clock';
 
 @Injectable()
 export class PharmacyService {
@@ -381,7 +382,7 @@ export class PharmacyService {
       data: {
         status: 'closed',
         closedByUserId: userId,
-        closureDate: new Date(),
+        closureDate: getInternetDate(),
         totalSalesCount,
         totalSalesAmount,
         cashCounted,

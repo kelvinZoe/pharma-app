@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { getInternetDate } from './common/clock';
 
 @Injectable()
 export class AppService {
@@ -6,7 +7,7 @@ export class AppService {
     return {
       service: 'pharma-backend',
       status: 'ok',
-      timestamp: new Date().toISOString()
+      timestamp: getInternetDate().toISOString()
     };
   }
 }

@@ -1,6 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, catchError, firstValueFrom, map, of, tap, timeout } from 'rxjs';
+import { setClientClockOffset } from '../utils/clock';
 
 export type UserRoleCode = 0 | 1 | 2 | 3 | 4 | 5;
 export type ModuleKey = 'admin' | 'frontdesk' | 'laboratory' | 'scanning' | 'pharmacy' | 'accounting';
@@ -60,6 +61,25 @@ export const MODULE_OPTIONS: readonly ModuleOption[] = [
 export class SessionService {
   private readonly http = inject(HttpClient);
   private readonly currentUserState = signal<SessionUser | null>(this.restore());
+
+  constructor() {
+    this.syncClock();
+  }
+
+  private syncClock(): void {
+    const start = Date.now();
+    this.http.get<{ timestamp: string }>(`${API_URL}/health`).subscribe({
+      next: (res) => {
+        const duration = Date.now() - start;
+        const serverTime = new Date(res.timestamp).getTime();
+        const adjustedServerTime = serverTime + Math.round(duration / 2);
+        const offset = adjustedServerTime - Date.now();
+        setClientClockOffset(offset);
+        console.log(`[Clock] Synced frontend clock with server. Offset: ${offset} ms`);
+      },
+      error: (err) => console.warn('[Clock] Failed to sync clock with server', err)
+    });
+  }
 
   readonly currentUser = this.currentUserState.asReadonly();
   readonly isAuthenticated = computed(() => this.currentUser() !== null);

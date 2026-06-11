@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, signal, computed } 
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
+import { getInternetDate } from '../../../core/utils/clock';
 
 interface CartItem {
   productId: string;
@@ -503,7 +504,7 @@ export class PharmacyPosSalesPageComponent implements OnInit {
   readonly completedSaleId = signal('');
   readonly activePrescriptionId = signal<string | null>(null);
   
-  readonly receiptDateTime = new Date();
+  readonly receiptDateTime = getInternetDate();
 
   // Daily closure signals & bindings
   readonly unclosedSalesCount = signal(0);

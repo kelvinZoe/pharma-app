@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
 import { AppDropdownComponent } from '../../../shared/ui/app-dropdown/app-dropdown.component';
+import { getInternetDate } from '../../../core/utils/clock';
 
 @Component({
   selector: 'app-billing-desk-page',
@@ -577,7 +578,7 @@ export class BillingDeskPageComponent implements OnInit {
     accreditationId: 'KPL-2026-991A',
   });
 
-  readonly currentDateTime = new Date();
+  readonly currentDateTime = getInternetDate();
 
   readonly paymentMethods = [
     { label: 'Cash (GHS)', value: 'cash' },

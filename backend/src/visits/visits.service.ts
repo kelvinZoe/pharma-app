@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { getInternetDate } from '../common/clock';
 
 @Injectable()
 export class VisitsService {
@@ -729,7 +730,7 @@ export class VisitsService {
                   status: 'voided',
                   voidReason: 'Registration deleted by Frontdesk',
                   voidedByUserId: userId,
-                  voidedAt: new Date(),
+                  voidedAt: getInternetDate(),
                 },
               });
             }
