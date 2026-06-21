@@ -982,6 +982,10 @@ export class ReportsService {
         },
       });
 
+      if ((payment as any).clinicCashSessionId) {
+        await this.recalculateClinicCashSession(tx, (payment as any).clinicCashSessionId);
+      }
+
       // 4. Log audit event
       await tx.auditLog.create({
         data: {
@@ -994,6 +998,44 @@ export class ReportsService {
       });
 
       return updatedPayment;
+    });
+  }
+
+  private async recalculateClinicCashSession(tx: any, sessionId: string) {
+    const session = await tx.clinicCashSession.findUnique({
+      where: { id: sessionId },
+      include: {
+        payments: {
+          where: { status: { not: 'voided' } },
+        },
+      },
+    });
+
+    if (!session || session.status !== 'closed') {
+      return;
+    }
+
+    const cashPaymentsTotal = session.payments.reduce(
+      (sum: number, p: any) => p.paymentMethod === 'cash' ? sum + Number(p.amount) : sum,
+      0,
+    );
+    const momoPaymentsTotal = session.payments.reduce(
+      (sum: number, p: any) => p.paymentMethod === 'mobile_money' ? sum + Number(p.amount) : sum,
+      0,
+    );
+    const expectedCash = Number(session.openingFloat ?? 0) + cashPaymentsTotal;
+    const expectedMomo = momoPaymentsTotal;
+    const totalCounted = Number(session.cashCounted ?? 0) + Number(session.momoCounted ?? 0);
+    const discrepancy = totalCounted - (expectedCash + expectedMomo);
+
+    await tx.clinicCashSession.update({
+      where: { id: sessionId },
+      data: {
+        expectedCash,
+        expectedMomo,
+        totalCounted,
+        discrepancy,
+      },
     });
   }
 
@@ -1098,4 +1140,3 @@ export class ReportsService {
     return { data, total, page, limit };
   }
 }
-

@@ -219,6 +219,19 @@ import { getInternetDate } from '../../../core/utils/clock';
 
         <button
           class="tab-segment-btn"
+          [class.active]="activeTab() === 'clinic-closures'"
+          (click)="selectTab('clinic-closures')"
+        >
+          <svg class="tab-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+            <line x1="2" y1="10" x2="22" y2="10"></line>
+            <path d="M7 15h.01M11 15h2"></path>
+          </svg>
+          Clinic Closures
+        </button>
+
+        <button
+          class="tab-segment-btn"
           [class.active]="activeTab() === 'expenses'"
           (click)="selectTab('expenses')"
         >
@@ -658,6 +671,64 @@ import { getInternetDate } from '../../../core/utils/clock';
               <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
             </svg>
             <p>No shift closures recorded in the selected period.</p>
+          </div>
+        </ng-template>
+      </div>
+
+      <!-- Tab Content: Clinic Cashier Closures -->
+      <div class="panel full-width premium-panel-layout" *ngIf="!isLoading() && activeTab() === 'clinic-closures'">
+        <div class="panel-header-reconciled">
+          <div class="panel-title-block">
+            <h2>Clinic Cashier Closures Ledger</h2>
+            <p class="section-desc">Frontdesk cashier reconciliation history. Audits counted cash and MoMo against clinic receipt collections.</p>
+          </div>
+        </div>
+
+        <div class="premium-table-container" *ngIf="clinicCashSessions().length > 0; else emptyClinicClosures">
+          <table class="premium-table">
+            <thead>
+              <tr>
+                <th>Closed Date</th>
+                <th>Cashier</th>
+                <th class="number-col">Opening Float</th>
+                <th class="number-col">Receipt Count</th>
+                <th class="number-col">Expected Cash</th>
+                <th class="number-col">Expected MoMo</th>
+                <th class="number-col">Counted Total</th>
+                <th>Discrepancy Variance</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let c of clinicCashSessions()">
+                <td><strong class="item-name-bold">{{ c.closedAt | date:'yyyy-MM-dd HH:mm' }}</strong></td>
+                <td>
+                  <span class="patient-name-span">{{ c.closedByUser?.fullName || c.openedByUser?.fullName || c.openedByUser?.username }}</span>
+                  <div class="small-text-meta">&#64;{{ c.closedByUser?.username || c.openedByUser?.username }}</div>
+                </td>
+                <td class="number-col bold-monospaced">₵{{ Number(c.openingFloat).toFixed(2) }}</td>
+                <td class="number-col bold-monospaced">{{ c.payments?.length || c.paymentsCount || 0 }} receipts</td>
+                <td class="number-col bold-monospaced">₵{{ Number(c.expectedCash || 0).toFixed(2) }}</td>
+                <td class="number-col bold-monospaced">₵{{ Number(c.expectedMomo || 0).toFixed(2) }}</td>
+                <td class="number-col counted-breakdown-cell">
+                  <div>Cash: ₵{{ Number(c.cashCounted || 0).toFixed(2) }}</div>
+                  <div>Momo: ₵{{ Number(c.momoCounted || 0).toFixed(2) }}</div>
+                </td>
+                <td>
+                  <span class="status-badge-pill" [class.success]="Number(c.discrepancy) === 0" [class.danger]="Number(c.discrepancy) < 0" [class.warning]="Number(c.discrepancy) > 0">
+                    ₵{{ Number(c.discrepancy) >= 0 ? '+' : '' }}{{ Number(c.discrepancy || 0).toFixed(2) }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ng-template #emptyClinicClosures>
+          <div class="empty-state-illustrate">
+            <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+              <line x1="2" y1="10" x2="22" y2="10"></line>
+            </svg>
+            <p>No clinic cashier closures recorded in the selected period.</p>
           </div>
         </ng-template>
       </div>
@@ -1466,7 +1537,7 @@ export class AdminFinancialsPageComponent implements OnInit {
   readonly Math = Math;
 
   // Search & Navigation signals
-  readonly activeTab = signal<'dashboard' | 'clinic' | 'pharmacy' | 'closures' | 'inventory' | 'expenses' | 'audit-logs'>('dashboard');
+  readonly activeTab = signal<'dashboard' | 'clinic' | 'pharmacy' | 'closures' | 'clinic-closures' | 'inventory' | 'expenses' | 'audit-logs'>('dashboard');
   readonly startDate = signal<string>('');
   readonly endDate = signal<string>('');
   readonly searchQuery = signal<string>('');
@@ -1477,6 +1548,7 @@ export class AdminFinancialsPageComponent implements OnInit {
   readonly clinicPayments = signal<any[]>([]);
   readonly pharmacySales = signal<any[]>([]);
   readonly closures = signal<any[]>([]);
+  readonly clinicCashSessions = signal<any[]>([]);
   readonly expenses = signal<any[]>([]);
   readonly auditLogs = signal<any[]>([]);
 
@@ -1552,7 +1624,7 @@ export class AdminFinancialsPageComponent implements OnInit {
     this.loadData();
   }
 
-  selectTab(tab: 'dashboard' | 'clinic' | 'pharmacy' | 'closures' | 'inventory' | 'expenses' | 'audit-logs'): void {
+  selectTab(tab: 'dashboard' | 'clinic' | 'pharmacy' | 'closures' | 'clinic-closures' | 'inventory' | 'expenses' | 'audit-logs'): void {
     this.activeTab.set(tab);
     // Reset pages on tab switch
     this.clinicPage.set(1);
@@ -1668,6 +1740,17 @@ export class AdminFinancialsPageComponent implements OnInit {
         },
         error: (err) => {
           console.error('Error fetching pharmacy daily closures', err);
+          this.isLoading.set(false);
+        }
+      });
+    } else if (tab === 'clinic-closures') {
+      this.api.getClinicCashSessions(start, end).subscribe({
+        next: (sessionsRes) => {
+          this.clinicCashSessions.set(sessionsRes);
+          this.isLoading.set(false);
+        },
+        error: (err) => {
+          console.error('Error fetching clinic cashier closures', err);
           this.isLoading.set(false);
         }
       });

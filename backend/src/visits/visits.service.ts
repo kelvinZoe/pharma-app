@@ -314,12 +314,8 @@ export class VisitsService {
       throw new NotFoundException('Service not found');
     }
 
-    // Check if patient approved
-    if (data.approvedByPatient !== true) {
-      throw new BadRequestException('Extra services must be approved by the patient');
-    }
-
     return this.prisma.$transaction(async (tx) => {
+      const approvedByPatient = data.approvedByPatient === true;
       // Create visit service line
       const line = await tx.visitService.create({
         data: {
@@ -330,14 +326,14 @@ export class VisitsService {
           quantity: data.quantity ? Number(data.quantity) : 1,
           lineTotal: Number(service.price) * (data.quantity ? Number(data.quantity) : 1),
           status: 'pending',
-          approvedByPatient: true,
+          approvedByPatient,
         },
       });
 
-      // Recalculate and update the draft invoice
-      if (visit.invoice) {
+      // Recalculate and update the invoice only after frontdesk/patient approval
+      if (visit.invoice && approvedByPatient) {
         const allVisitServices = await tx.visitService.findMany({
-          where: { visitId, status: { not: 'not_done' } },
+          where: { visitId, status: { not: 'not_done' }, approvedByPatient: true },
         });
 
         const newSubtotal = allVisitServices.reduce(
@@ -367,6 +363,167 @@ export class VisitsService {
     });
   }
 
+  async approveExtraService(visitId: string, visitServiceId: string, approved: boolean) {
+    const visit = await this.prisma.visit.findUnique({
+      where: { id: visitId },
+      include: { invoice: true },
+    });
+
+    if (!visit) {
+      throw new NotFoundException('Visit not found');
+    }
+
+    const line = await this.prisma.visitService.findUnique({
+      where: { id: visitServiceId },
+      include: { service: true },
+    });
+
+    if (!line || line.visitId !== visitId) {
+      throw new NotFoundException('Visit service line not found');
+    }
+
+    if (line.source !== 'department_added') {
+      throw new BadRequestException('Only department-added services can be approved here');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const updatedLine = await tx.visitService.update({
+        where: { id: visitServiceId },
+        data: {
+          approvedByPatient: approved,
+          status: approved && line.status === 'not_done' ? 'pending' : line.status,
+        },
+        include: { service: true },
+      });
+
+      if (visit.invoice) {
+        const allBillableServices = await tx.visitService.findMany({
+          where: { visitId, status: { not: 'not_done' }, approvedByPatient: true },
+        });
+        const newSubtotal = allBillableServices.reduce(
+          (sum, s) => sum + Number(s.lineTotal),
+          0,
+        );
+
+        await tx.clinicInvoice.update({
+          where: { id: visit.invoice.id },
+          data: {
+            subtotal: newSubtotal,
+            total: newSubtotal,
+            balanceDue: newSubtotal - Number(visit.invoice.amountPaid),
+            status: newSubtotal - Number(visit.invoice.amountPaid) > 0 ? 'draft' : visit.invoice.status,
+          },
+        });
+      }
+
+      return updatedLine;
+    });
+  }
+
+  async requestServicePriceAdjustment(visitId: string, visitServiceId: string, data: any, userId: string) {
+    const requestedLineTotal = Number(data.requestedLineTotal ?? data.totalAmount ?? data.lineTotal);
+    if (!Number.isFinite(requestedLineTotal) || requestedLineTotal <= 0) {
+      throw new BadRequestException('A valid adjusted total amount is required');
+    }
+
+    const line = await this.prisma.visitService.findUnique({
+      where: { id: visitServiceId },
+      include: { visit: true, service: true },
+    });
+
+    if (!line || line.visitId !== visitId) {
+      throw new NotFoundException('Visit service line not found');
+    }
+
+    if (line.status === 'not_done') {
+      throw new BadRequestException('Cannot adjust the price of a service marked as not done');
+    }
+
+    const reason = String(data.reason ?? '').trim();
+    if (!reason) {
+      throw new BadRequestException('Reason for price adjustment is required');
+    }
+
+    return this.prisma.visitService.update({
+      where: { id: visitServiceId },
+      data: {
+        requestedLineTotal,
+        priceAdjustmentReason: reason || null,
+        priceAdjustmentStatus: 'pending',
+        priceAdjustedAt: new Date(),
+        priceAdjustedByUserId: userId,
+      },
+      include: { service: { include: { department: true } } },
+    });
+  }
+
+  async approveServicePriceAdjustment(visitId: string, visitServiceId: string, approved: boolean, userId: string) {
+    const visit = await this.prisma.visit.findUnique({
+      where: { id: visitId },
+      include: { invoice: true },
+    });
+
+    if (!visit) {
+      throw new NotFoundException('Visit not found');
+    }
+
+    const line = await this.prisma.visitService.findUnique({
+      where: { id: visitServiceId },
+      include: { service: true },
+    });
+
+    if (!line || line.visitId !== visitId) {
+      throw new NotFoundException('Visit service line not found');
+    }
+
+    if (line.priceAdjustmentStatus !== 'pending' || line.requestedLineTotal === null) {
+      throw new BadRequestException('No pending price adjustment exists for this service');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const requestedLineTotal = Number(line.requestedLineTotal);
+      const updatedLine = await tx.visitService.update({
+        where: { id: visitServiceId },
+        data: approved
+          ? {
+              lineTotal: requestedLineTotal,
+              priceAdjustmentStatus: 'approved',
+              priceApprovedAt: new Date(),
+              priceApprovedByUserId: userId,
+            }
+          : {
+              priceAdjustmentStatus: 'rejected',
+              priceApprovedAt: new Date(),
+              priceApprovedByUserId: userId,
+            },
+        include: { service: { include: { department: true } } },
+      });
+
+      if (approved && visit.invoice) {
+        const allBillableServices = await tx.visitService.findMany({
+          where: { visitId, status: { not: 'not_done' }, approvedByPatient: true },
+        });
+        const newSubtotal = allBillableServices.reduce(
+          (sum, serviceLine) => sum + Number(serviceLine.lineTotal),
+          0,
+        );
+        const newBalanceDue = newSubtotal - Number(visit.invoice.amountPaid);
+
+        await tx.clinicInvoice.update({
+          where: { id: visit.invoice.id },
+          data: {
+            subtotal: newSubtotal,
+            total: newSubtotal,
+            balanceDue: newBalanceDue,
+            status: newBalanceDue > 0 ? 'draft' : visit.invoice.status,
+          },
+        });
+      }
+
+      return updatedLine;
+    });
+  }
+
   async removeExtraService(visitId: string, visitServiceId: string) {
     const visit = await this.prisma.visit.findUnique({
       where: { id: visitId },
@@ -391,7 +548,7 @@ export class VisitsService {
       // Recalculate and update the draft invoice
       if (visit.invoice) {
         const allRemainingServices = await tx.visitService.findMany({
-          where: { visitId, id: { not: visitServiceId }, status: { not: 'not_done' } },
+          where: { visitId, id: { not: visitServiceId }, status: { not: 'not_done' }, approvedByPatient: true },
         });
 
         const newSubtotal = allRemainingServices.reduce(
@@ -447,7 +604,7 @@ export class VisitsService {
       // Recalculate invoice if service status changed to not_done or from not_done
       if (visit.invoice) {
         const allBillableServices = await tx.visitService.findMany({
-          where: { visitId, status: { not: 'not_done' } },
+          where: { visitId, status: { not: 'not_done' }, approvedByPatient: true },
         });
 
         const newSubtotal = allBillableServices.reduce(

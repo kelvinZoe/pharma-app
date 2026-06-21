@@ -177,11 +177,30 @@ export class ApiService {
   }
 
   // --- Department Actions ---
-  addExtraService(visitId: string, serviceId: string, quantity = 1): Observable<any> {
+  addExtraService(visitId: string, serviceId: string, quantity = 1, approvedByPatient = true): Observable<any> {
     return this.http.post<any>(`${API_URL}/visits/${visitId}/services`, {
       serviceId,
       quantity,
-      approvedByPatient: true
+      approvedByPatient
+    });
+  }
+
+  approveExtraService(visitId: string, visitServiceId: string, approved = true): Observable<any> {
+    return this.http.put<any>(`${API_URL}/visits/${visitId}/services/${visitServiceId}/approval`, {
+      approved
+    });
+  }
+
+  requestServicePriceAdjustment(visitId: string, visitServiceId: string, requestedLineTotal: number, reason?: string): Observable<any> {
+    return this.http.put<any>(`${API_URL}/visits/${visitId}/services/${visitServiceId}/price-adjustment`, {
+      requestedLineTotal,
+      reason
+    });
+  }
+
+  approveServicePriceAdjustment(visitId: string, visitServiceId: string, approved = true): Observable<any> {
+    return this.http.put<any>(`${API_URL}/visits/${visitId}/services/${visitServiceId}/price-adjustment/approval`, {
+      approved
     });
   }
 
@@ -213,6 +232,31 @@ export class ApiService {
 
   payInvoice(visitId: string, data: any): Observable<any> {
     return this.http.post<any>(`${API_URL}/visits/${visitId}/invoice/pay`, data);
+  }
+
+  getActiveClinicCashSession(): Observable<any> {
+    return this.http.get<any>(`${API_URL}/billing/sessions/active`);
+  }
+
+  openClinicCashSession(openingFloat: number): Observable<any> {
+    return this.http.post<any>(`${API_URL}/billing/sessions/open`, { openingFloat });
+  }
+
+  closeClinicCashSession(data: any): Observable<any> {
+    return this.http.post<any>(`${API_URL}/billing/sessions/close`, data);
+  }
+
+  getClinicCashSessions(startDate?: string, endDate?: string): Observable<any[]> {
+    let url = `${API_URL}/billing/sessions`;
+    const params = [];
+    if (startDate) params.push(`startDate=${startDate}`);
+    if (endDate) params.push(`endDate=${endDate}`);
+    if (params.length > 0) url += `?${params.join('&')}`;
+    return this.http.get<any[]>(url);
+  }
+
+  getClinicCashSession(id: string): Observable<any> {
+    return this.http.get<any>(`${API_URL}/billing/sessions/${id}`);
   }
 
   // --- Pharmacy ---

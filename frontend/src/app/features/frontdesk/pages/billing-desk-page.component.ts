@@ -11,6 +11,34 @@ import { getInternetDate } from '../../../core/utils/clock';
   imports: [CommonModule, FormsModule, AppDropdownComponent],
   template: `
     <div class="billing-workspace" style="display: flex; flex-direction: column; gap: 1rem; width: 100%;">
+      <div class="panel full-width" style="border-left: 4px solid var(--app-primary-color);">
+        <div class="table-header-filters" style="align-items: center;">
+          <div>
+            <h2 style="margin-bottom: 0.35rem;">Clinic Cashier Session</h2>
+            <p class="section-desc" style="margin: 0;">
+              <ng-container *ngIf="activeClinicSession(); else noClinicSession">
+                Active shift opened with ₵{{ Number(activeClinicSession()?.openingFloat || 0).toFixed(2) }} float.
+                Expected cash: ₵{{ Number(activeClinicSession()?.expectedCash || activeClinicSession()?.openingFloat || 0).toFixed(2) }} ·
+                Expected MoMo: ₵{{ Number(activeClinicSession()?.expectedMomo || 0).toFixed(2) }}
+              </ng-container>
+              <ng-template #noClinicSession>
+                Open a cashier session before collecting clinic payments.
+              </ng-template>
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <span class="status-pill" [class.paid]="activeClinicSession()" [class.awaiting_payment]="!activeClinicSession()">
+              {{ activeClinicSession() ? 'SESSION OPEN' : 'SESSION CLOSED' }}
+            </span>
+            <button *ngIf="!activeClinicSession()" class="btn btn-primary btn-sm" (click)="isOpeningClinicSession.set(true)">
+              Open Session
+            </button>
+            <button *ngIf="activeClinicSession()" class="btn btn-danger btn-sm" (click)="triggerCloseClinicSession()">
+              Close Session
+            </button>
+          </div>
+        </div>
+      </div>
       
       <!-- Full width visits table counter -->
       <div class="panel full-width">
@@ -184,6 +212,50 @@ import { getInternetDate } from '../../../core/utils/clock';
         </div>
       </div>
 
+      <div class="modal-backdrop" *ngIf="isOpeningClinicSession()" (click)="isOpeningClinicSession.set(false)">
+        <div class="modal-card" (click)="$event.stopPropagation()" style="max-width: 420px;">
+          <div class="modal-card-header">
+            <h3>Open Clinic Cashier Session</h3>
+            <button class="modal-close-btn" (click)="isOpeningClinicSession.set(false)">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>Opening Cash Float (GHS)</label>
+              <input type="number" class="form-control" [ngModel]="clinicOpeningFloat()" (ngModelChange)="clinicOpeningFloat.set(Number($event))" min="0" />
+            </div>
+            <button class="btn btn-primary btn-block" (click)="openClinicCashSession()">Open Session</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-backdrop" *ngIf="isClosingClinicSession()" (click)="isClosingClinicSession.set(false)">
+        <div class="modal-card" (click)="$event.stopPropagation()" style="max-width: 480px;">
+          <div class="modal-card-header">
+            <h3>Close Clinic Cashier Session</h3>
+            <button class="modal-close-btn" (click)="isClosingClinicSession.set(false)">×</button>
+          </div>
+          <div class="modal-body">
+            <div style="background: #f8fafc; border: 1px solid var(--app-border-color); border-radius: 0.75rem; padding: 1rem; margin-bottom: 1rem; font-size: 0.85rem;">
+              <div><strong>Expected Cash:</strong> ₵{{ Number(activeClinicSession()?.expectedCash || activeClinicSession()?.openingFloat || 0).toFixed(2) }}</div>
+              <div><strong>Expected MoMo:</strong> ₵{{ Number(activeClinicSession()?.expectedMomo || 0).toFixed(2) }}</div>
+            </div>
+            <div class="form-group">
+              <label>Counted Cash (GHS)</label>
+              <input type="number" class="form-control" [ngModel]="clinicCloseCashCounted()" (ngModelChange)="clinicCloseCashCounted.set(Number($event))" min="0" />
+            </div>
+            <div class="form-group">
+              <label>Counted Mobile Money (GHS)</label>
+              <input type="number" class="form-control" [ngModel]="clinicCloseMomoCounted()" (ngModelChange)="clinicCloseMomoCounted.set(Number($event))" min="0" />
+            </div>
+            <div class="form-group">
+              <label>Closure Notes</label>
+              <textarea class="form-control" [ngModel]="clinicCloseNotes()" (ngModelChange)="clinicCloseNotes.set($event)"></textarea>
+            </div>
+            <button class="btn btn-danger btn-block" (click)="closeClinicCashSession()">Close & Reconcile Session</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Checkout payment / receipt overlay modal -->
       <div class="modal-backdrop" *ngIf="selectedVisit() !== null" (click)="closeModal()">
         <div class="modal-card wide-modal" (click)="$event.stopPropagation()" style="max-width: 840px;">
@@ -240,14 +312,34 @@ import { getInternetDate } from '../../../core/utils/clock';
                       <div style="flex: 1; display: flex; flex-direction: column;">
                         <span style="font-size: 0.85rem; font-weight: 600; color: var(--app-text-color);">{{ s.serviceName }}</span>
                         <span style="font-size: 0.7rem; color: var(--app-muted-text-color);">{{ s.departmentName }} • Qty: {{ s.quantity }}</span>
+                        <span *ngIf="s.source === 'department_added' && s.approvedByPatient === false" style="font-size: 0.7rem; color: #b45309; font-weight: 800;">
+                          Awaiting frontdesk payment approval
+                        </span>
+                        <span *ngIf="s.priceAdjustmentStatus === 'pending'" style="font-size: 0.7rem; color: #7c3aed; font-weight: 800;">
+                          Adjustment requested: ₵{{ s.lineTotal.toFixed(2) }} → ₵{{ s.requestedLineTotal.toFixed(2) }}
+                        </span>
+                        <span *ngIf="s.priceAdjustmentReason && s.priceAdjustmentStatus === 'pending'" style="font-size: 0.68rem; color: var(--app-muted-text-color);">
+                          Reason: {{ s.priceAdjustmentReason }}
+                        </span>
                       </div>
                       
                       <div style="margin-right: 0.75rem; font-size: 0.7rem; font-weight: 700; padding: 0.1rem 0.35rem; border-radius: 0.25rem;" [class.done]="s.status === 'done'" [class.not-done]="s.status === 'not_done'">
-                        {{ s.status === 'not_done' ? 'NOT DONE' : 'DONE' }}
+                        {{ s.priceAdjustmentStatus === 'pending' ? 'PRICE REVIEW' : (s.approvedByPatient === false ? 'PENDING APPROVAL' : (s.status === 'not_done' ? 'NOT DONE' : 'DONE')) }}
                       </div>
                       
-                      <div style="font-size: 0.85rem; font-weight: 700; color: var(--app-primary-color);">
-                        ₵{{ (s.status === 'not_done' ? 0 : s.lineTotal).toFixed(2) }}
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <button *ngIf="s.source === 'department_added' && s.approvedByPatient === false" class="btn btn-primary btn-sm" (click)="approveExtraService(s)">
+                          Approve Charge
+                        </button>
+                        <button *ngIf="s.priceAdjustmentStatus === 'pending'" class="btn btn-primary btn-sm" (click)="approvePriceAdjustment(s, true)">
+                          Apply Adjustment
+                        </button>
+                        <button *ngIf="s.priceAdjustmentStatus === 'pending'" class="btn btn-secondary btn-sm" (click)="approvePriceAdjustment(s, false)">
+                          Reject
+                        </button>
+                        <div style="font-size: 0.85rem; font-weight: 700; color: var(--app-primary-color); min-width: 70px; text-align: right;">
+                          ₵{{ (s.status === 'not_done' || s.approvedByPatient === false ? 0 : s.lineTotal).toFixed(2) }}
+                        </div>
                       </div>
                     </div>
 
@@ -332,13 +424,16 @@ import { getInternetDate } from '../../../core/utils/clock';
 
                     <button
                       class="btn btn-success btn-block"
-                      [disabled]="isSubmitting() || (paymentMethod() === 'mobile_money' && !paymentReference().trim())"
+                      [disabled]="isSubmitting() || !activeClinicSession() || (paymentMethod() === 'mobile_money' && !paymentReference().trim())"
                       (click)="recordPayment()"
                       style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.65rem 1rem; font-weight: 700;"
                     >
                       <span *ngIf="!isSubmitting()">Collect Full Payment (₵{{ invoice().balanceDue.toFixed(2) }})</span>
                       <span *ngIf="isSubmitting()">Processing payment...</span>
                     </button>
+                    <p *ngIf="!activeClinicSession()" style="margin: 0.75rem 0 0; font-size: 0.75rem; color: #b45309; font-weight: 700;">
+                      Open a clinic cashier session before collecting this payment.
+                    </p>
                   </div>
 
                   <!-- Already paid actions -->
@@ -532,6 +627,13 @@ export class BillingDeskPageComponent implements OnInit {
   readonly isSubmitting = signal(false);
   readonly showReceipt = signal(false);
   readonly showHistory = signal(false);
+  readonly activeClinicSession = signal<any | null>(null);
+  readonly isOpeningClinicSession = signal(false);
+  readonly isClosingClinicSession = signal(false);
+  readonly clinicOpeningFloat = signal(100);
+  readonly clinicCloseCashCounted = signal(0);
+  readonly clinicCloseMomoCounted = signal(0);
+  readonly clinicCloseNotes = signal('');
 
   // Search, Pagination & Loading state signals
   readonly searchQuery = signal('');
@@ -588,6 +690,55 @@ export class BillingDeskPageComponent implements OnInit {
   ngOnInit(): void {
     this.loadVisits();
     this.loadSettings();
+    this.loadClinicCashSession();
+  }
+
+  loadClinicCashSession(): void {
+    this.api.getActiveClinicCashSession().subscribe({
+      next: (session) => this.activeClinicSession.set(session),
+      error: (err) => console.error('Failed to load active clinic cashier session', err)
+    });
+  }
+
+  openClinicCashSession(): void {
+    this.api.openClinicCashSession(this.clinicOpeningFloat()).subscribe({
+      next: () => {
+        this.isOpeningClinicSession.set(false);
+        this.loadClinicCashSession();
+      },
+      error: (err) => {
+        console.error('Failed to open clinic cashier session', err);
+        alert(err?.error?.message || 'Failed to open clinic cashier session.');
+      }
+    });
+  }
+
+  triggerCloseClinicSession(): void {
+    const session = this.activeClinicSession();
+    this.clinicCloseCashCounted.set(Number(session?.expectedCash || session?.openingFloat || 0));
+    this.clinicCloseMomoCounted.set(Number(session?.expectedMomo || 0));
+    this.clinicCloseNotes.set('');
+    this.isClosingClinicSession.set(true);
+  }
+
+  closeClinicCashSession(): void {
+    const payload = {
+      cashCounted: this.clinicCloseCashCounted(),
+      momoCounted: this.clinicCloseMomoCounted(),
+      notes: this.clinicCloseNotes(),
+    };
+
+    this.api.closeClinicCashSession(payload).subscribe({
+      next: () => {
+        this.activeClinicSession.set(null);
+        this.isClosingClinicSession.set(false);
+        this.loadVisits();
+      },
+      error: (err) => {
+        console.error('Failed to close clinic cashier session', err);
+        alert(err?.error?.message || 'Failed to close clinic cashier session.');
+      }
+    });
   }
 
   toggleShowHistory(val: boolean): void {
@@ -657,13 +808,19 @@ export class BillingDeskPageComponent implements OnInit {
         
         // Map all services (including canceled ones so the checklist shows them as NOT DONE)
         const servicesList = (visitObj.visitServices || []).map((vs: any) => ({
+          id: vs.id,
           serviceId: vs.service.id,
           serviceName: vs.service.name,
           departmentName: vs.service.department?.name || 'Department',
           quantity: vs.quantity,
           unitPrice: Number(vs.unitPrice),
           lineTotal: Number(vs.lineTotal),
-          status: vs.status
+          status: vs.status,
+          source: vs.source,
+          approvedByPatient: vs.approvedByPatient !== false,
+          requestedLineTotal: vs.requestedLineTotal !== null && vs.requestedLineTotal !== undefined ? Number(vs.requestedLineTotal) : null,
+          priceAdjustmentReason: vs.priceAdjustmentReason || '',
+          priceAdjustmentStatus: vs.priceAdjustmentStatus || 'none'
         }));
 
         // Ensure values are numbers
@@ -708,10 +865,47 @@ export class BillingDeskPageComponent implements OnInit {
     return inv.services.some((s: any) => s.status === 'not_done');
   }
 
+  approveExtraService(serviceLine: any): void {
+    const v = this.selectedVisit();
+    if (!v) return;
+
+    this.api.approveExtraService(v.id, serviceLine.id, true).subscribe({
+      next: () => {
+        this.selectVisit(v);
+        this.loadVisits();
+      },
+      error: (err) => {
+        console.error('Failed to approve extra service', err);
+        alert(err?.error?.message ?? 'Failed to approve extra service charge.');
+      }
+    });
+  }
+
+  approvePriceAdjustment(serviceLine: any, approved: boolean): void {
+    const v = this.selectedVisit();
+    if (!v) return;
+
+    this.api.approveServicePriceAdjustment(v.id, serviceLine.id, approved).subscribe({
+      next: () => {
+        this.selectVisit(v);
+        this.loadVisits();
+      },
+      error: (err) => {
+        console.error('Failed to review price adjustment', err);
+        alert(err?.error?.message ?? 'Failed to review price adjustment.');
+      }
+    });
+  }
+
   recordPayment(): void {
     const v = this.selectedVisit();
     const inv = this.invoice();
     if (!v || !inv) return;
+
+    if (!this.activeClinicSession()) {
+      alert('Open a clinic cashier session before collecting clinic payments.');
+      return;
+    }
 
     const ref = this.paymentReference().trim();
     if (this.paymentMethod() === 'mobile_money' && !ref) {
@@ -724,12 +918,13 @@ export class BillingDeskPageComponent implements OnInit {
     const paymentData = {
       amount: inv.balanceDue,
       paymentMethod: this.paymentMethod(),
-      transactionReference: ref
+      referenceNumber: ref
     };
 
     this.api.payInvoice(v.id, paymentData).subscribe({
       next: (res) => {
         this.isSubmitting.set(false);
+        this.loadClinicCashSession();
         this.invoice.set({
           ...inv,
           balanceDue: 0,

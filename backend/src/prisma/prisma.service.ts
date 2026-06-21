@@ -15,6 +15,7 @@ const TENANT_MODELS = new Set([
   'Visit',
   'ClinicInvoice',
   'ClinicPayment',
+  'ClinicCashSession',
   'PharmacyProduct',
   'PharmacySale',
   'PharmacyDailyClosure',
@@ -27,7 +28,7 @@ const TENANT_MODELS = new Set([
 const MODELS_WITH_CREATED_AT = new Set([
   'Tenant', 'Department', 'User', 'Patient', 'Visit', 'Service', 'VisitService',
   'ServiceResultTemplate', 'VisitResult', 'Prescription', 'ClinicInvoice',
-  'ClinicPayment', 'PharmacyProduct', 'PharmacyBatch', 'PharmacyStockMovement',
+  'ClinicPayment', 'ClinicCashSession', 'PharmacyProduct', 'PharmacyBatch', 'PharmacyStockMovement',
   'PharmacySale', 'PharmacySaleItem', 'AuditLog', 'PharmacyDailyClosure',
   'GeneralTemplate', 'Expense'
 ]);
@@ -35,7 +36,7 @@ const MODELS_WITH_CREATED_AT = new Set([
 const MODELS_WITH_UPDATED_AT = new Set([
   'Tenant', 'Department', 'User', 'Patient', 'Visit', 'Service', 'VisitService',
   'ServiceResultTemplate', 'VisitResult', 'Prescription', 'ClinicInvoice',
-  'ClinicPayment', 'PharmacyProduct', 'PharmacyBatch', 'PharmacyStockMovement',
+  'ClinicPayment', 'ClinicCashSession', 'PharmacyProduct', 'PharmacyBatch', 'PharmacyStockMovement',
   'PharmacySale', 'AuditLog', 'PharmacyDailyClosure', 'GeneralTemplate', 'Expense'
 ]);
 
@@ -231,4 +232,3 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     await this.$disconnect();
   }
 }
-

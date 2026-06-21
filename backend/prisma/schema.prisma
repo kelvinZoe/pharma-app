@@ -30,6 +30,7 @@ model Tenant {
   visits           Visit[]
   clinicInvoices   ClinicInvoice[]
   clinicPayments   ClinicPayment[]
+  clinicCashSessions ClinicCashSession[]
   pharmacyProducts PharmacyProduct[]
   pharmacySales    PharmacySale[]
   prescriptions    Prescription[]
@@ -73,6 +74,8 @@ model User {
   isVerified            Boolean                 @default(false)
   auditLogs             AuditLog[]              @relation("AuditActor")
   paymentsReceived      ClinicPayment[]         @relation("CashierUser")
+  clinicCashSessionsClosed ClinicCashSession[]  @relation("ClinicCashSessionClosedBy")
+  clinicCashSessionsOpened ClinicCashSession[]  @relation("ClinicCashSessionOpenedBy")
   pharmacyClosures      PharmacyDailyClosure[]  @relation("PharmacyClosedBy")
   pharmacyOpenedClosures PharmacyDailyClosure[] @relation("PharmacyOpenedBy")
   pharmacySales         PharmacySale[]          @relation("PharmacySoldBy")
@@ -156,6 +159,13 @@ model VisitService {
   unitPrice         Decimal
   quantity          Int           @default(1)
   lineTotal         Decimal
+  requestedLineTotal Decimal?
+  priceAdjustmentReason String?
+  priceAdjustmentStatus String     @default("none")
+  priceAdjustedAt   DateTime?
+  priceAdjustedByUserId String?
+  priceApprovedAt   DateTime?
+  priceApprovedByUserId String?
   status            String        @default("pending")
   notDoneReason     String?
   approvedByPatient Boolean       @default(true)
@@ -247,6 +257,35 @@ model ClinicPayment {
   receivedByUser   User          @relation("CashierUser", fields: [receivedByUserId], references: [id])
   voidedByUser     User?         @relation("ClinicPaymentVoidedBy", fields: [voidedByUserId], references: [id])
   invoice          ClinicInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  clinicCashSessionId String?
+  clinicCashSession   ClinicCashSession? @relation("ClinicCashSessionPayments", fields: [clinicCashSessionId], references: [id])
+}
+
+model ClinicCashSession {
+  id               String          @id @default(uuid())
+  openedByUserId   String
+  closedByUserId   String?
+  openingFloat     Decimal         @default(0.00)
+  cashCounted      Decimal?
+  momoCounted      Decimal?
+  expectedCash     Decimal?
+  expectedMomo     Decimal?
+  totalCounted     Decimal?
+  discrepancy      Decimal?
+  notes            String?
+  status           String          @default("open")
+  openedAt         DateTime        @default(now())
+  closedAt         DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  tenantId         String?
+  tenant           Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  openedByUser     User            @relation("ClinicCashSessionOpenedBy", fields: [openedByUserId], references: [id])
+  closedByUser     User?           @relation("ClinicCashSessionClosedBy", fields: [closedByUserId], references: [id])
+  payments         ClinicPayment[] @relation("ClinicCashSessionPayments")
+
+  @@index([tenantId, status])
+  @@index([tenantId, openedAt])
 }
 
 model PharmacyProduct {
@@ -418,4 +457,3 @@ model Expense {
   tenantId      String?
   tenant        Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
-

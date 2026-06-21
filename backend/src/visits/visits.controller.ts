@@ -66,6 +66,35 @@ export class VisitsController {
     return this.visitsService.updateServiceStatus(visitId, visitServiceId, body);
   }
 
+  @Put('visits/:id/services/:visitServiceId/approval')
+  async approveExtraService(
+    @Param('id') visitId: string,
+    @Param('visitServiceId') visitServiceId: string,
+    @Body('approved') approved: boolean,
+  ) {
+    return this.visitsService.approveExtraService(visitId, visitServiceId, approved === true);
+  }
+
+  @Put('visits/:id/services/:visitServiceId/price-adjustment')
+  async requestServicePriceAdjustment(
+    @Req() req: any,
+    @Param('id') visitId: string,
+    @Param('visitServiceId') visitServiceId: string,
+    @Body() body: any,
+  ) {
+    return this.visitsService.requestServicePriceAdjustment(visitId, visitServiceId, body, req.user.id);
+  }
+
+  @Put('visits/:id/services/:visitServiceId/price-adjustment/approval')
+  async approveServicePriceAdjustment(
+    @Req() req: any,
+    @Param('id') visitId: string,
+    @Param('visitServiceId') visitServiceId: string,
+    @Body('approved') approved: boolean,
+  ) {
+    return this.visitsService.approveServicePriceAdjustment(visitId, visitServiceId, approved === true, req.user.id);
+  }
+
   @Delete('visits/:id/services/:visitServiceId')
   async removeService(
     @Param('id') visitId: string,

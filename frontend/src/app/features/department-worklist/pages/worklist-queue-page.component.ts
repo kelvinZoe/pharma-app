@@ -19,6 +19,16 @@ interface ServiceLine {
   resultValues: Record<string, any>;
   narrativeText?: string;
   source?: 'frontdesk' | 'department_added';
+  approvedByPatient?: boolean;
+  unitPrice?: number;
+  lineTotal?: number;
+  requestedLineTotal?: number | null;
+  priceAdjustmentReason?: string;
+  priceAdjustmentStatus?: 'none' | 'pending' | 'approved' | 'rejected';
+  adjustmentAmount?: number | null;
+  adjustmentReason?: string;
+  submittingAdjustment?: boolean;
+  showAdjustmentPanel?: boolean;
 }
 
 @Component({
@@ -176,9 +186,9 @@ interface ServiceLine {
             <div class="extra-services-card premium-border" style="padding: 1.25rem; background: #fff;">
               <h4 style="margin: 0 0 0.5rem; display: flex; align-items: center; gap: 0.35rem; font-weight: 800; color: var(--slate-800);">
                 <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.5;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                Add Extra Procedure
+                Request Extra Procedure
               </h4>
-              <p class="section-desc" style="color: var(--slate-500); margin-bottom: 1rem;">Add supplementary scans or laboratory tests directly during this session.</p>
+              <p class="section-desc" style="color: var(--slate-500); margin-bottom: 1rem;">Request supplementary scans or laboratory tests for frontdesk billing approval.</p>
               
               <div class="extra-selector">
                 <div class="form-group mb-2">
@@ -191,19 +201,12 @@ interface ServiceLine {
                   </app-dropdown>
                 </div>
                 
-                <div class="consent-switch-container mb-2" (click)="consentApproved.set(!consentApproved())">
-                  <div class="switch-toggle" [class.switch-active]="consentApproved()">
-                    <div class="switch-handle"></div>
-                  </div>
-                  <span class="switch-label">Patient has approved and consented to billing</span>
-                </div>
-
                 <button
                   class="btn btn-primary btn-sm btn-block"
-                  [disabled]="!selectedExtraServiceId() || !consentApproved()"
+                  [disabled]="!selectedExtraServiceId()"
                   (click)="addExtraService()"
                 >
-                  Add to Session
+                  Send to Frontdesk
                 </button>
               </div>
             </div>
@@ -249,22 +252,108 @@ interface ServiceLine {
               <p>No initial clinical services were requested.<br>You can add extra procedures using the catalog above.</p>
             </div>
 
-            <div *ngFor="let s of serviceLines()" class="visit-service-line" [class.done]="s.status === 'done'" [class.not-done]="s.status === 'not_done'">
-              <div class="line-header" style="background: var(--slate-50); border: 1px solid var(--slate-200); padding: 0.75rem 1rem; border-radius: 0.35rem; display: flex; align-items: center; justify-content: space-between;">
-                <span class="service-name" style="font-weight: 700; color: var(--slate-700);">{{ s.serviceName }}</span>
-                
-                <div class="line-status-actions" style="display: flex; gap: 0.5rem; align-items: center;">
-                  
-                  <!-- Remove Button (Only for department-added procedures, not for user-requested ones) -->
-                  <button
-                    *ngIf="s.source === 'department_added'"
-                    class="btn-remove-line"
-                    (click)="removeServiceLine(s)"
-                    title="Remove Procedure"
-                  >
-                    <svg viewBox="0 0 24 24" style="width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.5;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                    REMOVE
-                  </button>
+            <div *ngFor="let s of serviceLines()" class="visit-service-line" [class.done]="s.status === 'done'" [class.not-done]="s.status === 'not_done'" [class.adjustment-open]="s.showAdjustmentPanel">
+              <div class="service-line-shell">
+                <div class="service-line-main">
+                  <div class="service-title-stack">
+                    <span class="service-kicker">{{ s.source === 'department_added' ? 'Department-added procedure' : 'Requested service' }}</span>
+                    <span class="service-name">{{ s.serviceName }}</span>
+                    <span class="service-subcopy">
+                      Current billable charge
+                      <strong>₵{{ (s.lineTotal || 0).toFixed(2) }}</strong>
+                      <ng-container *ngIf="s.requestedLineTotal && s.priceAdjustmentStatus === 'pending'">
+                        • requested
+                        <strong>₵{{ s.requestedLineTotal.toFixed(2) }}</strong>
+                      </ng-container>
+                    </span>
+                  </div>
+
+                  <div class="service-line-actions">
+                    <span class="status-chip chip-neutral" *ngIf="s.source === 'department_added' && s.approvedByPatient === false">
+                      Awaiting billing approval
+                    </span>
+                    <span class="status-chip chip-warning" *ngIf="s.priceAdjustmentStatus === 'pending'">
+                      Price review pending
+                    </span>
+                    <span class="status-chip chip-success" *ngIf="s.priceAdjustmentStatus === 'approved'">
+                      Adjusted
+                    </span>
+                    <span class="status-chip chip-danger" *ngIf="s.priceAdjustmentStatus === 'rejected'">
+                      Rejected
+                    </span>
+
+                    <button type="button" class="ghost-action-btn" (click)="toggleAdjustmentPanel(s)">
+                      {{ s.showAdjustmentPanel ? 'Close adjustment' : 'Adjust charge' }}
+                    </button>
+
+                    <button
+                      *ngIf="s.source === 'department_added'"
+                      class="btn-remove-line"
+                      (click)="removeServiceLine(s)"
+                      title="Remove Procedure"
+                    >
+                      <svg viewBox="0 0 24 24" style="width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.5;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                      REMOVE
+                    </button>
+                  </div>
+                </div>
+
+                <div class="adjustment-review-note" *ngIf="s.priceAdjustmentStatus === 'pending' && !s.showAdjustmentPanel">
+                  <strong>Pending adjustment:</strong> ₵{{ (s.lineTotal || 0).toFixed(2) }} to ₵{{ (s.requestedLineTotal || 0).toFixed(2) }}
+                  <span *ngIf="s.priceAdjustmentReason">• {{ s.priceAdjustmentReason }}</span>
+                </div>
+
+                <div class="price-adjustment-drawer" *ngIf="s.showAdjustmentPanel">
+                  <div class="adjustment-context">
+                    <div>
+                      <span>Current charge</span>
+                      <strong>₵{{ (s.lineTotal || 0).toFixed(2) }}</strong>
+                    </div>
+                    <div>
+                      <span>Difference</span>
+                      <strong [class.positive-diff]="adjustmentDifference(s) > 0" [class.negative-diff]="adjustmentDifference(s) < 0">
+                        {{ adjustmentDifference(s) >= 0 ? '+' : '' }}₵{{ adjustmentDifference(s).toFixed(2) }}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Billing impact</span>
+                      <strong>{{ s.priceAdjustmentStatus === 'pending' ? 'Awaiting frontdesk' : 'Not applied yet' }}</strong>
+                    </div>
+                  </div>
+
+                  <div class="adjustment-form-grid">
+                    <label class="field-block">
+                      <span>New total charge</span>
+                      <input
+                        class="form-control adjustment-input"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        [(ngModel)]="s.adjustmentAmount"
+                        placeholder="Enter final amount"
+                      />
+                    </label>
+                    <label class="field-block">
+                      <span>Reason for adjustment</span>
+                      <input
+                        class="form-control adjustment-input"
+                        type="text"
+                        [(ngModel)]="s.adjustmentReason"
+                        placeholder="e.g. complication required extra scan views"
+                      />
+                    </label>
+                    <button
+                      class="send-adjustment-btn"
+                      [disabled]="s.submittingAdjustment || !s.adjustmentAmount || s.adjustmentAmount <= 0"
+                      (click)="requestPriceAdjustment(s)"
+                    >
+                      {{ s.submittingAdjustment ? 'Sending...' : 'Send to Frontdesk' }}
+                    </button>
+                  </div>
+
+                  <p class="adjustment-helper">
+                    This does not add a new service. It asks billing to review a revised total for this same service line.
+                  </p>
                 </div>
               </div>
 
@@ -726,11 +815,21 @@ export class WorklistQueuePageComponent implements OnInit {
           id: s.id,
           serviceId: s.service.id,
           serviceName: s.service.name,
-          status: s.status === 'pending' ? 'done' : s.status,
+          status: s.approvedByPatient === false ? 'pending' : (s.status === 'pending' ? 'done' : s.status),
           notDoneReason: s.notDoneReason || '',
           resultValues: {},
           narrativeText: s.results?.[0]?.narrativeNotes || s.narrativeNotes || '',
-          source: s.source || 'frontdesk'
+          source: s.source || 'frontdesk',
+          approvedByPatient: s.approvedByPatient !== false,
+          unitPrice: Number(s.unitPrice || 0),
+          lineTotal: Number(s.lineTotal || 0),
+          requestedLineTotal: s.requestedLineTotal !== null && s.requestedLineTotal !== undefined ? Number(s.requestedLineTotal) : null,
+          priceAdjustmentReason: s.priceAdjustmentReason || '',
+          priceAdjustmentStatus: s.priceAdjustmentStatus || 'none',
+          adjustmentAmount: s.requestedLineTotal !== null && s.requestedLineTotal !== undefined ? Number(s.requestedLineTotal) : Number(s.lineTotal || 0),
+          adjustmentReason: s.priceAdjustmentReason || '',
+          submittingAdjustment: false,
+          showAdjustmentPanel: false
         };
 
         // Load service result template
@@ -915,12 +1014,11 @@ export class WorklistQueuePageComponent implements OnInit {
   addExtraService(): void {
     const visit = this.selectedVisit();
     const serviceId = this.selectedExtraServiceId();
-    if (!visit || !serviceId || !this.consentApproved()) return;
+    if (!visit || !serviceId) return;
 
-    this.api.addExtraService(visit.id, serviceId).subscribe({
+    this.api.addExtraService(visit.id, serviceId, 1, false).subscribe({
       next: (res) => {
-        // Service successfully added! Let's refresh our lines
-        this.toast.success('Extra procedure added successfully and patient consent recorded.');
+        this.toast.success('Extra procedure request sent to frontdesk for billing approval.');
         
         // Find newly added line in return payload and append
         this.api.getVisit(visit.id).subscribe({
@@ -929,13 +1027,60 @@ export class WorklistQueuePageComponent implements OnInit {
             this.selectVisit(updatedVisit);
             // Reset selectors
             this.selectedExtraServiceId.set('');
-            this.consentApproved.set(false);
           }
         });
       },
       error: (err) => {
         console.error('Error adding extra service', err);
         this.toast.error(err?.error?.message ?? 'Failed to add extra service.');
+      }
+    });
+  }
+
+  toggleAdjustmentPanel(line: ServiceLine): void {
+    line.showAdjustmentPanel = !line.showAdjustmentPanel;
+  }
+
+  adjustmentDifference(line: ServiceLine): number {
+    return Number(line.adjustmentAmount || 0) - Number(line.lineTotal || 0);
+  }
+
+  requestPriceAdjustment(line: ServiceLine): void {
+    const visit = this.selectedVisit();
+    const requestedTotal = Number(line.adjustmentAmount);
+    const reason = (line.adjustmentReason || '').trim();
+    if (!visit || !line.id) return;
+
+    if (!Number.isFinite(requestedTotal) || requestedTotal <= 0) {
+      this.toast.error('Enter a valid adjusted total.');
+      return;
+    }
+
+    if (requestedTotal === Number(line.lineTotal || 0)) {
+      this.toast.info('Adjusted total is the same as the current charge.');
+      return;
+    }
+
+    if (!reason) {
+      this.toast.error('Add a short reason for the price adjustment.');
+      return;
+    }
+
+    line.submittingAdjustment = true;
+    this.api.requestServicePriceAdjustment(visit.id, line.id, requestedTotal, reason).subscribe({
+      next: () => {
+        this.toast.success('Price adjustment sent to frontdesk.');
+        this.api.getVisit(visit.id).subscribe({
+          next: (updatedVisit) => {
+            this.selectedVisit.set(updatedVisit);
+            this.selectVisit(updatedVisit);
+          }
+        });
+      },
+      error: (err) => {
+        line.submittingAdjustment = false;
+        console.error('Error requesting price adjustment', err);
+        this.toast.error(err?.error?.message ?? 'Failed to request price adjustment.');
       }
     });
   }
@@ -1147,15 +1292,17 @@ export class WorklistQueuePageComponent implements OnInit {
             .divider-single { border: solid #000 1px; margin: 10px 0; }
             .a4-service-entry { margin-bottom: 25px; page-break-inside: auto; }
             tr { page-break-inside: avoid; }
-            .a4-service-title { font-size: 12px; color: #000; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 4px; margin-bottom: 8px; }
-            .a4-result-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-family: 'Courier New', monospace; font-size: 12px; color: #000; }
-            .a4-result-table th { border: 1px solid #000; padding: 6px 8px; background-color: #f1f5f9; font-weight: 700; text-align: left; color: #000; }
-            .a4-result-table td { border: 1px solid #000; padding: 5px 8px; color: #000; }
-            .a4-sec-header td { font-weight: 700; background-color: #f8fafc; font-family: 'Helvetica Neue', Arial; font-size: 11px; text-transform: uppercase; color: #000; }
-            .row-label { font-weight: 600; font-family: 'Helvetica Neue', Arial; color: #000; }
+            .a4-service-title { font-size: 13.5px; font-weight: 900; color: #000; text-transform: uppercase; border-bottom: 1.75px solid #000; padding-bottom: 5px; margin-bottom: 9px; letter-spacing: 0.02em; }
+            .a4-result-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-family: 'Arial', 'Helvetica Neue', sans-serif; font-size: 14px; color: #000; }
+            .a4-result-table th { border: 1.5px solid #000; padding: 7px 9px; background-color: #f5f7fa; font-weight: 900; text-align: left; color: #000; }
+            .a4-result-table td { border: 1.5px solid #000; padding: 6px 9px; color: #000; font-weight: 800; }
+            .a4-sec-header td { font-weight: 900; background-color: #f8fafc; font-family: 'Arial', 'Helvetica Neue', sans-serif; font-size: 13px; text-transform: uppercase; color: #000; letter-spacing: 0.02em; }
+            .row-label { font-weight: 900; font-family: 'Arial', 'Helvetica Neue', sans-serif; color: #000; }
+            .cell-val { color: #000; font-weight: 900; font-family: 'Arial', 'Helvetica Neue', sans-serif; }
+            .cell-unit { color: #000; font-weight: 800; font-family: 'Arial', 'Helvetica Neue', sans-serif; }
             .abnormal { background-color: #fef2f2 !important; color: #dc2626 !important; }
-            .abnormal .cell-val { font-weight: 700; }
-            .a4-narrative-box { border: 1px solid #000; border-radius: 4px; padding: 10px; background-color: #f8fafc; font-style: italic; color: #000; }
+            .abnormal .cell-val { font-weight: 900; }
+            .a4-narrative-box { border: 1.25px solid #000; border-radius: 4px; padding: 11px; background-color: #f1f5f9; font-style: italic; color: #000; font-size: 13.5px; font-weight: 700; }
             .a4-cancelled-reason { color: #ef4444; font-size: 11px; margin: 5px 0 0 0; }
             .a4-prescription-section { margin-top: 30px; border: 1.5px dashed #000; border-radius: 4px; padding: 12px; page-break-inside: avoid; }
             .a4-section-hdr { font-size: 11px; text-transform: uppercase; margin: 0 0 8px 0; color: #000; }
