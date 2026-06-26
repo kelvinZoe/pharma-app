@@ -75,6 +75,7 @@ export class AuthController {
       name: user.fullName,
       email: user.email,
       username: user.username,
+      phone: user.phone,
       role: user.role,
       roles,
       module: user.module,

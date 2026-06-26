@@ -9,7 +9,9 @@ export type ModuleKey = 'admin' | 'frontdesk' | 'laboratory' | 'scanning' | 'pha
 export interface SessionUser {
   readonly id: string;
   readonly name: string;
+  readonly email: string;
   readonly username: string;
+  readonly phone?: string | null;
   readonly role: UserRoleCode;
   readonly roles: UserRoleCode[];
   readonly module: ModuleKey;
@@ -168,6 +170,24 @@ export class SessionService {
     );
   }
 
+  getProfile(): Observable<SessionUser> {
+    return this.http.get<SessionUser>(`${API_URL}/users/me`).pipe(
+      tap((user) => this.persistSessionUser(user))
+    );
+  }
+
+  updateProfile(payload: { readonly name: string; readonly email: string; readonly phone?: string | null }): Observable<SessionUser> {
+    return this.http.put<SessionUser>(`${API_URL}/users/me`, payload).pipe(
+      tap((user) => this.persistSessionUser(user))
+    );
+  }
+
+  updatePassword(payload: { readonly currentPassword: string; readonly newPassword: string }): Observable<SessionUser> {
+    return this.http.put<SessionUser>(`${API_URL}/users/me/password`, payload).pipe(
+      tap((user) => this.persistSessionUser(user))
+    );
+  }
+
   initSession(): Observable<boolean> {
     if (typeof localStorage === 'undefined') {
       return of(false);
@@ -208,6 +228,13 @@ export class SessionService {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(updated));
       }
+    }
+  }
+
+  private persistSessionUser(user: SessionUser): void {
+    this.currentUserState.set(user);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(user));
     }
   }
 

@@ -25,6 +25,7 @@ import { WorklistQueuePageComponent } from './features/department-worklist/pages
 import { WorklistResultsPageComponent } from './features/department-worklist/pages/worklist-results-page.component';
 import { PharmacyInventoryPageComponent } from './features/pharmacy/pages/pharmacy-inventory-page.component';
 import { PharmacyPosSalesPageComponent } from './features/pharmacy/pages/pharmacy-pos-sales-page.component';
+import { ProfilePageComponent } from './features/profile/pages/profile-page.component';
 
 const adminMenu: readonly ModuleMenuItem[] = [
   { label: 'Dashboard', path: '/admin/dashboard', exact: true },
@@ -415,6 +416,10 @@ export const routes: Routes = [
     component: AppShellComponent,
     canActivate: [authGuard],
     children: [
+      {
+        path: 'profile',
+        component: ProfilePageComponent
+      },
       {
         path: 'admin',
         component: ModuleShellComponent,

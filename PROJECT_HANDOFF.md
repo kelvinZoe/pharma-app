@@ -22,7 +22,7 @@ Repository: `https://github.com/kelvinZoe/pharma-app`
 
 ## Important Production URLs
 
-- Frontend: `https://pharma-app-inky.vercel.app`
+- Frontend: `https://pharma-uci.com`
 - Backend: hosted on Render.
 - API from frontend uses `/api` in production, so Vercel rewrites/proxy configuration should point to the Render backend.
 
@@ -34,8 +34,8 @@ Render backend needs backend env vars. Current known required vars:
 - `JWT_SECRET` — JWT signing secret.
 - `RESEND_API_KEY` — Resend API key.
 - `EMAIL_FROM` — verified sender for Resend.
-- `ALLOWED_ORIGINS` — allowed frontend origins for CORS.
-- `FRONTEND_URL=https://pharma-app-inky.vercel.app` — required for invitation links.
+- `ALLOWED_ORIGINS=https://pharma-uci.com` — allowed frontend origins for CORS.
+- `FRONTEND_URL=https://pharma-uci.com` — required for invitation/reset links.
 - `PORT` — Render usually provides this automatically; if set manually, prefer uppercase `PORT`, not lowercase `port`.
 
 If invitation emails ever show `localhost`, check `FRONTEND_URL` on Render first.
@@ -148,7 +148,7 @@ When an admin creates a staff user:
 
 Invitation links are generated from:
 
-- `FRONTEND_URL` env var, falling back to `https://pharma-app-inky.vercel.app`.
+- `FRONTEND_URL` env var, falling back to `https://pharma-uci.com`.
 
 Main file:
 
@@ -304,5 +304,5 @@ Main files:
 
 - Prisma migration history/provider mismatch.
 - Tenant-aware username uniqueness is implemented globally using raw SQL lookup to avoid cross-tenant ambiguity during username login.
-- Invitation links depend on Render env var `FRONTEND_URL`.
+- Invitation and password-reset links depend on Render env var `FRONTEND_URL`.
 - Backend deployment must happen for auth/invite/user changes to take effect; frontend deployment alone is not enough.

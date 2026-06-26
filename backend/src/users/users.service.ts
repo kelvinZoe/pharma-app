@@ -233,6 +233,101 @@ export class UsersService {
     return { message: 'Staff account removed successfully' };
   }
 
+  async findProfile(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      include: { tenant: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return this.toSessionProfile(user);
+  }
+
+  async updateProfile(id: string, data: any) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      include: { tenant: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const updateData: any = {};
+    if (data.name !== undefined || data.fullName !== undefined) {
+      const fullName = String(data.name ?? data.fullName ?? '').trim();
+      if (fullName.length < 2) {
+        throw new BadRequestException('Full name must be at least 2 characters');
+      }
+      updateData.fullName = fullName;
+    }
+
+    if (data.phone !== undefined) {
+      updateData.phone = data.phone ? String(data.phone).trim() : null;
+    }
+
+    if (data.email !== undefined) {
+      const email = String(data.email).trim().toLowerCase();
+      if (!email || !email.includes('@')) {
+        throw new BadRequestException('A valid email address is required');
+      }
+      if (email !== user.email) {
+        const existing = await this.prisma.user.findUnique({ where: { email } });
+        if (existing && existing.id !== id) {
+          throw new BadRequestException('Email is already taken');
+        }
+      }
+      updateData.email = email;
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: updateData,
+      include: { tenant: true },
+    });
+
+    return this.toSessionProfile(updated);
+  }
+
+  async updateOwnPassword(id: string, data: any) {
+    const currentPassword = String(data.currentPassword ?? '');
+    const newPassword = String(data.newPassword ?? data.password ?? '');
+
+    if (!currentPassword || !newPassword) {
+      throw new BadRequestException('Current password and new password are required');
+    }
+
+    if (newPassword.length < 6) {
+      throw new BadRequestException('New password must be at least 6 characters');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      include: { tenant: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isMatch) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: { passwordHash },
+      include: { tenant: true },
+    });
+
+    return this.toSessionProfile(updated);
+  }
+
   async update(id: string, data: any) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) {
@@ -305,6 +400,24 @@ export class UsersService {
       case 5:
       default: return 'accounting';
     }
+  }
+
+  private toSessionProfile(user: any) {
+    const roles = user.roles ? String(user.roles).split(',').map(Number) : [user.role];
+    return {
+      id: user.id,
+      name: user.fullName,
+      fullName: user.fullName,
+      email: user.email,
+      username: user.username,
+      phone: user.phone,
+      role: user.role,
+      roles,
+      module: user.module,
+      tenantId: user.tenantId,
+      tenantSlug: user.tenant?.slug ?? 'default',
+      tenantName: user.tenant?.name ?? 'PharmaFlow Clinic',
+    };
   }
 
   private async generateUsername(fullName: string): Promise<string> {

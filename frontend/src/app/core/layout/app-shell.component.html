@@ -112,6 +112,20 @@
             <span class="link-text">Settings</span>
           </a>
         }
+        <a
+          class="general-link"
+          routerLink="/profile"
+          routerLinkActive="is-active"
+          (click)="closeMobileSidebar()"
+        >
+          <span class="icon-container">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="sidebar-icon">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+          </span>
+          <span class="link-text">Profile</span>
+        </a>
         <a class="general-link" (click)="closeMobileSidebar()">
           <span class="icon-container">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="sidebar-icon">
@@ -190,7 +204,7 @@
         </button>
 
         <!-- User Profile Card -->
-        <div class="user-profile">
+        <a class="user-profile" routerLink="/profile" aria-label="Open profile">
           <div class="user-avatar">
             {{ userInitials() }}
           </div>
@@ -198,7 +212,7 @@
             <span class="user-name">{{ currentUser()?.name }}</span>
             <span class="user-role">{{ currentRoleLabel() }}</span>
           </div>
-        </div>
+        </a>
       </div>
     </header>
 

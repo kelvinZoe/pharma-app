@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, map, startWith } from 'rxjs';
@@ -70,6 +70,7 @@ export class AppShellComponent {
   readonly isAdmin = this.session.isAdmin;
   readonly availableModules = this.session.availableModules;
   readonly mobileSidebarOpen = signal(false);
+  private readonly workspaceModuleKeys = new Set(MODULE_OPTIONS.map((moduleOption) => moduleOption.key));
 
   private readonly currentUrl = toSignal(
     this.router.events.pipe(
@@ -80,9 +81,23 @@ export class AppShellComponent {
     { initialValue: this.router.url }
   );
 
+  readonly lastWorkspaceModuleKey = signal(this.resolveInitialWorkspaceModule());
+
+  constructor() {
+    effect(() => {
+      const segment = this.currentUrl().split('/').filter(Boolean)[0];
+      if (this.workspaceModuleKeys.has(segment as any)) {
+        this.lastWorkspaceModuleKey.set(segment);
+      }
+    });
+  }
+
   readonly activeModuleKey = computed(() => {
     const url = this.currentUrl();
     const segment = url.split('/').filter(Boolean)[0];
+    if (!segment || !this.workspaceModuleKeys.has(segment as any)) {
+      return this.lastWorkspaceModuleKey();
+    }
     return segment || 'admin';
   });
 
@@ -103,6 +118,9 @@ export class AppShellComponent {
 
   readonly activePageLabel = computed(() => {
     const url = this.currentUrl();
+    if (url.startsWith('/profile')) {
+      return 'Profile';
+    }
     const menu = this.activeMenu();
     
     // Exact match first
@@ -130,6 +148,14 @@ export class AppShellComponent {
       .join('')
       .toUpperCase();
   });
+
+  private resolveInitialWorkspaceModule(): string {
+    const segment = this.router.url.split('/').filter(Boolean)[0];
+    if (this.workspaceModuleKeys.has(segment as any)) {
+      return segment;
+    }
+    return this.currentUser()?.module ?? 'admin';
+  }
 
   toggleMobileSidebar(): void {
     this.mobileSidebarOpen.update((state) => !state);

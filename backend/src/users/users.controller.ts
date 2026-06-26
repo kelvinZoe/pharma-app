@@ -26,6 +26,21 @@ export class UsersController {
     return this.usersService.create(body);
   }
 
+  @Get('me')
+  async getProfile(@Req() req: any) {
+    return this.usersService.findProfile(req.user.id);
+  }
+
+  @Put('me')
+  async updateProfile(@Req() req: any, @Body() body: any) {
+    return this.usersService.updateProfile(req.user.id, body);
+  }
+
+  @Put('me/password')
+  async updatePassword(@Req() req: any, @Body() body: any) {
+    return this.usersService.updateOwnPassword(req.user.id, body);
+  }
+
   @Post(':id/resend-invitation')
   async resendInvitation(@Req() req: any, @Param('id') id: string) {
     this.ensureAdmin(req.user);
