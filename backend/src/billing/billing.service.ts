@@ -2,10 +2,14 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { getInternetDate } from '../common/clock';
 import { TenantContextService } from '../common/multitenancy/tenant-context.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class BillingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async findActiveClinicSession(userId: string) {
     const session = await (this.prisma as any).clinicCashSession.findFirst({
@@ -82,7 +86,7 @@ export class BillingService {
     const totalCounted = cashCounted + momoCounted;
     const discrepancy = totalCounted - (summary.expectedCash + summary.expectedMomo);
 
-    return (this.prisma as any).clinicCashSession.update({
+    const closedSession = await (this.prisma as any).clinicCashSession.update({
       where: { id: activeSession.id },
       data: {
         status: 'closed',
@@ -102,6 +106,21 @@ export class BillingService {
         payments: true,
       },
     });
+
+    if (Math.abs(discrepancy) > 0.01) {
+      await this.notificationsService.create({
+        title: 'Clinic cashier discrepancy',
+        message: `A clinic cashier session closed with a discrepancy of GHS ${discrepancy.toFixed(2)}.`,
+        type: 'danger',
+        module: 'accounting',
+        targetRoles: [0, 5],
+        entityType: 'clinicCashSession',
+        entityId: closedSession.id,
+        route: '/admin/financials',
+      });
+    }
+
+    return closedSession;
   }
 
   async findClinicSessions(startDate?: string, endDate?: string) {

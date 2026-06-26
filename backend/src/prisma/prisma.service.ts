@@ -22,7 +22,8 @@ const TENANT_MODELS = new Set([
   'AuditLog',
   'Prescription',
   'GeneralTemplate',
-  'Expense'
+  'Expense',
+  'Notification'
 ]);
 
 const MODELS_WITH_CREATED_AT = new Set([
@@ -30,14 +31,14 @@ const MODELS_WITH_CREATED_AT = new Set([
   'ServiceResultTemplate', 'VisitResult', 'Prescription', 'ClinicInvoice',
   'ClinicPayment', 'ClinicCashSession', 'PharmacyProduct', 'PharmacyBatch', 'PharmacyStockMovement',
   'PharmacySale', 'PharmacySaleItem', 'AuditLog', 'PharmacyDailyClosure',
-  'GeneralTemplate', 'Expense'
+  'GeneralTemplate', 'Expense', 'Notification'
 ]);
 
 const MODELS_WITH_UPDATED_AT = new Set([
   'Tenant', 'Department', 'User', 'Patient', 'Visit', 'Service', 'VisitService',
   'ServiceResultTemplate', 'VisitResult', 'Prescription', 'ClinicInvoice',
   'ClinicPayment', 'ClinicCashSession', 'PharmacyProduct', 'PharmacyBatch', 'PharmacyStockMovement',
-  'PharmacySale', 'AuditLog', 'PharmacyDailyClosure', 'GeneralTemplate', 'Expense'
+  'PharmacySale', 'AuditLog', 'PharmacyDailyClosure', 'GeneralTemplate', 'Expense', 'Notification'
 ]);
 
 const isTenantModel = (model: string): boolean => TENANT_MODELS.has(model);

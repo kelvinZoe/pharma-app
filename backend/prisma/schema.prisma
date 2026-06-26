@@ -38,6 +38,7 @@ model Tenant {
   closures         PharmacyDailyClosure[]
   generalTemplates GeneralTemplate[]
   expenses         Expense[]
+  notifications    Notification[]
 }
 
 model Department {
@@ -90,6 +91,28 @@ model User {
   expensesCreated       Expense[]               @relation("ExpenseCreatedBy")
 
   @@unique([tenantId, username])
+}
+
+model Notification {
+  id           String   @id @default(uuid())
+  title        String
+  message      String
+  type         String   @default("info")
+  module       String?
+  targetRole   Int?
+  targetUserId String?
+  entityType   String?
+  entityId     String?
+  route        String?
+  isRead       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  tenantId     String?
+  tenant       Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, targetRole, isRead])
+  @@index([tenantId, targetUserId, isRead])
+  @@index([tenantId, createdAt])
 }
 
 model Patient {

@@ -191,17 +191,76 @@
         <!-- Live Badge -->
         <div class="live-status">
           <span class="live-pulse"></span>
-          <span class="live-label">LIVE SYNC</span>
+          <span class="live-label">{{ realtimeConnected() ? 'LIVE SYNC' : 'SYNCING' }}</span>
         </div>
 
         <!-- Notifications -->
-        <button class="notification-btn" type="button" aria-label="Notifications">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-          </svg>
-          <span class="notification-badge"></span>
-        </button>
+        <div class="notification-menu">
+          <button class="notification-btn" type="button" aria-label="Notifications" (click)="toggleNotifications()">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            @if (unreadNotifications() > 0) {
+              <span class="notification-badge">{{ unreadNotifications() > 9 ? '9+' : unreadNotifications() }}</span>
+            }
+          </button>
+
+          @if (notificationsOpen()) {
+            <div class="notification-dropdown">
+              <div class="notification-dropdown__header">
+                <div>
+                  <strong>Notifications</strong>
+                  <span>{{ unreadNotifications() }} unread · {{ realtimeConnected() ? 'Realtime on' : 'Connecting' }}</span>
+                </div>
+                <button type="button" (click)="markAllNotificationsRead()" [disabled]="unreadNotifications() === 0">
+                  Mark all read
+                </button>
+              </div>
+
+              <div class="notification-preferences">
+                <button
+                  type="button"
+                  class="notification-sound-toggle"
+                  [class.notification-sound-toggle--active]="soundEnabled()"
+                  [attr.aria-pressed]="soundEnabled()"
+                  (click)="toggleNotificationSound()"
+                >
+                  <span class="sound-toggle-icon">{{ soundEnabled() ? '🔔' : '🔕' }}</span>
+                  <span>{{ soundEnabled() ? 'Sound on' : 'Sound off' }}</span>
+                </button>
+              </div>
+
+              <div class="notification-list">
+                @if (loadingNotifications()) {
+                  <div class="notification-state">Loading notifications...</div>
+                } @else {
+                  @for (notification of notifications(); track notification.id) {
+                    <button
+                      type="button"
+                      class="notification-item"
+                      [class.notification-item--unread]="!notification.isRead"
+                      [class.notification-item--info]="notification.type === 'info'"
+                      [class.notification-item--success]="notification.type === 'success'"
+                      [class.notification-item--warning]="notification.type === 'warning'"
+                      [class.notification-item--danger]="notification.type === 'danger'"
+                      (click)="openNotification(notification)"
+                    >
+                      <span class="notification-dot"></span>
+                      <span class="notification-content">
+                        <strong>{{ notification.title }}</strong>
+                        <span>{{ notification.message }}</span>
+                        <small>{{ notificationAge(notification.createdAt) }}</small>
+                      </span>
+                    </button>
+                  } @empty {
+                    <div class="notification-state">No notifications yet.</div>
+                  }
+                }
+              </div>
+            </div>
+          }
+        </div>
 
         <!-- User Profile Card -->
         <a class="user-profile" routerLink="/profile" aria-label="Open profile">

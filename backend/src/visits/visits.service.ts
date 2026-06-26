@@ -1,10 +1,14 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { getInternetDate } from '../common/clock';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class VisitsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   // --- Patients ---
   async searchPatients(query: string) {
@@ -220,6 +224,7 @@ export class VisitsService {
     // Fetch services to snapshot prices
     const services = await this.prisma.service.findMany({
       where: { id: { in: data.serviceIds } },
+      include: { department: true },
     });
 
     if (services.length !== data.serviceIds.length) {
@@ -288,6 +293,39 @@ export class VisitsService {
       return newVisit;
     });
 
+    const departmentCodes = new Set(services.map((service: any) => service.department?.code).filter(Boolean));
+    const patient = await this.prisma.patient.findUnique({
+      where: { id: data.patientId },
+      select: { surname: true, firstName: true, patientCode: true },
+    });
+    const patientLabel = patient ? `${patient.surname}, ${patient.firstName}` : 'A patient';
+
+    if (departmentCodes.has('LAB')) {
+      await this.notificationsService.create({
+        title: 'New lab request',
+        message: `${patientLabel} has been sent to the laboratory queue.`,
+        type: 'info',
+        module: 'laboratory',
+        targetRole: 2,
+        entityType: 'visit',
+        entityId: visit.id,
+        route: '/laboratory/queue',
+      });
+    }
+
+    if (departmentCodes.has('SCAN')) {
+      await this.notificationsService.create({
+        title: 'New scan request',
+        message: `${patientLabel} has been sent to the scanning queue.`,
+        type: 'info',
+        module: 'scanning',
+        targetRole: 3,
+        entityType: 'visit',
+        entityId: visit.id,
+        route: '/scanning/queue',
+      });
+    }
+
     return this.findVisitById(visit.id);
   }
 
@@ -314,7 +352,7 @@ export class VisitsService {
       throw new NotFoundException('Service not found');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const line = await this.prisma.$transaction(async (tx) => {
       const approvedByPatient = data.approvedByPatient === true;
       // Create visit service line
       const line = await tx.visitService.create({
@@ -361,6 +399,21 @@ export class VisitsService {
 
       return line;
     });
+
+    if (line.approvedByPatient === false) {
+      await this.notificationsService.create({
+        title: 'Extra procedure needs approval',
+        message: 'A department requested an extra procedure for frontdesk billing approval.',
+        type: 'warning',
+        module: 'frontdesk',
+        targetRole: 1,
+        entityType: 'visit',
+        entityId: visitId,
+        route: '/frontdesk/billing-desk',
+      });
+    }
+
+    return line;
   }
 
   async approveExtraService(visitId: string, visitServiceId: string, approved: boolean) {
@@ -444,7 +497,7 @@ export class VisitsService {
       throw new BadRequestException('Reason for price adjustment is required');
     }
 
-    return this.prisma.visitService.update({
+    const updatedLine = await this.prisma.visitService.update({
       where: { id: visitServiceId },
       data: {
         requestedLineTotal,
@@ -455,6 +508,19 @@ export class VisitsService {
       },
       include: { service: { include: { department: true } } },
     });
+
+    await this.notificationsService.create({
+      title: 'Price adjustment requested',
+      message: `${updatedLine.service?.name ?? 'A service'} was adjusted from GHS ${Number(line.lineTotal).toFixed(2)} to GHS ${requestedLineTotal.toFixed(2)}.`,
+      type: 'warning',
+      module: 'frontdesk',
+      targetRole: 1,
+      entityType: 'visit',
+      entityId: visitId,
+      route: '/frontdesk/billing-desk',
+    });
+
+    return updatedLine;
   }
 
   async approveServicePriceAdjustment(visitId: string, visitServiceId: string, approved: boolean, userId: string) {
@@ -592,7 +658,7 @@ export class VisitsService {
       throw new NotFoundException('Visit service line not found');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const updatedSvc = await tx.visitService.update({
         where: { id: visitServiceId },
         data: {
@@ -640,8 +706,30 @@ export class VisitsService {
         });
       }
 
-      return updatedSvc;
+      return { updatedSvc, finished };
     });
+
+    if (result.finished) {
+      const completedVisit = await this.prisma.visit.findUnique({
+        where: { id: visitId },
+        include: { patient: true },
+      });
+      const patientLabel = completedVisit?.patient
+        ? `${completedVisit.patient.surname}, ${completedVisit.patient.firstName}`
+        : 'A patient';
+      await this.notificationsService.create({
+        title: 'Clinical work completed',
+        message: `${patientLabel} is ready for billing review.`,
+        type: 'success',
+        module: 'frontdesk',
+        targetRole: 1,
+        entityType: 'visit',
+        entityId: visitId,
+        route: '/frontdesk/billing-desk',
+      });
+    }
+
+    return result.updatedSvc;
   }
 
   // --- Save Results ---
@@ -828,13 +916,16 @@ export class VisitsService {
       throw new BadRequestException('prescriptionText is required');
     }
 
-    const visit = await this.prisma.visit.findUnique({ where: { id: visitId } });
+    const visit = await this.prisma.visit.findUnique({
+      where: { id: visitId },
+      include: { patient: true },
+    });
     if (!visit) {
       throw new NotFoundException('Visit not found');
     }
 
     // Create prescription linked to visit
-    return this.prisma.prescription.create({
+    const prescription = await this.prisma.prescription.create({
       data: {
         visitId,
         prescriptionText: data.prescriptionText,
@@ -842,6 +933,19 @@ export class VisitsService {
         status: 'active',
       },
     });
+
+    await this.notificationsService.create({
+      title: 'New clinic prescription',
+      message: `${visit.patient.surname}, ${visit.patient.firstName} has a prescription waiting in pharmacy.`,
+      type: 'info',
+      module: 'pharmacy',
+      targetRole: 4,
+      entityType: 'prescription',
+      entityId: prescription.id,
+      route: '/pharmacy/clinic-prescriptions',
+    });
+
+    return prescription;
   }
 
   async deleteVisit(id: string, userId: string) {

@@ -1,10 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { filter, map, startWith } from 'rxjs';
+import { Subscription, filter, map, startWith } from 'rxjs';
 
 import { ROLE_LABELS } from '../auth/role-labels';
 import { MODULE_OPTIONS, SessionService } from '../auth/session.service';
+import { ApiService } from '../services/api.service';
+import { NotificationRealtimeService, RealtimeNotification } from '../services/notification-realtime.service';
 
 interface SidebarItem {
   readonly label: string;
@@ -55,6 +57,8 @@ const MENUS: Record<string, readonly SidebarItem[]> = {
 
 import { AppToastComponent } from '../../shared/ui/app-toast/app-toast.component';
 
+const NOTIFICATION_SOUND_KEY = 'pharma.notifications.sound';
+
 @Component({
   selector: 'app-shell',
   imports: [RouterOutlet, RouterLink, RouterLinkActive, AppToastComponent],
@@ -62,14 +66,24 @@ import { AppToastComponent } from '../../shared/ui/app-toast/app-toast.component
   styleUrl: './app-shell.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class AppShellComponent {
+export class AppShellComponent implements OnDestroy {
   private readonly router = inject(Router);
   private readonly session = inject(SessionService);
+  private readonly api = inject(ApiService);
+  private readonly notificationRealtime = inject(NotificationRealtimeService);
+  private readonly realtimeSubscription = new Subscription();
+  private audioContext: AudioContext | null = null;
 
   readonly currentUser = this.session.currentUser;
   readonly isAdmin = this.session.isAdmin;
   readonly availableModules = this.session.availableModules;
   readonly mobileSidebarOpen = signal(false);
+  readonly notificationsOpen = signal(false);
+  readonly notifications = signal<any[]>([]);
+  readonly unreadNotifications = signal(0);
+  readonly loadingNotifications = signal(false);
+  readonly realtimeConnected = this.notificationRealtime.connected;
+  readonly soundEnabled = signal(this.restoreSoundPreference());
   private readonly workspaceModuleKeys = new Set(MODULE_OPTIONS.map((moduleOption) => moduleOption.key));
 
   private readonly currentUrl = toSignal(
@@ -90,6 +104,21 @@ export class AppShellComponent {
         this.lastWorkspaceModuleKey.set(segment);
       }
     });
+
+    effect(() => {
+      if (this.currentUser()) {
+        this.notificationRealtime.connect();
+        this.loadNotificationCount();
+      } else {
+        this.notificationRealtime.disconnect();
+      }
+    });
+
+    this.realtimeSubscription.add(
+      this.notificationRealtime.notifications$.subscribe((notification) => {
+        this.receiveRealtimeNotification(notification);
+      })
+    );
   }
 
   readonly activeModuleKey = computed(() => {
@@ -175,8 +204,151 @@ export class AppShellComponent {
     }
   }
 
+  toggleNotifications(): void {
+    this.notificationsOpen.update((open) => !open);
+    if (this.notificationsOpen()) {
+      this.loadNotifications();
+    }
+  }
+
+  loadNotifications(): void {
+    this.loadingNotifications.set(true);
+    this.api.getNotifications(20).subscribe({
+      next: (items) => {
+        this.notifications.set(items ?? []);
+        this.unreadNotifications.set((items ?? []).filter((item) => !item.isRead).length);
+        this.loadingNotifications.set(false);
+      },
+      error: (err) => {
+        console.error('Failed to load notifications', err);
+        this.loadingNotifications.set(false);
+      }
+    });
+  }
+
+  loadNotificationCount(): void {
+    this.api.getUnreadNotificationCount().subscribe({
+      next: (res) => this.unreadNotifications.set(Number(res?.count ?? 0)),
+      error: (err) => console.error('Failed to load notification count', err)
+    });
+  }
+
+  toggleNotificationSound(): void {
+    this.soundEnabled.update((enabled) => !enabled);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(NOTIFICATION_SOUND_KEY, this.soundEnabled() ? '1' : '0');
+    }
+    if (this.soundEnabled()) {
+      this.playNotificationSound();
+    }
+  }
+
+  async openNotification(notification: any): Promise<void> {
+    if (!notification.isRead) {
+      this.api.markNotificationRead(notification.id).subscribe({
+        next: () => {
+          this.notifications.update((items) => items.map((item) => item.id === notification.id ? { ...item, isRead: true } : item));
+          this.unreadNotifications.update((count) => Math.max(0, count - 1));
+        },
+        error: (err) => console.error('Failed to mark notification as read', err)
+      });
+    }
+
+    this.notificationsOpen.set(false);
+    if (notification.route) {
+      await this.router.navigateByUrl(notification.route);
+    }
+  }
+
+  markAllNotificationsRead(): void {
+    this.api.markAllNotificationsRead().subscribe({
+      next: () => {
+        this.notifications.update((items) => items.map((item) => ({ ...item, isRead: true })));
+        this.unreadNotifications.set(0);
+      },
+      error: (err) => console.error('Failed to mark notifications as read', err)
+    });
+  }
+
+  notificationAge(createdAt: string): string {
+    const timestamp = new Date(createdAt).getTime();
+    if (!Number.isFinite(timestamp)) return '';
+    const diffMs = Date.now() - timestamp;
+    const minutes = Math.max(0, Math.floor(diffMs / 60000));
+    if (minutes < 1) return 'now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+  }
+
+  ngOnDestroy(): void {
+    this.realtimeSubscription.unsubscribe();
+    this.notificationRealtime.disconnect();
+    this.audioContext?.close().catch(() => undefined);
+  }
+
   async logout(): Promise<void> {
     this.session.logout();
+    this.notificationRealtime.disconnect();
     await this.router.navigateByUrl('/login');
+  }
+
+  private receiveRealtimeNotification(notification: RealtimeNotification): void {
+    if (!notification?.id) return;
+
+    this.unreadNotifications.update((count) => count + 1);
+
+    if (this.notificationsOpen()) {
+      this.notifications.update((items) => {
+        if (items.some((item) => item.id === notification.id)) return items;
+        return [{ ...notification, isRead: false }, ...items].slice(0, 20);
+      });
+    }
+
+    this.playNotificationSound();
+  }
+
+  private restoreSoundPreference(): boolean {
+    if (typeof localStorage === 'undefined') return true;
+    return localStorage.getItem(NOTIFICATION_SOUND_KEY) !== '0';
+  }
+
+  private playNotificationSound(): void {
+    if (!this.soundEnabled() || typeof window === 'undefined') return;
+
+    const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextCtor) return;
+
+    try {
+      this.audioContext ??= new AudioContextCtor();
+      const context = this.audioContext;
+      if (context.state === 'suspended') {
+        context.resume().catch(() => undefined);
+      }
+
+      this.playTone(context, 880, 0, 0.12);
+      this.playTone(context, 1175, 0.14, 0.18);
+    } catch {
+      // Browsers may block audio until the user interacts with the page.
+    }
+  }
+
+  private playTone(context: AudioContext, frequency: number, delay: number, duration: number): void {
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    const startAt = context.currentTime + delay;
+    const stopAt = startAt + duration;
+
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(frequency, startAt);
+    gain.gain.setValueAtTime(0.0001, startAt);
+    gain.gain.exponentialRampToValueAtTime(0.075, startAt + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, stopAt);
+
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start(startAt);
+    oscillator.stop(stopAt);
   }
 }

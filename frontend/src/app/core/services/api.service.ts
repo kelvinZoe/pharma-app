@@ -404,6 +404,23 @@ export class ApiService {
     return this.http.post<any>(`${API_URL}/reports/pharmacy/${id}/void`, { reason });
   }
 
+  // --- In-App Notifications ---
+  getNotifications(limit = 20): Observable<any[]> {
+    return this.http.get<any[]>(`${API_URL}/notifications?limit=${limit}`);
+  }
+
+  getUnreadNotificationCount(): Observable<{ count: number }> {
+    return this.http.get<{ count: number }>(`${API_URL}/notifications/unread-count`);
+  }
+
+  markNotificationRead(id: string): Observable<any> {
+    return this.http.patch<any>(`${API_URL}/notifications/${id}/read`, {});
+  }
+
+  markAllNotificationsRead(): Observable<any> {
+    return this.http.patch<any>(`${API_URL}/notifications/read-all`, {});
+  }
+
   // --- Register Sessions ---
   getActiveSession(): Observable<any> {
     return this.http.get<any>(`${API_URL}/pharmacy/sessions/active`);

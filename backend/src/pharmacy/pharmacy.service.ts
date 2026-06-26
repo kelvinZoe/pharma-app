@@ -1,10 +1,14 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { getInternetDate } from '../common/clock';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class PharmacyService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   // --- Products ---
   async findAllProducts() {
@@ -59,7 +63,7 @@ export class PharmacyService {
       throw new NotFoundException('Pharmacy product not found');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 1. Create batch
       const batch = await tx.pharmacyBatch.create({
         data: {
@@ -131,7 +135,7 @@ export class PharmacyService {
     }
     const saleNumber = `PH-${nextNum}`;
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // Check for active open session
       const activeSession = await tx.pharmacyDailyClosure.findFirst({
         where: {
@@ -146,6 +150,7 @@ export class PharmacyService {
 
       let subtotal = 0;
       const saleItemsToCreate: any[] = [];
+      const productIdsSold = new Set<string>();
 
       for (const item of items) {
         const { productId, batchId, quantity } = item;
@@ -185,6 +190,7 @@ export class PharmacyService {
             quantityRemaining: batch.quantityRemaining - qtyToSell,
           },
         });
+        productIdsSold.add(productId);
 
         // Add negative stock movement
         await tx.pharmacyStockMovement.create({
@@ -261,11 +267,48 @@ export class PharmacyService {
         },
       });
 
-      return tx.pharmacySale.findUnique({
+      const lowStockAlerts: Array<{ id: string; name: string; stockOnHand: number; reorderLevel: number }> = [];
+      for (const productId of productIdsSold) {
+        const productWithBatches = await tx.pharmacyProduct.findUnique({
+          where: { id: productId },
+          include: { batches: true },
+        });
+        if (productWithBatches) {
+          const stockOnHand = productWithBatches.batches.reduce((sum, batch) => sum + Number(batch.quantityRemaining), 0);
+          const reorderLevel = Number(productWithBatches.reorderLevel);
+          if (stockOnHand <= reorderLevel) {
+            lowStockAlerts.push({
+              id: productWithBatches.id,
+              name: productWithBatches.name,
+              stockOnHand,
+              reorderLevel,
+            });
+          }
+        }
+      }
+
+      const savedSale = await tx.pharmacySale.findUnique({
         where: { id: sale.id },
         include: { items: true },
       });
+
+      return { sale: savedSale, lowStockAlerts };
     });
+
+    for (const item of result.lowStockAlerts) {
+      await this.notificationsService.create({
+        title: 'Low stock alert',
+        message: `${item.name} is at ${item.stockOnHand} units, below or equal to reorder level ${item.reorderLevel}.`,
+        type: 'warning',
+        module: 'pharmacy',
+        targetRoles: [0, 4],
+        entityType: 'pharmacyProduct',
+        entityId: item.id,
+        route: '/pharmacy/inventory',
+      });
+    }
+
+    return result.sale;
   }
 
   // --- Daily Closures & Register Sessions ---
@@ -448,4 +491,3 @@ export class PharmacyService {
     return closure;
   }
 }
-
