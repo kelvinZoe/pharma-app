@@ -147,6 +147,27 @@ export class SessionService {
     );
   }
 
+  requestPasswordReset(payload: { readonly identifier: string }): Observable<any> {
+    return this.http.post<any>(`${API_URL}/auth/forgot-password`, payload);
+  }
+
+  verifyPasswordReset(token: string): Observable<any> {
+    return this.http.get<any>(`${API_URL}/auth/reset-password?token=${encodeURIComponent(token)}`);
+  }
+
+  completePasswordReset(payload: { readonly token: string; readonly password?: string }): Observable<SessionUser> {
+    return this.http.post<{ accessToken: string; user: SessionUser }>(`${API_URL}/auth/reset-password`, payload).pipe(
+      tap((res) => {
+        this.currentUserState.set(res.user);
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(TOKEN_STORAGE_KEY, res.accessToken);
+          localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(res.user));
+        }
+      }),
+      map((res) => res.user)
+    );
+  }
+
   initSession(): Observable<boolean> {
     if (typeof localStorage === 'undefined') {
       return of(false);

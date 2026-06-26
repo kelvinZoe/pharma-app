@@ -446,6 +446,9 @@
 .auth-toggle-link-container {
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
   margin-top: 1rem;
 }
 

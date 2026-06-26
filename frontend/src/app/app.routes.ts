@@ -5,6 +5,8 @@ import { AppShellComponent } from './core/layout/app-shell.component';
 import { ModuleMenuItem, ModuleShellComponent } from './core/layout/module-shell/module-shell.component';
 import { LoginPageComponent } from './features/auth/pages/login-page.component';
 import { VerifyInviteComponent } from './features/auth/pages/verify-invite.component';
+import { ForgotPasswordComponent } from './features/auth/pages/forgot-password.component';
+import { ResetPasswordComponent } from './features/auth/pages/reset-password.component';
 import { DashboardPageData, RoleDashboardPageComponent } from './shared/pages/role-dashboard-page.component';
 import { WorkspacePageComponent, WorkspacePageData } from './shared/pages/workspace-page.component';
 
@@ -396,6 +398,16 @@ export const routes: Routes = [
   {
     path: 'auth/verify-invite',
     component: VerifyInviteComponent,
+    canActivate: [guestGuard]
+  },
+  {
+    path: 'auth/forgot-password',
+    component: ForgotPasswordComponent,
+    canActivate: [guestGuard]
+  },
+  {
+    path: 'auth/reset-password',
+    component: ResetPasswordComponent,
     canActivate: [guestGuard]
   },
   {

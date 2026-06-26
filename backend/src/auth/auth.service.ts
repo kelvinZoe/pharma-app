@@ -4,12 +4,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { getInternetDate } from '../common/clock';
+import { EmailService } from '../common/email/email.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly emailService: EmailService,
   ) {}
 
   async validateUser(identifier: string, pass: string): Promise<any> {
@@ -215,6 +217,100 @@ export class AuthService {
     });
 
     // Log the user in directly by generating session payload
+    return this.login(updatedUser);
+  }
+
+  async requestPasswordReset(data: any) {
+    const identifier = String(data.identifier ?? data.email ?? '').trim().toLowerCase();
+    if (!identifier) {
+      throw new BadRequestException('Email or username is required');
+    }
+
+    const user = identifier.includes('@')
+      ? await this.prisma.user.findUnique({ where: { email: identifier } })
+      : await this.prisma.user.findFirst({ where: { username: identifier } });
+
+    const genericResponse = {
+      message: 'If an active account exists for those details, a password reset email has been sent.',
+    };
+
+    if (!user || !user.isActive || !user.isVerified) {
+      return genericResponse;
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetExpires = new Date(getInternetDate().getTime() + 60 * 60 * 1000);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetToken: resetToken,
+        passwordResetExpires: resetExpires,
+      },
+    });
+
+    await this.emailService.sendPasswordReset(user.email, user.fullName, resetToken);
+
+    return genericResponse;
+  }
+
+  async verifyPasswordReset(token: string) {
+    if (!token) {
+      throw new BadRequestException('Password reset token is required');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { passwordResetToken: token },
+    });
+
+    if (!user || !user.isActive || !user.isVerified) {
+      throw new NotFoundException('Password reset token is invalid');
+    }
+
+    if (user.passwordResetExpires && user.passwordResetExpires < getInternetDate()) {
+      throw new BadRequestException('Password reset link has expired');
+    }
+
+    return {
+      email: user.email,
+      fullName: user.fullName,
+    };
+  }
+
+  async completePasswordReset(data: any) {
+    if (!data.token || !data.password) {
+      throw new BadRequestException('Token and password are required');
+    }
+
+    if (String(data.password).length < 6) {
+      throw new BadRequestException('Password must be at least 6 characters');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { passwordResetToken: data.token },
+      include: { tenant: true },
+    });
+
+    if (!user || !user.isActive || !user.isVerified) {
+      throw new NotFoundException('Password reset token is invalid');
+    }
+
+    if (user.passwordResetExpires && user.passwordResetExpires < getInternetDate()) {
+      throw new BadRequestException('Password reset link has expired');
+    }
+
+    const passwordHash = await bcrypt.hash(data.password, 10);
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      },
+      include: { tenant: true },
+    });
+
     return this.login(updatedUser);
   }
 

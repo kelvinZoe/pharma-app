@@ -99,6 +99,21 @@ export class AuthController {
     return this.authService.completeInvite(body);
   }
 
+  @Post('forgot-password')
+  async forgotPassword(@Body() body: any) {
+    return this.authService.requestPasswordReset(body);
+  }
+
+  @Get('reset-password')
+  async verifyPasswordReset(@Query('token') token: string) {
+    return this.authService.verifyPasswordReset(token);
+  }
+
+  @Post('reset-password')
+  async completePasswordReset(@Body() body: any) {
+    return this.authService.completePasswordReset(body);
+  }
+
   private resolveModule(role: number): string {
     switch (role) {
       case 0: return 'admin';

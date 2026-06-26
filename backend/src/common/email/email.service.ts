@@ -57,4 +57,55 @@ export class EmailService {
       this.logger.warn(`👉 FALLBACK INVITE LINK: ${inviteLink}`);
     }
   }
+
+  async sendPasswordReset(email: string, fullName: string, token: string) {
+    const resetLink = `${this.frontendUrl}/auth/reset-password?token=${token}`;
+    const subject = 'Reset your Pharma Flow password';
+    const htmlContent = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <h2 style="color: #0d9488; margin-top: 0;">Password Reset Request</h2>
+        <p>Hello <strong>${fullName}</strong>,</p>
+        <p>We received a request to reset the password for your Pharma Flow account.</p>
+        <p>Click the button below to set a new secure password. This link expires in 1 hour.</p>
+        <div style="margin: 30px 0; text-align: center;">
+          <a href="${resetLink}" style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; font-weight: bold; border-radius: 6px; display: inline-block;">Reset Password</a>
+        </div>
+        <p style="color: #64748b; font-size: 0.875rem;">If you did not request this reset, you can safely ignore this email.</p>
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="color: #94a3b8; font-size: 0.75rem;">If the button doesn't work, copy and paste this URL into your browser:<br/>${resetLink}</p>
+      </div>
+    `;
+
+    if (!this.resendApiKey) {
+      this.logger.warn(`RESEND_API_KEY is not set. Simulation password reset link logged below:`);
+      this.logger.warn(`👉 PASSWORD RESET LINK: ${resetLink}`);
+      return;
+    }
+
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.resendApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: this.resendFromEmail,
+          to: [email],
+          subject,
+          html: htmlContent,
+        }),
+      });
+
+      if (!response.ok) {
+        const errBody = await response.text();
+        throw new Error(`Resend API error (${response.status}): ${errBody}`);
+      }
+
+      this.logger.log(`Password reset email successfully dispatched to ${email}`);
+    } catch (error) {
+      this.logger.error(`Failed to send password reset email via Resend to ${email}:`, error);
+      this.logger.warn(`👉 FALLBACK PASSWORD RESET LINK: ${resetLink}`);
+    }
+  }
 }

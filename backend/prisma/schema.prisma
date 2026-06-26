@@ -71,6 +71,8 @@ model User {
   tenant                Tenant?                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   inviteToken           String?                 @unique
   inviteExpires         DateTime?
+  passwordResetToken    String?                 @unique
+  passwordResetExpires  DateTime?
   isVerified            Boolean                 @default(false)
   auditLogs             AuditLog[]              @relation("AuditActor")
   paymentsReceived      ClinicPayment[]         @relation("CashierUser")
