@@ -20,6 +20,16 @@ export interface SessionUser {
   readonly tenantName?: string;
 }
 
+export interface PharmacyLocation {
+  readonly id: string;
+  readonly code: string;
+  readonly name: string;
+  readonly address?: string | null;
+  readonly phone?: string | null;
+  readonly licenceNumber?: string | null;
+  readonly isActive: boolean;
+}
+
 export interface ModuleOption {
   readonly key: ModuleKey;
   readonly label: string;
@@ -28,6 +38,7 @@ export interface ModuleOption {
 
 const SESSION_STORAGE_KEY = 'pharma.session';
 const TOKEN_STORAGE_KEY = 'pharma.token';
+const PHARMACY_LOCATION_STORAGE_KEY = 'pharma.pharmacy.location';
 const getApiUrl = () => {
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
@@ -63,6 +74,7 @@ export const MODULE_OPTIONS: readonly ModuleOption[] = [
 export class SessionService {
   private readonly http = inject(HttpClient);
   private readonly currentUserState = signal<SessionUser | null>(this.restore());
+  private readonly activePharmacyLocationIdState = signal<string | null>(this.restorePharmacyLocationId());
 
   constructor() {
     this.syncClock();
@@ -84,6 +96,7 @@ export class SessionService {
   }
 
   readonly currentUser = this.currentUserState.asReadonly();
+  readonly activePharmacyLocationId = this.activePharmacyLocationIdState.asReadonly();
   readonly isAuthenticated = computed(() => this.currentUser() !== null);
   readonly isAdmin = computed(() => {
     const user = this.currentUser();
@@ -118,6 +131,7 @@ export class SessionService {
   login(payload: { readonly identifier: string; readonly password?: string }): Observable<SessionUser> {
     return this.http.post<{ accessToken: string; user: SessionUser }>(`${API_URL}/auth/login`, payload).pipe(
       tap((res) => {
+        this.clearActivePharmacyLocation();
         this.currentUserState.set(res.user);
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem(TOKEN_STORAGE_KEY, res.accessToken);
@@ -139,6 +153,7 @@ export class SessionService {
   completeInvite(payload: { readonly token: string; readonly password?: string }): Observable<any> {
     return this.http.post<{ accessToken: string; user: SessionUser }>(`${API_URL}/auth/complete-invite`, payload).pipe(
       tap((res) => {
+        this.clearActivePharmacyLocation();
         this.currentUserState.set(res.user);
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem(TOKEN_STORAGE_KEY, res.accessToken);
@@ -160,6 +175,7 @@ export class SessionService {
   completePasswordReset(payload: { readonly token: string; readonly password?: string }): Observable<SessionUser> {
     return this.http.post<{ accessToken: string; user: SessionUser }>(`${API_URL}/auth/reset-password`, payload).pipe(
       tap((res) => {
+        this.clearActivePharmacyLocation();
         this.currentUserState.set(res.user);
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem(TOKEN_STORAGE_KEY, res.accessToken);
@@ -214,10 +230,28 @@ export class SessionService {
 
   logout(): void {
     this.currentUserState.set(null);
+    this.activePharmacyLocationIdState.set(null);
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(SESSION_STORAGE_KEY);
       localStorage.removeItem(TOKEN_STORAGE_KEY);
+      localStorage.removeItem(PHARMACY_LOCATION_STORAGE_KEY);
     }
+  }
+
+  setActivePharmacyLocation(locationId: string): void {
+    const normalizedLocationId = String(locationId ?? '').trim();
+    this.activePharmacyLocationIdState.set(normalizedLocationId || null);
+    if (typeof localStorage !== 'undefined') {
+      if (normalizedLocationId) {
+        localStorage.setItem(PHARMACY_LOCATION_STORAGE_KEY, normalizedLocationId);
+      } else {
+        localStorage.removeItem(PHARMACY_LOCATION_STORAGE_KEY);
+      }
+    }
+  }
+
+  clearActivePharmacyLocation(): void {
+    this.setActivePharmacyLocation('');
   }
 
   updateTenantName(name: string): void {
@@ -272,5 +306,10 @@ export class SessionService {
       localStorage.removeItem(SESSION_STORAGE_KEY);
       return null;
     }
+  }
+
+  private restorePharmacyLocationId(): string | null {
+    if (typeof localStorage === 'undefined') return null;
+    return localStorage.getItem(PHARMACY_LOCATION_STORAGE_KEY);
   }
 }

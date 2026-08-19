@@ -8,7 +8,8 @@ export class BillingController {
   constructor(private readonly billingService: BillingService) {}
 
   @Get('invoice')
-  async getInvoice(@Param('id') visitId: string) {
+  async getInvoice(@Req() req: any, @Param('id') visitId: string) {
+    this.ensureClinicCashier(req.user);
     return this.billingService.getVisitInvoice(visitId);
   }
 
@@ -61,15 +62,18 @@ export class BillingSessionsController {
     @Req() req: any,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('limit') limit?: string,
   ) {
     this.ensureClinicCashier(req.user);
-    return this.billingService.findClinicSessions(startDate, endDate);
+    const canViewAll = this.hasRole(req.user, 0) || this.hasRole(req.user, 5);
+    return this.billingService.findClinicSessions(startDate, endDate, canViewAll ? undefined : req.user.id, Number(limit));
   }
 
   @Get(':id')
   async getSession(@Req() req: any, @Param('id') id: string) {
     this.ensureClinicCashier(req.user);
-    return this.billingService.findClinicSessionById(id);
+    const canViewAll = this.hasRole(req.user, 0) || this.hasRole(req.user, 5);
+    return this.billingService.findClinicSessionById(id, canViewAll ? undefined : req.user.id);
   }
 
   private ensureClinicCashier(user: any) {
@@ -80,5 +84,12 @@ export class BillingSessionsController {
     if (!canHandleClinicCash) {
       throw new ForbiddenException('Only frontdesk, accounting, or admin users can manage clinic cashier sessions');
     }
+  }
+
+  private hasRole(user: any, role: number): boolean {
+    const roles = user?.roles
+      ? (Array.isArray(user.roles) ? user.roles.map(Number) : String(user.roles).split(',').map(Number))
+      : [Number(user?.role)];
+    return roles.includes(role);
   }
 }

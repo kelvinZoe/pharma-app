@@ -433,7 +433,7 @@ import { SessionService } from '../../../core/auth/session.service';
         align-items: center;
         gap: 0.25rem;
         color: #94a3b8;
-        font-size: 0.7rem;
+        font-size: 12px;
         text-align: center;
         font-weight: 600;
 

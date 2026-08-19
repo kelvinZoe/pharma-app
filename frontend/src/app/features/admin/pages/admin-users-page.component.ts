@@ -425,11 +425,7 @@ export class AdminUsersPageComponent implements OnInit {
     }
 
     this.api.resendUserInvitation(user.id).subscribe({
-      next: (res) => {
-        if (res?.inviteToken) {
-          const inviteLink = `${window.location.origin}/auth/verify-invite?token=${res.inviteToken}`;
-          this.activeInviteLink.set(inviteLink);
-        }
+      next: () => {
         this.toast.success(`Invitation resent to ${user.email}.`);
         this.loadUsers();
       },
@@ -497,16 +493,11 @@ export class AdminUsersPageComponent implements OnInit {
       });
     } else {
       this.api.createUser(payload).subscribe({
-        next: (res) => {
+        next: () => {
           this.isSubmitting.set(false);
           this.cancelEdit();
           this.loadUsers();
-          if (res && res.inviteToken) {
-            const inviteLink = `${window.location.origin}/auth/verify-invite?token=${res.inviteToken}`;
-            this.activeInviteLink.set(inviteLink);
-          } else {
-            this.toast.success('Staff invitation email sent successfully.');
-          }
+          this.toast.success('Staff invitation email sent successfully.');
         },
         error: (err) => {
           console.error('Error creating user', err);

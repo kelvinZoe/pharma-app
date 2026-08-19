@@ -76,7 +76,7 @@ interface GeneralTemplateItem {
               <tr *ngFor="let t of templates()" style="border-bottom: 1px solid var(--app-border-color); font-size: 0.85rem; color: var(--slate-700);" class="table-row-hover" [class.d-none]="loading()">
                 <td style="padding: 0.85rem 1rem; font-weight: 700; color: var(--slate-800);">{{ t.name }}</td>
                 <td style="padding: 0.85rem 1rem;">
-                  <span class="badge" style="background: var(--teal-50); color: var(--teal-700); font-weight: 750; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.725rem;">
+                  <span class="badge" style="background: var(--teal-50); color: var(--teal-700); font-weight: 750; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 12px;">
                     {{ getTemplateDepartment(t) }}
                   </span>
                 </td>
@@ -166,7 +166,7 @@ interface GeneralTemplateItem {
               <!-- Reordering / Sort list of selected services -->
               <div class="form-group" *ngIf="selectedServices().length > 0">
                 <label style="font-weight: 750; display: block; margin-bottom: 0.25rem;">Arrange Print Order:</label>
-                <p style="font-size: 0.725rem; color: var(--slate-400); margin: 0 0 0.5rem;">Use arrows to arrange services in the exact order they should print on report sheet.</p>
+                <p style="font-size: 12px; color: var(--slate-400); margin: 0 0 0.5rem;">Use arrows to arrange services in the exact order they should print on report sheet.</p>
 
                 <div style="border: 1px solid var(--app-border-color); border-radius: 0.375rem; background: #ffffff; overflow: hidden;">
                   <div *ngFor="let s of selectedServices(); let idx = index" style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--app-border-color); font-size: 0.825rem; font-weight: 600; color: var(--slate-700);" class="table-row-hover">

@@ -260,24 +260,188 @@ export class ApiService {
   }
 
   // --- Pharmacy ---
+  getPharmacyLocations(): Observable<any[]> {
+    return this.http.get<any[]>(`${API_URL}/pharmacy/locations`);
+  }
+
+  getPharmacySuppliers(): Observable<any[]> {
+    return this.http.get<any[]>(`${API_URL}/pharmacy/suppliers`);
+  }
+
+  getPharmacySupplierDetail(supplierId: string): Observable<any> {
+    return this.http.get<any>(`${API_URL}/pharmacy/suppliers/${supplierId}`);
+  }
+
+  createPharmacySupplier(data: any): Observable<any> {
+    return this.http.post<any>(`${API_URL}/pharmacy/suppliers`, data);
+  }
+
+  updatePharmacySupplier(supplierId: string, data: any): Observable<any> {
+    return this.http.patch<any>(`${API_URL}/pharmacy/suppliers/${supplierId}`, data);
+  }
+
+  getPharmacyPurchaseOrders(): Observable<any[]> {
+    return this.http.get<any[]>(`${API_URL}/pharmacy/purchase-orders`);
+  }
+
+  getPharmacyPurchaseOrderDetail(orderId: string): Observable<any> {
+    return this.http.get<any>(`${API_URL}/pharmacy/purchase-orders/${orderId}`);
+  }
+
+  createPharmacyPurchaseOrder(data: any): Observable<any> {
+    return this.http.post<any>(`${API_URL}/pharmacy/purchase-orders`, data);
+  }
+
+  updatePharmacyPurchaseOrder(orderId: string, data: any): Observable<any> {
+    return this.http.patch<any>(`${API_URL}/pharmacy/purchase-orders/${orderId}`, data);
+  }
+
+  submitPharmacyPurchaseOrder(orderId: string): Observable<any> {
+    return this.http.post<any>(`${API_URL}/pharmacy/purchase-orders/${orderId}/submit`, {});
+  }
+
+  approvePharmacyPurchaseOrder(orderId: string): Observable<any> {
+    return this.http.post<any>(`${API_URL}/pharmacy/purchase-orders/${orderId}/approve`, {});
+  }
+
+  cancelPharmacyPurchaseOrder(orderId: string): Observable<any> {
+    return this.http.post<any>(`${API_URL}/pharmacy/purchase-orders/${orderId}/cancel`, {});
+  }
+
+  getPharmacyPayablesSummary(): Observable<any> {
+    return this.http.get<any>(`${API_URL}/pharmacy/payables/summary`);
+  }
+
+  getPharmacySupplierInvoices(status = 'all', supplierId = '', search = ''): Observable<any[]> {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (supplierId) params.set('supplierId', supplierId);
+    if (search) params.set('search', search);
+    return this.http.get<any[]>(`${API_URL}/pharmacy/supplier-invoices?${params.toString()}`);
+  }
+
+  getPharmacySupplierInvoiceDetail(invoiceId: string): Observable<any> {
+    return this.http.get<any>(`${API_URL}/pharmacy/supplier-invoices/${invoiceId}`);
+  }
+
+  updatePharmacySupplierInvoice(invoiceId: string, data: any): Observable<any> {
+    return this.http.patch<any>(`${API_URL}/pharmacy/supplier-invoices/${invoiceId}`, data);
+  }
+
+  getPharmacySupplierPayments(supplierId = ''): Observable<any[]> {
+    return this.http.get<any[]>(`${API_URL}/pharmacy/supplier-payments${supplierId ? `?supplierId=${encodeURIComponent(supplierId)}` : ''}`);
+  }
+
+  recordPharmacySupplierPayment(data: any): Observable<any> {
+    return this.http.post<any>(`${API_URL}/pharmacy/supplier-payments`, data);
+  }
+
+  getPharmacyPurchaseReturns(supplierId = ''): Observable<any[]> {
+    return this.http.get<any[]>(`${API_URL}/pharmacy/purchase-returns${supplierId ? `?supplierId=${encodeURIComponent(supplierId)}` : ''}`);
+  }
+
+  recordPharmacyPurchaseReturn(data: any): Observable<any> {
+    return this.http.post<any>(`${API_URL}/pharmacy/purchase-returns`, data);
+  }
+
+  getPharmacySupplierStatement(supplierId: string, startDate = '', endDate = ''): Observable<any> {
+    const params = new URLSearchParams();
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
+    const query = params.toString();
+    return this.http.get<any>(`${API_URL}/pharmacy/supplier-statements/${supplierId}${query ? `?${query}` : ''}`);
+  }
+
+  getPharmacyInventoryControlSummary(): Observable<any> { return this.http.get<any>(`${API_URL}/pharmacy/inventory-control/summary`); }
+  getPharmacyStockLedger(params: Record<string, string> = {}): Observable<any[]> { const query = new URLSearchParams(params).toString(); return this.http.get<any[]>(`${API_URL}/pharmacy/stock-ledger${query ? `?${query}` : ''}`); }
+  getPharmacyStockCounts(): Observable<any[]> { return this.http.get<any[]>(`${API_URL}/pharmacy/stock-counts`); }
+  getPharmacyStockCount(id: string): Observable<any> { return this.http.get<any>(`${API_URL}/pharmacy/stock-counts/${id}`); }
+  createPharmacyStockCount(data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/stock-counts`, data); }
+  savePharmacyStockCount(id: string, data: any): Observable<any> { return this.http.patch<any>(`${API_URL}/pharmacy/stock-counts/${id}`, data); }
+  submitPharmacyStockCount(id: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/stock-counts/${id}/submit`, {}); }
+  approvePharmacyStockCount(id: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/stock-counts/${id}/approve`, {}); }
+  getPharmacyStockAdjustments(): Observable<any[]> { return this.http.get<any[]>(`${API_URL}/pharmacy/stock-adjustments`); }
+  requestPharmacyStockAdjustment(data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/stock-adjustments`, data); }
+  approvePharmacyStockAdjustment(id: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/stock-adjustments/${id}/approve`, {}); }
+  rejectPharmacyStockAdjustment(id: string, reason: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/stock-adjustments/${id}/reject`, { reason }); }
+  getPharmacyTransferSummary(): Observable<any> { return this.http.get<any>(`${API_URL}/pharmacy/transfers/summary`); }
+  getPharmacyTransfers(params: Record<string, string> = {}): Observable<any[]> { const query = new URLSearchParams(params).toString(); return this.http.get<any[]>(`${API_URL}/pharmacy/transfers${query ? `?${query}` : ''}`); }
+  getPharmacyTransfer(id: string): Observable<any> { return this.http.get<any>(`${API_URL}/pharmacy/transfers/${id}`); }
+  createPharmacyTransfer(data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers`, data); }
+  submitPharmacyTransfer(id: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/submit`, {}); }
+  approvePharmacyTransfer(id: string, data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/approve`, data); }
+  rejectPharmacyTransfer(id: string, reason: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/reject`, { reason }); }
+  dispatchPharmacyTransfer(id: string, data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/dispatch`, data); }
+  receivePharmacyTransfer(id: string, data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/receive`, data); }
+  resolvePharmacyTransfer(id: string, data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/resolve`, data); }
+  cancelPharmacyTransfer(id: string, reason: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/cancel`, { reason }); }
+  getPharmacyNetworkStock(search = ''): Observable<any> { return this.http.get<any>(`${API_URL}/pharmacy/network-stock${search ? `?search=${encodeURIComponent(search)}` : ''}`); }
+  updatePharmacyInventoryPolicy(locationId: string, productId: string, data: any): Observable<any> { return this.http.patch<any>(`${API_URL}/pharmacy/locations/${locationId}/products/${productId}/inventory-policy`, data); }
+  getPharmacyQuarantinedStock(): Observable<any[]> { return this.http.get<any[]>(`${API_URL}/pharmacy/quarantine`); }
+  resolvePharmacyQuarantine(batchId: string, data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/quarantine/${batchId}/resolve`, data); }
+
+  createPharmacyLocation(data: any): Observable<any> {
+    return this.http.post<any>(`${API_URL}/pharmacy/locations`, data);
+  }
+
+  getPharmacyLocationUsers(locationId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${API_URL}/pharmacy/locations/${locationId}/users`);
+  }
+
+  assignPharmacyLocationUser(locationId: string, userId: string, isDefault = false): Observable<any[]> {
+    return this.http.post<any[]>(`${API_URL}/pharmacy/locations/${locationId}/users`, { userId, isDefault });
+  }
+
   getPharmacyProducts(): Observable<any[]> {
     return this.http.get<any[]>(`${API_URL}/pharmacy/products`);
+  }
+
+  getPharmacyMedicines(): Observable<any[]> {
+    return this.http.get<any[]>(`${API_URL}/pharmacy/medicines`);
+  }
+
+  createPharmacyMedicine(data: any): Observable<any> {
+    return this.http.post<any>(`${API_URL}/pharmacy/medicines`, data);
+  }
+
+  updatePharmacyMedicine(medicineId: string, data: any): Observable<any> {
+    return this.http.patch<any>(`${API_URL}/pharmacy/medicines/${medicineId}`, data);
+  }
+
+  getPharmacyProductDetail(productId: string): Observable<any> {
+    return this.http.get<any>(`${API_URL}/pharmacy/products/${productId}`);
   }
 
   createPharmacyProduct(data: any): Observable<any> {
     return this.http.post<any>(`${API_URL}/pharmacy/products`, data);
   }
 
+  updatePharmacyProduct(productId: string, data: any): Observable<any> {
+    return this.http.patch<any>(`${API_URL}/pharmacy/products/${productId}`, data);
+  }
+
+  getPharmacyGoodsReceipts(): Observable<any[]> {
+    return this.http.get<any[]>(`${API_URL}/pharmacy/goods-receipts`);
+  }
+
+  receivePharmacyStock(data: any): Observable<any> {
+    return this.http.post<any>(`${API_URL}/pharmacy/goods-receipts`, data);
+  }
+
   addPharmacyBatch(productId: string, data: any): Observable<any> {
     return this.http.post<any>(`${API_URL}/pharmacy/products/${productId}/batches`, data);
   }
 
-  getPharmacyPrescriptions(): Observable<any[]> {
-    return this.http.get<any[]>(`${API_URL}/pharmacy/prescriptions/active`);
-  }
-
   processPharmacySale(data: any): Observable<any> {
     return this.http.post<any>(`${API_URL}/pharmacy/sales`, data);
+  }
+
+  getRecentPharmacySales(limit = 30): Observable<any[]> {
+    return this.http.get<any[]>(`${API_URL}/pharmacy/sales/recent?limit=${limit}`);
+  }
+
+  getPharmacySale(id: string): Observable<any> {
+    return this.http.get<any>(`${API_URL}/pharmacy/sales/${id}`);
   }
 
   // --- Reports ---
@@ -292,22 +456,24 @@ export class ApiService {
     return this.http.get<any>(url);
   }
 
-  getPharmacyStream(startDate?: string, endDate?: string, page?: number, limit?: number): Observable<any> {
+  getPharmacyStream(startDate?: string, endDate?: string, page?: number, limit?: number, locationId?: string): Observable<any> {
     let url = `${API_URL}/reports/pharmacy`;
     const params = [];
     if (startDate) params.push(`startDate=${startDate}`);
     if (endDate) params.push(`endDate=${endDate}`);
     if (page !== undefined) params.push(`page=${page}`);
     if (limit !== undefined) params.push(`limit=${limit}`);
+    if (locationId) params.push(`locationId=${encodeURIComponent(locationId)}`);
     if (params.length > 0) url += `?${params.join('&')}`;
     return this.http.get<any>(url);
   }
 
-  getCombinedSummary(startDate?: string, endDate?: string): Observable<any> {
+  getCombinedSummary(startDate?: string, endDate?: string, locationId?: string): Observable<any> {
     let url = `${API_URL}/reports/summary`;
     const params = [];
     if (startDate) params.push(`startDate=${startDate}`);
     if (endDate) params.push(`endDate=${endDate}`);
+    if (locationId) params.push(`locationId=${encodeURIComponent(locationId)}`);
     if (params.length > 0) url += `?${params.join('&')}`;
     return this.http.get<any>(url);
   }
@@ -391,8 +557,8 @@ export class ApiService {
     return this.http.post<any>(`${API_URL}/expenses`, data);
   }
 
-  deleteExpense(id: string): Observable<any> {
-    return this.http.delete<any>(`${API_URL}/expenses/${id}`);
+  voidExpense(id: string, reason: string): Observable<any> {
+    return this.http.post<any>(`${API_URL}/expenses/${id}/void`, { reason });
   }
 
   // --- Financial Integrity / Voids ---
@@ -400,8 +566,8 @@ export class ApiService {
     return this.http.post<any>(`${API_URL}/reports/clinic/${id}/void`, { reason });
   }
 
-  voidPharmacySale(id: string, reason: string): Observable<any> {
-    return this.http.post<any>(`${API_URL}/reports/pharmacy/${id}/void`, { reason });
+  voidPharmacySale(id: string, reason: string, stockDisposition: 'quarantine' | 'sellable' = 'quarantine'): Observable<any> {
+    return this.http.post<any>(`${API_URL}/reports/pharmacy/${id}/void`, { reason, stockDisposition });
   }
 
   // --- In-App Notifications ---

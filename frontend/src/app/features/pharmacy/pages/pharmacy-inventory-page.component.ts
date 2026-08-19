@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { RouterLink } from '@angular/router';
+
 import { ApiService } from '../../../core/services/api.service';
 
 interface PharmacyBatch {
@@ -15,336 +16,161 @@ interface PharmacyBatch {
 
 interface PharmacyProduct {
   id: string;
+  productCode: string;
   name: string;
-  description?: string;
+  genericName?: string;
+  strength?: string;
+  dosageForm?: string;
+  manufacturer?: string;
+  unitOfMeasure: string;
   reorderLevel: number;
-  qtyOnHand: number;
+  shelfLocation?: string;
+  defaultSellingPrice?: number;
+  stockOnHand: number;
   batches: PharmacyBatch[];
-  expanded?: boolean;
 }
+
+type StockFilter = 'all' | 'low' | 'out' | 'healthy';
 
 @Component({
   selector: 'app-pharmacy-inventory-page',
-  standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule],
+  imports: [CommonModule, RouterLink],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="pharmacy-workspace pharmacy-inventory-grid">
-      <!-- Products Table Panel -->
-      <div class="panel">
-        <div class="panel-header">
-          <h2>Medicine Stock Inventory</h2>
-          <button class="btn btn-secondary btn-sm" (click)="loadProducts()">
-            🔄 Refresh List
-          </button>
+    <section class="inventory-page">
+      <header class="page-header">
+        <div>
+          <span class="eyebrow">Active location stock</span>
+          <h1>Stock Overview</h1>
+          <p>Monitor quantities and expiry exposure here. Catalogue setup and supplier receiving are handled in their own workflows.</p>
         </div>
-
-        <div class="search-box">
-          <input
-            type="text"
-            placeholder="Search medicine catalog by name..."
-            [(ngModel)]="searchQuery"
-            class="form-control search-input"
-          />
-          <span class="search-icon">🔍</span>
+        <div class="header-actions">
+          <a routerLink="/pharmacy/catalogue" class="button button--secondary">Medicine catalogue</a>
+          <a routerLink="/pharmacy/receiving" class="button button--primary">Receive stock</a>
         </div>
+      </header>
 
-        <table class="premium-table">
-          <thead>
-            <tr>
-              <th>Medicine Name</th>
-              <th>Description</th>
-              <th class="number-col">Min Threshold</th>
-              <th class="number-col">On Hand Qty</th>
-              <th class="number-col">Active Batches</th>
-              <th>Oversight Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (p of filteredProducts(); track p.id) {
-              <!-- Product main row -->
-              <tr style="cursor: pointer;" (click)="toggleExpand(p)">
-                <td>
-                  <strong>{{ p.name }}</strong>
-                  <span class="ml-2 text-muted" style="font-size: 0.75rem;">(Click to view batches)</span>
-                </td>
-                <td>{{ p.description || 'N/A' }}</td>
-                <td class="number-col">{{ p.reorderLevel }} units</td>
-                <td class="number-col" style="font-weight: 700;">
-                  {{ p.qtyOnHand }} units
-                </td>
-                <td class="number-col">{{ p.batches.length }} batch(es)</td>
-                <td>
-                  <span class="stock-pill" [class]="getStockLevelClass(p)">
-                    {{ getStockLevelLabel(p) }}
-                  </span>
-                </td>
-              </tr>
-              
-              <!-- Expanded batches row -->
-              <tr *ngIf="p.expanded" class="batches-expanded-row">
-                <td colspan="6">
-                  <div class="expanded-batches-container">
-                    <h5 style="margin: 0 0 0.75rem; font-size: 0.85rem; font-weight: 700; color: var(--app-text-color);">
-                      Active Inventory Batches for {{ p.name }}
-                    </h5>
-                    
-                    <div class="batches-grid" *ngIf="p.batches && p.batches.length > 0; else noBatches">
-                      <div *ngFor="let b of p.batches" class="batch-mini-card">
-                        <div class="batch-num">Batch: {{ b.batchNumber }}</div>
-                        <div class="batch-qty">Qty: <strong>{{ b.quantityRemaining }}</strong> / {{ b.quantityReceived }} left</div>
-                        <div class="batch-qty">Cost: ₵{{ b.purchasePrice.toFixed(2) }} | POS: ₵{{ b.sellingPrice.toFixed(2) }}</div>
-                        <span class="batch-expiry" [class]="getExpiryClass(b.expiryDate)">
-                          Exp: {{ b.expiryDate | date:'mediumDate' }} • {{ getExpiryLabel(b.expiryDate) }}
-                        </span>
+      <div class="stock-summary">
+        <button type="button" [class.active]="stockFilter() === 'all'" (click)="stockFilter.set('all')"><span>Catalogue items</span><strong>{{ products().length }}</strong><small>Visible at this location</small></button>
+        <button type="button" [class.active]="stockFilter() === 'healthy'" (click)="stockFilter.set('healthy')"><span>Healthy stock</span><strong>{{ healthyCount() }}</strong><small>Above reorder level</small></button>
+        <button type="button" [class.active]="stockFilter() === 'low'" (click)="stockFilter.set('low')"><span>Low stock</span><strong>{{ lowStockCount() }}</strong><small>Requires replenishment</small></button>
+        <button type="button" [class.active]="stockFilter() === 'out'" (click)="stockFilter.set('out')"><span>Out of stock</span><strong>{{ outOfStockCount() }}</strong><small>No sellable quantity</small></button>
+        <div class="expiry-stat"><span>Expiry exposure</span><strong>{{ expiryAlertCount() }}</strong><small>Active batches within 90 days</small></div>
+      </div>
+
+      <div class="inventory-toolbar">
+        <label class="search-field"><span class="sr-only">Search stock</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg><input type="search" autocomplete="off" placeholder="Search medicine, generic name, product code or batch" (input)="setSearch($event)" /></label>
+        <label class="filter-field"><span class="sr-only">Filter expiry status</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"></path></svg><select (change)="setExpiryFilter($event)"><option value="all">All expiry dates</option><option value="90">Expiring within 90 days</option><option value="30">Expiring within 30 days</option><option value="expired">Expired batches</option></select></label>
+        <button type="button" class="refresh-button" [disabled]="loading()" (click)="loadProducts()">{{ loading() ? 'Refreshing…' : 'Refresh' }}</button>
+      </div>
+
+      @if (loadError()) {
+        <div class="state-card state-card--error"><strong>Stock could not be loaded</strong><p>{{ loadError() }}</p><button type="button" class="button button--secondary" (click)="loadProducts()">Try again</button></div>
+      } @else {
+        <div class="stock-table-wrap">
+          <table class="stock-table">
+            <colgroup><col class="col-medicine" /><col class="col-location" /><col class="col-number" /><col class="col-number" /><col class="col-batches" /><col class="col-expiry" /><col class="col-status" /><col class="col-action" /></colgroup>
+            <thead><tr><th>Medicine</th><th>Shelf / Bin</th><th>On hand</th><th>Reorder at</th><th>Active batches</th><th>Nearest expiry</th><th>Status</th><th>Details</th></tr></thead>
+            <tbody>
+              @if (loading()) {
+                @for (row of [1,2,3,4]; track row) { <tr class="skeleton-row"><td colspan="8"><span></span></td></tr> }
+              } @else {
+                @for (product of filteredProducts(); track product.id) {
+                  <tr class="product-row" [class.expanded]="expandedProductId() === product.id">
+                    <td><div class="medicine-cell"><strong>{{ product.name }}</strong><span>{{ product.genericName || product.productCode }}{{ product.strength ? ' · ' + product.strength : '' }}</span></div></td>
+                    <td><div class="location-cell">@if (product.shelfLocation) {<strong>{{ product.shelfLocation }}</strong>} @else {<span class="location-unassigned">Not assigned</span>}</div></td>
+                    <td><div class="quantity-cell"><strong>{{ product.stockOnHand | number:'1.0-2' }}</strong><span>{{ product.unitOfMeasure }}{{ product.stockOnHand === 1 ? '' : 's' }}</span></div></td>
+                    <td>{{ product.reorderLevel | number:'1.0-2' }}</td>
+                    <td>{{ activeBatches(product).length }}</td>
+                    <td><span [class]="nearestExpiryClass(product)">{{ nearestExpiry(product) }}</span></td>
+                    <td><span [class]="'status-indicator ' + stockStatusClass(product)">{{ stockStatusLabel(product) }}</span></td>
+                    <td><button type="button" class="view-button" [attr.aria-expanded]="expandedProductId() === product.id" [attr.aria-label]="(expandedProductId() === product.id ? 'Hide batches for ' : 'View batches for ') + product.name" (click)="toggleProduct(product.id)"><span>{{ expandedProductId() === product.id ? 'Hide' : 'View batches' }}</span><svg viewBox="0 0 24 24" aria-hidden="true" [class.rotated]="expandedProductId() === product.id"><path d="m9 18 6-6-6-6"></path></svg></button></td>
+                  </tr>
+                  @if (expandedProductId() === product.id) {
+                    <tr class="batch-detail-row"><td colspan="8">
+                      <div class="batch-detail">
+                        <header>
+                          <div><span class="eyebrow">Batch ledger</span><h2>{{ product.name }}</h2><p>{{ activeBatches(product).length }} active batch{{ activeBatches(product).length === 1 ? '' : 'es' }} · {{ product.stockOnHand | number:'1.0-2' }} {{ product.unitOfMeasure }}{{ product.stockOnHand === 1 ? '' : 's' }} available</p></div>
+                          <a routerLink="/pharmacy/receiving" class="receive-batch-action"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Receive stock</a>
+                        </header>
+                        @if (product.batches.length) {
+                          <div class="batch-table-wrap">
+                            <table class="batch-table">
+                              <thead><tr><th>Batch number</th><th>Stock balance</th><th>Unit cost</th><th>Selling price</th><th>Expiry date</th><th>Condition</th></tr></thead>
+                              <tbody>
+                                @for (batch of product.batches; track batch.id) {
+                                  <tr [class.batch-expired]="daysUntil(batch.expiryDate) < 0">
+                                    <td><code>{{ batch.batchNumber }}</code></td>
+                                    <td><strong>{{ batch.quantityRemaining | number:'1.0-2' }}</strong><span> of {{ batch.quantityReceived | number:'1.0-2' }} received</span></td>
+                                    <td>GHS {{ batch.purchasePrice | number:'1.2-4' }}</td>
+                                    <td>GHS {{ batch.sellingPrice | number:'1.2-2' }}</td>
+                                    <td>{{ batch.expiryDate | date:'mediumDate' }}</td>
+                                    <td><span [class]="expiryClass(batch.expiryDate)">{{ expiryLabel(batch.expiryDate) }}</span></td>
+                                  </tr>
+                                }
+                              </tbody>
+                            </table>
+                          </div>
+                        } @else {
+                          <div class="batch-empty">
+                            <div class="batch-empty__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 7 8-4 8 4-8 4-8-4Z"></path><path d="m4 7 8 4 8-4v10l-8 4-8-4V7Z"></path><path d="M12 11v10"></path></svg></div>
+                            <div><strong>No batches at this location</strong><p>Receive the first supplier batch to make this medicine available for sale.</p></div>
+                            <a routerLink="/pharmacy/receiving">Receive first batch</a>
+                          </div>
+                        }
                       </div>
-                    </div>
-                    
-                    <ng-template #noBatches>
-                      <p class="text-muted small">No stock batches registered for this product. Use the form on the right to add intake batches.</p>
-                    </ng-template>
-                  </div>
-                </td>
-              </tr>
-            } @empty {
-              <tr>
-                <td colspan="6" class="text-center py-4">No products found matching the search.</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Add Product & Add Batch Sidebar Panels -->
-      <div class="sidebar-container" style="display: flex; flex-direction: column; gap: 1.5rem;">
-        
-        <!-- Intake Batch Form -->
-        <div class="panel">
-          <div class="panel-header">
-            <h3>➕ Record Stock Intake Batch</h3>
-          </div>
-          
-          <form [formGroup]="batchForm" (ngSubmit)="submitBatch()" class="sidebar-form">
-            <div class="form-group">
-              <label for="batchProduct">Select Medicine <span class="text-danger">*</span></label>
-              <select id="batchProduct" formControlName="productId" class="form-control">
-                <option value="">-- Choose Medicine --</option>
-                <option *ngFor="let p of products()" [value]="p.id">{{ p.name }}</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label for="batchNumber">Batch Number <span class="text-danger">*</span></label>
-              <input id="batchNumber" type="text" formControlName="batchNumber" class="form-control" placeholder="e.g. B-10029" />
-            </div>
-
-            <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
-              <div class="form-group">
-                <label for="qtyReceived">Qty Received <span class="text-danger">*</span></label>
-                <input id="qtyReceived" type="number" formControlName="quantityReceived" class="form-control" placeholder="100" min="1" />
-              </div>
-              <div class="form-group">
-                <label for="expiryDate">Expiry Date <span class="text-danger">*</span></label>
-                <input id="expiryDate" type="date" formControlName="expiryDate" class="form-control" />
-              </div>
-            </div>
-
-            <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
-              <div class="form-group">
-                <label for="purchasePrice">Unit Purchase ₵ <span class="text-danger">*</span></label>
-                <input id="purchasePrice" type="number" step="0.01" formControlName="purchasePrice" class="form-control" placeholder="4.50" min="0" />
-              </div>
-              <div class="form-group">
-                <label for="sellingPrice">Unit Selling ₵ <span class="text-danger">*</span></label>
-                <input id="sellingPrice" type="number" step="0.01" formControlName="sellingPrice" class="form-control" placeholder="8.00" min="0" />
-              </div>
-            </div>
-
-            <button class="btn btn-success btn-block" [disabled]="batchForm.invalid || isSubmittingBatch()">
-              Record Batch Intake
-            </button>
-          </form>
+                    </td></tr>
+                  }
+                } @empty { <tr><td colspan="8" class="empty-cell">No stock items match the selected filters.</td></tr> }
+              }
+            </tbody>
+          </table>
         </div>
-
-        <!-- Add Product Form -->
-        <div class="panel">
-          <div class="panel-header">
-            <h3>📦 Register New Medicine</h3>
-          </div>
-          
-          <form [formGroup]="productForm" (ngSubmit)="submitProduct()" class="sidebar-form">
-            <div class="form-group">
-              <label for="prodName">Medicine Name <span class="text-danger">*</span></label>
-              <input id="prodName" type="text" formControlName="name" class="form-control" placeholder="e.g. Amoxicillin 250mg Capsules" />
-            </div>
-
-            <div class="form-group">
-              <label for="prodDesc">Description (Optional)</label>
-              <input id="prodDesc" type="text" formControlName="description" class="form-control" placeholder="e.g. Antibiotic, pack of 100" />
-            </div>
-
-            <div class="form-group">
-              <label for="prodReorder">Reorder Threshold Level <span class="text-danger">*</span></label>
-              <input id="prodReorder" type="number" formControlName="reorderLevel" class="form-control" placeholder="25" min="0" />
-            </div>
-
-            <button class="btn btn-primary btn-block" [disabled]="productForm.invalid || isSubmittingProduct()">
-              Register Medicine Catalog
-            </button>
-          </form>
-        </div>
-
-      </div>
-    </div>
+      }
+    </section>
   `,
-  styleUrl: './pharmacy-page.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  styles: `
+    :host{display:block}.inventory-page{display:grid;gap:1.2rem;max-width:1520px;margin:0 auto}.page-header{display:flex;align-items:end;justify-content:space-between;gap:2rem;padding-bottom:1.2rem;border-bottom:1px solid var(--app-border-color)}h1,h2,p{margin-top:0}h1{margin-bottom:.4rem;font-size:clamp(1.8rem,3vw,2.5rem);letter-spacing:-.04em}.page-header p{max-width:74ch;margin-bottom:0;color:var(--app-muted-text-color);line-height:1.6}.eyebrow{display:block;margin-bottom:.35rem;color:var(--app-primary-color);font-size:12px;font-weight:850;letter-spacing:.12em;text-transform:uppercase}.header-actions{display:flex;gap:.65rem}.button{display:inline-flex;align-items:center;justify-content:center;min-height:2.65rem;padding:.65rem 1rem;border-radius:.6rem;font-size:.8rem;font-weight:800;text-decoration:none}.button--primary{border:1px solid var(--app-primary-color);background:var(--app-primary-color);color:white}.button--secondary{border:1px solid var(--app-border-color);background:white;color:var(--app-text-color)}.stock-summary{display:grid;grid-template-columns:repeat(5,1fr);border:1px solid var(--app-border-color);border-radius:.8rem;background:white;overflow:hidden}.stock-summary>button,.stock-summary>div{display:grid;gap:.2rem;min-width:0;padding:.95rem 1rem;border:0;border-right:1px solid var(--app-border-color);background:white;text-align:left}.stock-summary>*:last-child{border-right:0}.stock-summary button{font:inherit;cursor:pointer}.stock-summary button:hover,.stock-summary button.active{background:var(--app-primary-soft-color);box-shadow:inset 0 -3px 0 var(--app-primary-color)}.stock-summary span{color:var(--app-muted-text-color);font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}.stock-summary strong{font-size:1.2rem}.stock-summary small{overflow:hidden;color:var(--app-muted-text-color);font-size:12px;text-overflow:ellipsis;white-space:nowrap}.expiry-stat strong{color:#b54708}.inventory-toolbar{display:grid;grid-template-columns:minmax(300px,1fr) 220px auto;gap:.65rem}.search-field,.filter-field{position:relative;display:flex;align-items:center}.search-field svg,.filter-field svg{position:absolute;left:.82rem;z-index:1;width:1rem;height:1rem;fill:none;stroke:#64748b;stroke-width:1.8;stroke-linecap:round;pointer-events:none}.inventory-toolbar input,.inventory-toolbar select{width:100%;min-height:2.65rem;padding:0 .8rem 0 2.45rem;border:1px solid #cbd5e1;border-radius:.55rem;background:#fff;color:#0f172a!important;-webkit-text-fill-color:#0f172a;font:inherit;font-size:.78rem}.inventory-toolbar input::placeholder{color:#94a3b8;opacity:1}.inventory-toolbar select option{background:#fff;color:#0f172a}.refresh-button{padding:0 1rem;border:1px solid color-mix(in srgb,var(--app-primary-color),white 65%);border-radius:.55rem;background:var(--app-primary-soft-color);color:var(--app-primary-color);font:inherit;font-size:.76rem;font-weight:800;cursor:pointer}.stock-table-wrap{overflow-x:auto;border:1px solid var(--app-border-color);border-radius:.8rem;background:white}.stock-table{width:100%;min-width:1120px;border-collapse:collapse;table-layout:fixed}.col-medicine{width:20%}.col-location{width:11%}.col-number{width:10%}.col-batches{width:11%}.col-expiry{width:14%}.col-status{width:11%}.col-action{width:10%}th{padding:.68rem .85rem;background:#f8fafc;color:var(--app-muted-text-color);font-size:12px;letter-spacing:.055em;text-align:left;text-transform:uppercase;white-space:nowrap}td{padding:.62rem .85rem;border-top:1px solid var(--app-border-color);color:#1e293b;font-size:12px;vertical-align:middle}.stock-table tbody>.product-row>td{display:table-cell!important}.product-row{height:3.2rem;transition:background-color 140ms ease}.product-row:hover{background:#fbfdfd}.medicine-cell,.location-cell,.quantity-cell{display:grid;gap:.1rem}.medicine-cell strong{overflow:hidden;font-size:.76rem;text-overflow:ellipsis;white-space:nowrap}.medicine-cell span,.location-cell span,.quantity-cell span{color:var(--app-muted-text-color);font-size:12px}.location-cell strong{font-size:12px}.location-unassigned{font-style:italic}.quantity-cell strong{font-size:.86rem}.expiry-safe,.expiry-warning,.expiry-critical,.expiry-expired{font-size:12px;font-weight:760}.expiry-safe{color:#067647}.expiry-warning{color:#b54708}.expiry-critical,.expiry-expired{color:#b42318}.status-indicator{display:inline-flex;align-items:center;gap:.38rem;font-size:12px;font-weight:780;white-space:nowrap}.status-indicator::before{content:'';width:.42rem;height:.42rem;border-radius:50%;background:currentColor}.status-healthy{color:#067647}.status-low{color:#b54708}.status-out{color:#b42318}.view-button{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;min-height:1.9rem;padding:.32rem .52rem;border:1px solid color-mix(in srgb,var(--app-primary-color),white 68%);border-radius:.42rem;background:white;color:var(--app-primary-color);font:inherit;font-size:12px;font-weight:820;white-space:nowrap;cursor:pointer;transition:background-color 140ms ease,border-color 140ms ease}.view-button:hover,.view-button[aria-expanded="true"]{border-color:var(--app-primary-color);background:var(--app-primary-soft-color)}.view-button svg{width:.8rem;height:.8rem;fill:none;stroke:currentColor;stroke-width:2;transition:transform 160ms ease}.view-button svg.rotated{transform:rotate(90deg)}.expanded{background:color-mix(in srgb,var(--app-primary-soft-color),white 52%)}.batch-detail-row>td{display:table-cell!important;padding:0}.batch-detail{display:grid;gap:.75rem;padding:.82rem 1rem .9rem;border-left:3px solid var(--app-primary-color);background:#fbfdfd}.batch-detail>header{display:flex;align-items:center;justify-content:space-between;gap:1rem}.batch-detail h2{margin-bottom:0;font-size:.9rem}.batch-detail>header p{margin:.18rem 0 0;color:var(--app-muted-text-color);font-size:12px}.receive-batch-action{display:inline-flex;align-items:center;gap:.32rem;padding:.42rem .6rem;border:1px solid color-mix(in srgb,var(--app-primary-color),white 68%);border-radius:.42rem;background:white;color:var(--app-primary-color);font-size:12px;font-weight:800;text-decoration:none;white-space:nowrap}.receive-batch-action svg{width:.8rem;height:.8rem;fill:none;stroke:currentColor;stroke-width:2}.batch-table-wrap{overflow:hidden;border:1px solid var(--app-border-color);border-radius:.55rem;background:white}.batch-table{width:100%;border-collapse:collapse;table-layout:fixed}.batch-table th{padding:.5rem .65rem;background:#f8fafc;font-size:12px}.batch-table td{display:table-cell!important;padding:.56rem .65rem;border-top:1px solid var(--app-border-color);font-size:12px}.batch-table tbody tr:hover{background:#fbfdfd}.batch-table tr.batch-expired{background:#fffafa}.batch-table code{color:var(--app-primary-color);font-size:12px;font-weight:800}.batch-table td:nth-child(2) span{color:var(--app-muted-text-color);font-size:12px}.batch-empty{display:flex;align-items:center;gap:.8rem;padding:.78rem .85rem;border:1px dashed color-mix(in srgb,var(--app-primary-color),white 60%);border-radius:.55rem;background:white}.batch-empty__icon{display:grid;place-items:center;flex:0 0 2.2rem;width:2.2rem;height:2.2rem;border-radius:.5rem;background:var(--app-primary-soft-color);color:var(--app-primary-color)}.batch-empty__icon svg{width:1.15rem;height:1.15rem;fill:none;stroke:currentColor;stroke-width:1.7}.batch-empty>div:nth-child(2){display:grid;gap:.15rem;flex:1}.batch-empty strong{font-size:12px}.batch-empty p{margin:0;color:var(--app-muted-text-color);font-size:12px}.batch-empty>a{color:var(--app-primary-color);font-size:12px;font-weight:800;text-decoration:none;white-space:nowrap}.no-batches,.empty-cell,.state-card{padding:2rem;text-align:center;color:var(--app-muted-text-color)}.state-card{border:1px dashed var(--app-border-color);border-radius:.8rem;background:white}.state-card--error{color:#9f3128}.skeleton-row td{display:table-cell!important;padding:1rem}.skeleton-row span{display:block;height:1.4rem;border-radius:.4rem;background:linear-gradient(90deg,#f1f5f9,#f8fafc,#f1f5f9);background-size:200% 100%;animation:shimmer 1.3s infinite}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}input:focus,select:focus,button:focus-visible,a:focus-visible{outline:3px solid color-mix(in srgb,var(--app-primary-color),transparent 80%);outline-offset:2px}@keyframes shimmer{to{background-position:-200% 0}}@media(max-width:980px){.stock-summary{grid-template-columns:repeat(2,1fr)}.stock-summary>*{border-bottom:1px solid var(--app-border-color)}.batch-table{min-width:760px}.batch-table-wrap{overflow-x:auto}}@media(max-width:720px){.page-header{align-items:stretch;flex-direction:column}.header-actions{display:grid}.inventory-toolbar{grid-template-columns:1fr}.stock-summary{grid-template-columns:1fr}.stock-summary>button,.stock-summary>div{border-right:0}.batch-detail>header,.batch-empty{align-items:flex-start;flex-direction:column}.batch-empty>a{margin-left:3rem}}
+  `,
 })
 export class PharmacyInventoryPageComponent implements OnInit {
   private readonly api = inject(ApiService);
-  private readonly fb = inject(FormBuilder);
-
   readonly products = signal<PharmacyProduct[]>([]);
-  readonly searchQuery = signal('');
-  
-  readonly isSubmittingProduct = signal(false);
-  readonly isSubmittingBatch = signal(false);
+  readonly loading = signal(true);
+  readonly loadError = signal('');
+  readonly search = signal('');
+  readonly stockFilter = signal<StockFilter>('all');
+  readonly expiryFilter = signal('all');
+  readonly expandedProductId = signal('');
 
-  readonly productForm = this.fb.group({
-    name: ['', [Validators.required, Validators.minLength(2)]],
-    description: [''],
-    reorderLevel: [20, [Validators.required, Validators.min(0)]]
-  });
-
-  readonly batchForm = this.fb.group({
-    productId: ['', [Validators.required]],
-    batchNumber: ['', [Validators.required]],
-    expiryDate: ['', [Validators.required]],
-    purchasePrice: [null as number | null, [Validators.required, Validators.min(0)]],
-    sellingPrice: [null as number | null, [Validators.required, Validators.min(0)]],
-    quantityReceived: [null as number | null, [Validators.required, Validators.min(1)]]
-  });
-
-  ngOnInit(): void {
-    this.loadProducts();
-  }
-
-  loadProducts(): void {
-    this.api.getPharmacyProducts().subscribe({
-      next: (res) => {
-        // Retain expand statuses on reload if matching product
-        const oldState = this.products();
-        const mapped = res.map((p: any) => {
-          const old = oldState.find(x => x.id === p.id);
-          return {
-            ...p,
-            expanded: old ? old.expanded : false
-          };
-        });
-        this.products.set(mapped);
-      },
-      error: (err) => console.error('Error fetching pharmacy products', err)
-    });
-  }
-
-  toggleExpand(p: PharmacyProduct): void {
-    this.products.update(list =>
-      list.map(item => (item.id === p.id ? { ...item, expanded: !item.expanded } : item))
-    );
-  }
-
+  readonly outOfStockCount = computed(() => this.products().filter((product) => product.stockOnHand <= 0).length);
+  readonly lowStockCount = computed(() => this.products().filter((product) => product.stockOnHand > 0 && product.stockOnHand <= product.reorderLevel).length);
+  readonly healthyCount = computed(() => this.products().filter((product) => product.stockOnHand > product.reorderLevel).length);
+  readonly expiryAlertCount = computed(() => this.products().flatMap((product) => this.activeBatches(product)).filter((batch) => this.daysUntil(batch.expiryDate) <= 90).length);
   readonly filteredProducts = computed(() => {
-    const text = this.searchQuery().toLowerCase().trim();
-    if (!text) return this.products();
-    return this.products().filter(p => p.name.toLowerCase().includes(text));
+    const query = this.search().trim().toLowerCase();
+    const stockFilter = this.stockFilter();
+    const expiryFilter = this.expiryFilter();
+    return this.products().filter((product) => {
+      const searchMatch = !query || [product.name, product.genericName, product.productCode, ...product.batches.map((batch) => batch.batchNumber)].some((value) => value?.toLowerCase().includes(query));
+      const stockMatch = stockFilter === 'all' || (stockFilter === 'out' && product.stockOnHand <= 0) || (stockFilter === 'low' && product.stockOnHand > 0 && product.stockOnHand <= product.reorderLevel) || (stockFilter === 'healthy' && product.stockOnHand > product.reorderLevel);
+      const days = product.batches.map((batch) => this.daysUntil(batch.expiryDate));
+      const expiryMatch = expiryFilter === 'all' || (expiryFilter === 'expired' && days.some((day) => day < 0)) || (expiryFilter === '90' && days.some((day) => day >= 0 && day <= 90)) || (expiryFilter === '30' && days.some((day) => day >= 0 && day <= 30));
+      return searchMatch && stockMatch && expiryMatch;
+    });
   });
 
-  getStockLevelClass(p: PharmacyProduct): string {
-    if (p.qtyOnHand === 0) return 'stock-alert-warning';
-    return p.qtyOnHand <= p.reorderLevel ? 'stock-alert-warning' : 'stock-alert-ok';
-  }
-
-  getStockLevelLabel(p: PharmacyProduct): string {
-    if (p.qtyOnHand === 0) return 'OUT OF STOCK';
-    return p.qtyOnHand <= p.reorderLevel ? 'LOW STOCK' : 'STOCKED';
-  }
-
-  getExpiryClass(dateStr: string): string {
-    const exp = new Date(dateStr);
-    const now = new Date();
-    const diffMonths = (exp.getFullYear() - now.getFullYear()) * 12 + (exp.getMonth() - now.getMonth());
-    
-    if (diffMonths < 3) return 'expiry-critical';
-    if (diffMonths <= 6) return 'expiry-warning';
-    return 'expiry-normal';
-  }
-
-  getExpiryLabel(dateStr: string): string {
-    const exp = new Date(dateStr);
-    const now = new Date();
-    const diffMonths = (exp.getFullYear() - now.getFullYear()) * 12 + (exp.getMonth() - now.getMonth());
-    
-    if (diffMonths < 0) return 'EXPIRED';
-    if (diffMonths < 3) return 'CRITICAL';
-    if (diffMonths <= 6) return 'WARNING';
-    return 'SAFE';
-  }
-
-  submitProduct(): void {
-    if (this.productForm.invalid) return;
-
-    this.isSubmittingProduct.set(true);
-    const data = this.productForm.getRawValue();
-
-    this.api.createPharmacyProduct({
-      name: (data.name ?? '').trim(),
-      description: (data.description ?? '').trim() || null,
-      reorderLevel: Number(data.reorderLevel)
-    }).subscribe({
-      next: (res) => {
-        this.isSubmittingProduct.set(false);
-        this.productForm.reset({ name: '', description: '', reorderLevel: 20 });
-        this.loadProducts();
-        alert('Product registered successfully in catalog.');
-      },
-      error: (err) => {
-        console.error('Error creating product', err);
-        this.isSubmittingProduct.set(false);
-        alert(err?.error?.message ?? 'Failed to create product.');
-      }
-    });
-  }
-
-  submitBatch(): void {
-    if (this.batchForm.invalid) return;
-
-    this.isSubmittingBatch.set(true);
-    const data = this.batchForm.getRawValue();
-    const productId = data.productId;
-    if (!productId) {
-      this.isSubmittingBatch.set(false);
-      return;
-    }
-
-    const payload = {
-      batchNumber: (data.batchNumber ?? '').trim(),
-      expiryDate: new Date(data.expiryDate || '').toISOString(),
-      purchasePrice: Number(data.purchasePrice),
-      sellingPrice: Number(data.sellingPrice),
-      quantityReceived: Number(data.quantityReceived)
-    };
-
-    this.api.addPharmacyBatch(productId, payload).subscribe({
-      next: (res) => {
-        this.isSubmittingBatch.set(false);
-        this.batchForm.reset({ productId: '', batchNumber: '', expiryDate: '', purchasePrice: null, sellingPrice: null, quantityReceived: null });
-        this.loadProducts();
-        alert('Inventory intake batch registered and stocked successfully.');
-      },
-      error: (err) => {
-        console.error('Error creating batch', err);
-        this.isSubmittingBatch.set(false);
-        alert(err?.error?.message ?? 'Failed to record batch intake.');
-      }
-    });
-  }
+  ngOnInit(): void { this.loadProducts(); }
+  loadProducts(): void { this.loading.set(true); this.loadError.set(''); this.api.getPharmacyProducts().subscribe({ next: (products) => { this.products.set(products ?? []); this.loading.set(false); }, error: (error) => { this.loadError.set(error?.error?.message ?? 'Please check your connection and try again.'); this.loading.set(false); } }); }
+  setSearch(event: Event): void { this.search.set((event.target as HTMLInputElement).value); }
+  setExpiryFilter(event: Event): void { this.expiryFilter.set((event.target as HTMLSelectElement).value); }
+  toggleProduct(productId: string): void { this.expandedProductId.set(this.expandedProductId() === productId ? '' : productId); }
+  activeBatches(product: PharmacyProduct): PharmacyBatch[] { return product.batches.filter((batch) => batch.quantityRemaining > 0); }
+  daysUntil(dateValue: string): number { const today = new Date(); today.setHours(0,0,0,0); return Math.ceil((new Date(dateValue).getTime() - today.getTime()) / 86_400_000); }
+  expiryLabel(dateValue: string): string { const days = this.daysUntil(dateValue); if (days < 0) return 'Expired'; if (days === 0) return 'Expires today'; if (days <= 30) return `${days} days`; if (days <= 90) return `${Math.ceil(days / 30)} months`; return 'Safe'; }
+  expiryClass(dateValue: string): string { const days = this.daysUntil(dateValue); if (days < 0) return 'expiry-expired'; if (days <= 30) return 'expiry-critical'; if (days <= 90) return 'expiry-warning'; return 'expiry-safe'; }
+  nearestExpiry(product: PharmacyProduct): string { const batch = this.activeBatches(product).sort((left, right) => new Date(left.expiryDate).getTime() - new Date(right.expiryDate).getTime())[0]; return batch ? new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(batch.expiryDate)) : '—'; }
+  nearestExpiryClass(product: PharmacyProduct): string { const batch = this.activeBatches(product).sort((left, right) => new Date(left.expiryDate).getTime() - new Date(right.expiryDate).getTime())[0]; return batch ? this.expiryClass(batch.expiryDate) : '' ; }
+  stockStatusLabel(product: PharmacyProduct): string { if (product.stockOnHand <= 0) return 'Out of stock'; return product.stockOnHand <= product.reorderLevel ? 'Low stock' : 'Healthy'; }
+  stockStatusClass(product: PharmacyProduct): string { if (product.stockOnHand <= 0) return 'status-out'; return product.stockOnHand <= product.reorderLevel ? 'status-low' : 'status-healthy'; }
 }

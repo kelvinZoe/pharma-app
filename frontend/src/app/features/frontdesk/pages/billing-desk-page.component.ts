@@ -311,19 +311,19 @@ import { getInternetDate } from '../../../core/utils/clock';
                     <div *ngFor="let s of invoice().services" style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; border: 1px solid var(--app-border-color); border-radius: 0.5rem; background: #fafafa;">
                       <div style="flex: 1; display: flex; flex-direction: column;">
                         <span style="font-size: 0.85rem; font-weight: 600; color: var(--app-text-color);">{{ s.serviceName }}</span>
-                        <span style="font-size: 0.7rem; color: var(--app-muted-text-color);">{{ s.departmentName }} • Qty: {{ s.quantity }}</span>
-                        <span *ngIf="s.source === 'department_added' && s.approvedByPatient === false" style="font-size: 0.7rem; color: #b45309; font-weight: 800;">
+                        <span style="font-size: 12px; color: var(--app-muted-text-color);">{{ s.departmentName }} • Qty: {{ s.quantity }}</span>
+                        <span *ngIf="s.source === 'department_added' && s.approvedByPatient === false" style="font-size: 12px; color: #b45309; font-weight: 800;">
                           Awaiting frontdesk payment approval
                         </span>
-                        <span *ngIf="s.priceAdjustmentStatus === 'pending'" style="font-size: 0.7rem; color: #7c3aed; font-weight: 800;">
+                        <span *ngIf="s.priceAdjustmentStatus === 'pending'" style="font-size: 12px; color: #7c3aed; font-weight: 800;">
                           Adjustment requested: ₵{{ s.lineTotal.toFixed(2) }} → ₵{{ s.requestedLineTotal.toFixed(2) }}
                         </span>
-                        <span *ngIf="s.priceAdjustmentReason && s.priceAdjustmentStatus === 'pending'" style="font-size: 0.68rem; color: var(--app-muted-text-color);">
+                        <span *ngIf="s.priceAdjustmentReason && s.priceAdjustmentStatus === 'pending'" style="font-size: 12px; color: var(--app-muted-text-color);">
                           Reason: {{ s.priceAdjustmentReason }}
                         </span>
                       </div>
                       
-                      <div style="margin-right: 0.75rem; font-size: 0.7rem; font-weight: 700; padding: 0.1rem 0.35rem; border-radius: 0.25rem;" [class.done]="s.status === 'done'" [class.not-done]="s.status === 'not_done'">
+                      <div style="margin-right: 0.75rem; font-size: 12px; font-weight: 700; padding: 0.1rem 0.35rem; border-radius: 0.25rem;" [class.done]="s.status === 'done'" [class.not-done]="s.status === 'not_done'">
                         {{ s.priceAdjustmentStatus === 'pending' ? 'PRICE REVIEW' : (s.approvedByPatient === false ? 'PENDING APPROVAL' : (s.status === 'not_done' ? 'NOT DONE' : 'DONE')) }}
                       </div>
                       
@@ -344,7 +344,7 @@ import { getInternetDate } from '../../../core/utils/clock';
                     </div>
 
                     <!-- Not Done Banner -->
-                    <div class="billing-not-done-alert" *ngIf="hasNotDoneServices()" style="margin-top: 0.75rem; padding: 0.5rem 0.75rem; font-size: 0.725rem; border-radius: 0.5rem;">
+                    <div class="billing-not-done-alert" *ngIf="hasNotDoneServices()" style="margin-top: 0.75rem; padding: 0.5rem 0.75rem; font-size: 12px; border-radius: 0.5rem;">
                       <div style="display: flex; align-items: center; gap: 0.25rem; margin-bottom: 0.15rem; font-weight: 700; color: #b45309;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
                           <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
@@ -372,11 +372,11 @@ import { getInternetDate } from '../../../core/utils/clock';
                   <!-- Stat totals cards -->
                   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;" *ngIf="invoice() && !loadingInvoice()">
                     <div style="background: #fafafa; border: 1px solid var(--app-border-color); border-radius: 0.5rem; padding: 0.5rem; text-align: center;">
-                      <div style="font-size: 0.7rem; color: var(--app-muted-text-color); font-weight: 600; text-transform: uppercase;">Subtotal</div>
+                      <div style="font-size: 12px; color: var(--app-muted-text-color); font-weight: 600; text-transform: uppercase;">Subtotal</div>
                       <strong style="font-size: 1.1rem; color: var(--app-text-color);">₵{{ invoice().subtotal.toFixed(2) }}</strong>
                     </div>
                     <div style="background: #e6fcf5; border: 1px solid #c3fae8; border-radius: 0.5rem; padding: 0.5rem; text-align: center;">
-                      <div style="font-size: 0.7rem; color: #0ca678; font-weight: 600; text-transform: uppercase;">Balance Due</div>
+                      <div style="font-size: 12px; color: #0ca678; font-weight: 600; text-transform: uppercase;">Balance Due</div>
                       <strong style="font-size: 1.1rem; color: #0ca678;">₵{{ invoice().balanceDue.toFixed(2) }}</strong>
                     </div>
                   </div>
@@ -397,6 +397,19 @@ import { getInternetDate } from '../../../core/utils/clock';
                   <div class="payment-form" style="padding: 1rem; border-radius: 0.75rem; border: 1px dashed var(--app-border-color); background: #fff;" *ngIf="invoice() && !loadingInvoice() && invoice().balanceDue > 0">
                     <h4 style="font-size: 0.95rem; margin-bottom: 0.75rem;">Collect Payment</h4>
                     
+                    <div class="form-group" style="margin-bottom: 0.75rem;">
+                      <label style="font-size: 0.75rem; font-weight: 700; margin-bottom: 0.25rem;">Amount to collect (GHS)</label>
+                      <input
+                        type="number"
+                        min="0.01"
+                        [max]="invoice().balanceDue"
+                        step="0.01"
+                        class="form-control"
+                        [ngModel]="paymentAmount()"
+                        (ngModelChange)="paymentAmount.set(Number($event))"
+                      />
+                    </div>
+
                     <div class="form-group" style="margin-bottom: 0.75rem;">
                       <label style="font-size: 0.75rem; font-weight: 700; margin-bottom: 0.25rem;">Payment Method</label>
                       <app-dropdown
@@ -424,11 +437,11 @@ import { getInternetDate } from '../../../core/utils/clock';
 
                     <button
                       class="btn btn-success btn-block"
-                      [disabled]="isSubmitting() || !activeClinicSession() || (paymentMethod() === 'mobile_money' && !paymentReference().trim())"
+                      [disabled]="isSubmitting() || !activeClinicSession() || paymentAmount() <= 0 || paymentAmount() > invoice().balanceDue || (paymentMethod() === 'mobile_money' && !paymentReference().trim())"
                       (click)="recordPayment()"
                       style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.65rem 1rem; font-weight: 700;"
                     >
-                      <span *ngIf="!isSubmitting()">Collect Full Payment (₵{{ invoice().balanceDue.toFixed(2) }})</span>
+                      <span *ngIf="!isSubmitting()">Collect Payment (₵{{ paymentAmount().toFixed(2) }})</span>
                       <span *ngIf="isSubmitting()">Processing payment...</span>
                     </button>
                     <p *ngIf="!activeClinicSession()" style="margin: 0.75rem 0 0; font-size: 0.75rem; color: #b45309; font-weight: 700;">
@@ -516,8 +529,9 @@ import { getInternetDate } from '../../../core/utils/clock';
                   <strong>RECEIPT</strong>
                   <div>No: REC-{{ selectedVisit()?.id?.slice(-6)?.toUpperCase() }}</div>
                   <div>Date: {{ currentDateTime | date:'dd/MM/yy HH:mm' }}</div>
-                  <div>PAID IN FULL</div>
+                  <div>{{ invoice()?.balanceDue <= 0 ? 'PAID IN FULL' : 'PART PAYMENT' }}</div>
                   <div>Pay: {{ paymentMethod() | uppercase }}</div>
+                  <div>Received: ₵{{ lastPaymentAmount().toFixed(2) }}</div>
                   <div *ngIf="paymentReference()">Ref: {{ paymentReference() }}</div>
                 </div>
               </div>
@@ -537,7 +551,7 @@ import { getInternetDate } from '../../../core/utils/clock';
                     <td>{{ s.serviceId.slice(-6).toUpperCase() }}</td>
                     <td>
                       {{ s.serviceName }}
-                      <div *ngIf="s.status === 'not_done'" style="font-size: 8px; color: #c00;">*Cancelled</div>
+                      <div *ngIf="s.status === 'not_done'" style="font-size: 12px; color: #c00;">*Cancelled</div>
                     </td>
                     <td>{{ s.departmentName }}</td>
                     <td style="text-align:right;">{{ s.quantity }}</td>
@@ -624,6 +638,8 @@ export class BillingDeskPageComponent implements OnInit {
   
   readonly paymentMethod = signal<'cash' | 'mobile_money'>('cash');
   readonly paymentReference = signal('');
+  readonly paymentAmount = signal(0);
+  readonly lastPaymentAmount = signal(0);
   readonly isSubmitting = signal(false);
   readonly showReceipt = signal(false);
   readonly showHistory = signal(false);
@@ -746,6 +762,7 @@ export class BillingDeskPageComponent implements OnInit {
     this.selectedVisit.set(null);
     this.invoice.set(null);
     this.paymentReference.set('');
+    this.paymentAmount.set(0);
     this.searchQuery.set('');
     this.page.set(1);
     this.loadVisits();
@@ -833,6 +850,7 @@ export class BillingDeskPageComponent implements OnInit {
           services: servicesList
         };
         this.invoice.set(normalized);
+        this.paymentAmount.set(normalized.balanceDue);
         this.loadingInvoice.set(false);
       },
       error: (err) => {
@@ -846,6 +864,7 @@ export class BillingDeskPageComponent implements OnInit {
     this.selectedVisit.set(null);
     this.invoice.set(null);
     this.paymentReference.set('');
+    this.paymentAmount.set(0);
     this.showReceipt.set(false);
     this.loadVisits();
   }
@@ -915,8 +934,14 @@ export class BillingDeskPageComponent implements OnInit {
 
     this.isSubmitting.set(true);
 
+    const amount = Number(this.paymentAmount());
+    if (!Number.isFinite(amount) || amount <= 0 || amount > inv.balanceDue) {
+      alert(`Enter an amount between GHS 0.01 and GHS ${inv.balanceDue.toFixed(2)}.`);
+      return;
+    }
+
     const paymentData = {
-      amount: inv.balanceDue,
+      amount,
       paymentMethod: this.paymentMethod(),
       referenceNumber: ref
     };
@@ -925,18 +950,20 @@ export class BillingDeskPageComponent implements OnInit {
       next: (res) => {
         this.isSubmitting.set(false);
         this.loadClinicCashSession();
+        this.lastPaymentAmount.set(amount);
         this.invoice.set({
           ...inv,
-          balanceDue: 0,
-          amountPaid: inv.total,
-          status: 'paid'
+          balanceDue: Number(res.invoice.balanceDue),
+          amountPaid: Number(res.invoice.amountPaid),
+          status: res.invoice.status
         });
+        this.paymentAmount.set(Number(res.invoice.balanceDue));
         this.viewReceipt();
       },
       error: (err) => {
         console.error('Payment failed', err);
         this.isSubmitting.set(false);
-        alert(err?.error?.message ?? 'Failed to process full invoice payment.');
+        alert(err?.error?.message ?? 'Failed to process invoice payment.');
       }
     });
   }

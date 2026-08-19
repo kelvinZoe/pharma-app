@@ -1,14 +1,20 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+
 import { ApiService } from '../../../core/services/api.service';
+import { ToastService } from '../../../core/services/toast.service';
 import { getInternetDate } from '../../../core/utils/clock';
 
 interface CartItem {
   productId: string;
   productName: string;
-  batchId: string;
-  batchNumber: string;
+  productCode: string;
+  unitOfMeasure: string;
+  packageLabel: string;
+  minimumSaleQuantity: number;
+  quantityStep: number;
+  allowLooseSale: boolean;
   sellingPrice: number;
   quantity: number;
   maxQuantity: number;
@@ -16,818 +22,506 @@ interface CartItem {
 
 @Component({
   selector: 'app-pharmacy-pos-sales',
-  standalone: true,
   imports: [CommonModule, FormsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="pharmacy-workspace" [class.pharmacy-pos-grid]="activeTab() !== 'end_of_day'" [style.grid-template-columns]="activeTab() === 'end_of_day' ? '1fr' : null">
-      
-      <!-- Catalog / Prescription Work area -->
-      <div class="panel" *ngIf="!showThermalReceipt() && !showThermalClosureSlip()">
-        <div class="panel-header" style="border-bottom: 1px solid var(--app-border-color); padding-bottom: 0.5rem;">
-          <div class="tab-selector" style="display: flex; gap: 1rem;">
-            <button
-              class="btn"
-              [class.btn-primary]="activeTab() === 'walk_in'"
-              [class.btn-secondary]="activeTab() !== 'walk_in'"
-              (click)="setTab('walk_in')"
-            >
-              🛒 Direct Walk-In Sale
-            </button>
-            <button
-              class="btn"
-              [class.btn-primary]="activeTab() === 'referred'"
-              [class.btn-secondary]="activeTab() !== 'referred'"
-              (click)="setTab('referred')"
-            >
-              📋 Clinic Prescriptions Queue
-            </button>
-            <button
-              class="btn"
-              [class.btn-primary]="activeTab() === 'end_of_day'"
-              [class.btn-secondary]="activeTab() !== 'end_of_day'"
-              (click)="setTab('end_of_day')"
-            >
-              ⏰ End of Day
-            </button>
+    <main class="pos-shell" [class.printing-document]="receiptSale() || completedClosure()">
+      <header class="pos-header">
+        <div>
+          <span class="eyebrow">Counter workspace</span>
+          <h1>Pharmacy POS</h1>
+          <p>Dispense safely, collect payment, and keep every shift accountable.</p>
+        </div>
+        <div class="register-state" [class.closed]="!activeSession()">
+          <span class="status-dot"></span>
+          <div>
+            <small>Register</small>
+            @if (sessionLoading()) {
+              <strong>Checking shift</strong>
+            } @else if (activeSession()) {
+              <strong>Open</strong>
+              <span>Float GHS {{ money(openingFloat()) }}</span>
+            } @else {
+              <strong>Closed</strong>
+              <span>Payment disabled</span>
+            }
           </div>
-          <button class="btn btn-secondary btn-sm" (click)="loadInitialData()">
-            🔄 Refresh
+          @if (!activeSession() && !sessionLoading()) {
+            <label class="open-register-control">
+              <span>Opening float</span>
+              <input type="number" min="0" step="0.01" [ngModel]="openingFloatInput()" (ngModelChange)="openingFloatInput.set(+$event)" />
+            </label>
+            <button type="button" class="button primary" [disabled]="openingRegister()" (click)="openRegister()">
+              {{ openingRegister() ? 'Opening…' : 'Open register' }}
+            </button>
+          }
+        </div>
+      </header>
+
+      <nav class="pos-tabs" aria-label="POS sections">
+        @for (item of tabs; track item.value) {
+          <button type="button" [class.active]="activeTab() === item.value" (click)="setTab(item.value)">
+            {{ item.label }}
+            @if (item.value === 'history') { <span>{{ recentSales().length }}</span> }
           </button>
-        </div>
+        }
+      </nav>
 
-        <!-- Direct Walkin Picker -->
-        <div *ngIf="activeTab() === 'walk_in'" style="margin-top: 1rem;">
-          <div class="search-box">
-            <input
-              type="text"
-              placeholder="Search medicine stock catalog..."
-              [(ngModel)]="searchQuery"
-              class="form-control search-input"
-            />
-            <span class="search-icon">🔍</span>
-          </div>
-
-          <div class="pos-product-picker" *ngIf="filteredProducts().length > 0; else noProducts">
-            <div *ngFor="let p of filteredProducts()" class="pos-product-card" (click)="openBatchSelect(p)">
-              <div>
-                <div class="name">{{ p.name }}</div>
-                <div class="stock-desc">Stock: <strong>{{ p.qtyOnHand }} units</strong> across {{ p.batches?.length || 0 }} batch(es)</div>
-              </div>
-              
-              <!-- Batch select dropdown if clicked -->
-              <div *ngIf="selectingProductId() === p.id" class="batch-select-popup mt-2" (click)="$event.stopPropagation()">
-                <label class="small label">Pick Batch:</label>
-                <select class="form-control form-control-sm" #bSelect>
-                  <option *ngFor="let b of p.batches" [value]="b.id">
-                    Batch: {{ b.batchNumber }} (₵{{ b.sellingPrice }} - {{ b.quantityRemaining }} left)
-                  </option>
-                </select>
-                <button
-                  class="btn btn-primary btn-sm btn-block mt-2"
-                  (click)="addToCartFromSelect(p, bSelect.value)"
-                  [disabled]="p.qtyOnHand === 0"
-                >
-                  Add to Cart
-                </button>
-              </div>
-
-              <div class="price-strip" *ngIf="selectingProductId() !== p.id">
-                <span class="small text-muted">Cost: ₵{{ getProductMinPrice(p).toFixed(2) }} - ₵{{ getProductMaxPrice(p).toFixed(2) }}</span>
-                <strong style="font-size: 0.85rem; color: var(--app-primary-color);">Select Batches</strong>
-              </div>
-            </div>
-          </div>
-          
-          <ng-template #noProducts>
-            <div class="empty-state">
-              <p>No products available in stock catalog.</p>
-            </div>
-          </ng-template>
-        </div>
-
-        <!-- Referred Prescriptions Queue -->
-        <div *ngIf="activeTab() === 'referred'" style="margin-top: 1.25rem;">
-          <p class="section-desc">Active referred prescriptions from radiology scans or lab doctor procedures.</p>
-          
-          <div class="referred-queue-section" *ngIf="prescriptions().length > 0; else noScripts">
-            <div *ngFor="let r of prescriptions()" class="referred-prescription-card" (click)="loadPrescriptionIntoCart(r)">
-              <div class="header">
-                <div class="name">{{ r.visit.patient.surname }}, {{ r.visit.patient.firstName }}</div>
-                <span class="code">{{ r.visit.patient.code }}</span>
-              </div>
-              <div class="prescription-text">{{ r.prescriptionText }}</div>
-              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--app-muted-text-color);">
-                <span>Doctor Note • Visit Ref: VIS-{{ r.visitId.slice(-6).toUpperCase() }}</span>
-                <span class="text-success" style="font-weight: 700;">➔ DISPENSE SCRIPT</span>
-              </div>
-            </div>
-          </div>
-
-          <ng-template #noScripts>
-            <div class="empty-state">
-              <div class="empty-icon">💊</div>
-              <p>No clinic prescriptions currently in queue awaiting dispensing.</p>
-            </div>
-          </ng-template>
-        </div>
-
-        <!-- End of Day Drawer Closure -->
-        <div *ngIf="activeTab() === 'end_of_day'" style="margin-top: 1.25rem;">
-          
-          <div class="closure-summary-card mb-4" style="background: var(--app-primary-soft-color); border: 1px solid rgba(49, 145, 234, 0.15); border-radius: 0.75rem; padding: 1.25rem;">
-            <h4 style="margin: 0 0 0.75rem 0; font-weight: 700; font-size: 1rem; color: var(--app-primary-color); display: flex; align-items: center; gap: 0.5rem;">
-              <span>📊</span> Unclosed Sales Session Summary
-            </h4>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 1rem;">
-              <div style="background: #fff; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid var(--app-border-color);">
-                <div style="font-size: 0.75rem; color: var(--app-muted-text-color); font-weight: 600;">Unclosed Txns</div>
-                <div style="font-size: 1.2rem; font-weight: 800; color: var(--app-text-color); margin-top: 0.25rem;">{{ unclosedSalesCount() }}</div>
-              </div>
-              <div style="background: #fff; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid var(--app-border-color);">
-                <div style="font-size: 0.75rem; color: var(--app-muted-text-color); font-weight: 600;">Expected Cash</div>
-                <div style="font-size: 1.2rem; font-weight: 800; color: var(--app-text-color); margin-top: 0.25rem;">₵{{ unclosedCashTotal().toFixed(2) }}</div>
-              </div>
-              <div style="background: #fff; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid var(--app-border-color);">
-                <div style="font-size: 0.75rem; color: var(--app-muted-text-color); font-weight: 600;">Expected Momo</div>
-                <div style="font-size: 1.2rem; font-weight: 800; color: var(--app-text-color); margin-top: 0.25rem;">₵{{ unclosedMomoTotal().toFixed(2) }}</div>
-              </div>
-              <div style="background: #fff; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid var(--app-border-color);">
-                <div style="font-size: 0.75rem; color: var(--app-muted-text-color); font-weight: 600;">Total System expected</div>
-                <div style="font-size: 1.2rem; font-weight: 800; color: var(--app-primary-color); margin-top: 0.25rem;">₵{{ unclosedSalesTotal().toFixed(2) }}</div>
-              </div>
-            </div>
-          </div>
-
-          <div *ngIf="unclosedSalesCount() === 0" class="empty-state" style="background: #fff; border: 1px solid var(--app-border-color); border-radius: 0.75rem; padding: 3rem 1.5rem;">
-            <div class="empty-icon">🎉</div>
-            <p style="font-weight: 700; color: var(--app-text-color); margin-bottom: 0.25rem;">No unclosed sales found.</p>
-            <p style="font-size: 0.8rem;">All transactions are successfully locked. POS drawer is clean!</p>
-          </div>
-
-          <div *ngIf="unclosedSalesCount() > 0" class="closure-form" style="background: #fff; border: 1px solid var(--app-border-color); border-radius: 0.75rem; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-            <h4 style="margin: 0; font-weight: 700; font-size: 1.05rem; color: var(--app-text-color);">Shift Register Reconciliation</h4>
-            <p style="font-size: 0.8rem; color: var(--app-muted-text-color); margin: -0.75rem 0 0.25rem 0;">Count and verify the physical cash drawer and mobile money wallet balances below.</p>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-              <div class="form-group mb-0">
-                <label>Physical Cash Counted (GHS) <span style="color: var(--app-danger-color);">*</span></label>
+      @if (activeTab() === 'sale') {
+        <section class="sale-workspace">
+          <section class="catalogue-pane">
+            <div class="search-row">
+              <label class="search-field">
+                <span class="sr-only">Search medicine catalogue</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
                 <input
-                  type="number"
-                  class="form-control"
-                  [(ngModel)]="cashCountedInput"
-                  (ngModelChange)="onCashCountedChange($event)"
-                  placeholder="₵0.00"
-                  min="0"
-                  step="0.01"
+                  type="search"
+                  autocomplete="off"
+                  placeholder="Scan barcode or search name, generic, brand, code…"
+                  [ngModel]="searchQuery()"
+                  (ngModelChange)="searchQuery.set($event)"
+                  (keydown.enter)="handleSearchEnter()"
                 />
+                @if (searchQuery()) { <button type="button" aria-label="Clear search" (click)="searchQuery.set('')">×</button> }
+              </label>
+              <button type="button" class="button" (click)="loadProducts()">Refresh stock</button>
+            </div>
+
+            @if (productsLoading()) {
+              <div class="product-skeleton" aria-label="Loading medicines">
+                @for (line of [1,2,3,4,5]; track line) { <span></span> }
               </div>
-              <div class="form-group mb-0">
-                <label>Physical Momo Counted (GHS) <span style="color: var(--app-danger-color);">*</span></label>
-                <input
-                  type="number"
-                  class="form-control"
-                  [(ngModel)]="momoCountedInput"
-                  (ngModelChange)="onMomoCountedChange($event)"
-                  placeholder="₵0.00"
-                  min="0"
-                  step="0.01"
-                />
+            } @else if (productsError()) {
+              <div class="state error"><strong>Stock could not be loaded</strong><p>{{ productsError() }}</p><button type="button" class="button" (click)="loadProducts()">Try again</button></div>
+            } @else {
+              <div class="product-list">
+                @for (product of filteredProducts(); track product.id) {
+                  <article class="product-row" [class.product-row--unavailable]="!canSellProduct(product)">
+                    <button type="button" class="product-summary" [disabled]="!canSellProduct(product)" (click)="addToCart(product)">
+                      <span class="product-name"><strong>{{ productTitle(product) }}</strong><small>{{ productClinicalLine(product) }}</small><em>{{ productPackageLabel(product) }}</em></span>
+                      <span class="product-alerts">
+                        @if (product.hasExpiredStock) { <span class="expiry-badge">Expired batch</span> }
+                        @if (product.hasNearExpiryStock) { <span class="near-expiry-badge">Near expiry</span> }
+                        @if (!canSellProduct(product)) { <span class="unavailable-badge">{{ productUnavailableReason(product) }}</span> }
+                      </span>
+                      <span class="stock-figure">
+                        <span class="stock-total"><strong>{{ product.stockOnHand | number:'1.0-2' }}</strong><span>{{ stockUnitLabel(product) }}</span></span>
+                        <span class="stock-meter" [ngClass]="stockTone(product)" aria-hidden="true">
+                          @for (bar of stockBars; track bar) { <i [class.filled]="bar <= stockMeterLevel(product)"></i> }
+                        </span>
+                      </span>
+                      <span class="price-figure"><small>Unit price</small><strong>GHS {{ money(product.defaultSellingPrice) }}</strong></span>
+                    </button>
+                  </article>
+                } @empty {
+                  <div class="state"><strong>No sellable medicines found</strong><p>Try another name or barcode. Expired, quarantined, reserved, and exhausted batches are excluded.</p></div>
+                }
               </div>
+            }
+          </section>
+
+          <aside class="cart-pane">
+            <header><div><span class="eyebrow">Current sale</span><h2>Checkout</h2></div><span class="line-count">{{ cart().length }} line{{ cart().length === 1 ? '' : 's' }}</span></header>
+            <div class="cart-lines">
+              @for (item of cart(); track item.productId) {
+                <article class="cart-line">
+                  <div><strong>{{ item.productName }}</strong><small>{{ item.packageLabel }} · {{ item.allowLooseSale ? 'Loose sale allowed' : 'Whole packages only' }}</small></div>
+                  <div class="quantity-control"><button type="button" aria-label="Reduce quantity" [disabled]="item.quantity <= item.minimumSaleQuantity" (click)="updateQuantity(item,-item.quantityStep)">−</button><input type="number" [min]="item.minimumSaleQuantity" [step]="item.quantityStep" [max]="item.maxQuantity" [ngModel]="item.quantity" (ngModelChange)="setQuantity(item,$event)" /><button type="button" aria-label="Increase quantity" [disabled]="item.quantity + item.quantityStep > item.maxQuantity" (click)="updateQuantity(item,item.quantityStep)">+</button></div>
+                  <div class="line-price"><strong>GHS {{ money(item.sellingPrice * item.quantity) }}</strong><small>{{ money(item.sellingPrice) }} each</small></div>
+                  <button type="button" class="remove-cart-line" [attr.aria-label]="'Remove ' + item.productName" (click)="removeFromCart(item.productId)">Remove</button>
+                </article>
+              } @empty {
+                <div class="empty-cart"><span>0</span><strong>No medicines selected</strong><p>Search or scan a medicine, then click it to add it.</p></div>
+              }
             </div>
 
-            <!-- Discrepancy checker banner -->
-            <div *ngIf="isInputEntered()" style="border-radius: 0.65rem; padding: 0.85rem 1.15rem; font-size: 0.85rem; font-weight: 600; display: flex; flex-direction: column; gap: 0.15rem; border: 1px solid transparent; transition: all 0.2s;"
-                 [class.stock-alert-ok]="discrepancy() === 0"
-                 [style.borderColor]="discrepancy() === 0 ? 'rgba(27,94,32,0.15)' : null"
-                 [class.stock-alert-warning]="discrepancy() > 0"
-                 [style.borderColor]="discrepancy() > 0 ? 'rgba(245,127,23,0.15)' : null"
-                 [class.expiry-critical]="discrepancy() < 0"
-                 [style.borderColor]="discrepancy() < 0 ? 'rgba(198,40,40,0.15)' : null">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span>Physical Sum Counted:</span>
-                <strong>₵{{ countedTotal().toFixed(2) }}</strong>
-              </div>
-              <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed rgba(0,0,0,0.08); margin-top: 0.35rem; padding-top: 0.35rem;">
-                <span>Session Discrepancy:</span>
-                <strong>
-                  ₵{{ discrepancy() >= 0 ? '+' : '' }}{{ discrepancy().toFixed(2) }}
-                </strong>
-              </div>
-              <div style="font-size: 0.75rem; font-weight: 500; margin-top: 0.4rem;" *ngIf="discrepancy() === 0">
-                🎉 Perfect balance! The drawer matches expected sales. Ready to lock shift safely.
-              </div>
-              <div style="font-size: 0.75rem; font-weight: 500; margin-top: 0.4rem;" *ngIf="discrepancy() > 0">
-                ⚠️ Cash Surplus detected. Please fill out shift notes below explaining why the drawer has extra funds.
-              </div>
-              <div style="font-size: 0.75rem; font-weight: 500; margin-top: 0.4rem;" *ngIf="discrepancy() < 0">
-                ⚠️ Drawer Shortage detected. Please write reconciliation explanation remarks below before submission.
-              </div>
+            @if (cart().length) {
+              <section class="checkout-fields">
+                <label><span>Customer name <small>optional</small></span><input type="text" [ngModel]="customerName()" (ngModelChange)="customerName.set($event)" placeholder="Walk-in customer" /></label>
+                <fieldset><legend>Payment method</legend><div class="payment-options"><button type="button" [class.active]="paymentMethod() === 'cash'" (click)="selectPayment('cash')">Cash</button><button type="button" [class.active]="paymentMethod() === 'mobile_money'" (click)="selectPayment('mobile_money')">Mobile Money</button></div></fieldset>
+                @if (paymentMethod() === 'cash') {
+                  <label><span>Cash received</span><div class="money-input"><b>GHS</b><input type="number" min="0" step="0.01" [ngModel]="cashTendered()" (ngModelChange)="cashTendered.set($event === null ? null : +$event)" /><button type="button" (click)="cashTendered.set(cartTotal())">Exact</button></div></label>
+                } @else {
+                  <label><span>MoMo transaction reference</span><input type="text" [ngModel]="mobileMoneyReference()" (ngModelChange)="mobileMoneyReference.set($event)" placeholder="Required reference" /></label>
+                }
+              </section>
+              <footer class="checkout-total">
+                <div><span>Total</span><strong>GHS {{ money(cartTotal()) }}</strong></div>
+                @if (paymentMethod() === 'cash') { <p [class.insufficient]="changeDue() < 0">{{ changeDue() < 0 ? 'Still due' : 'Change due' }} <strong>GHS {{ money(Math.abs(changeDue())) }}</strong></p> }
+                <button type="button" class="pay-button" [disabled]="!canCheckout()" (click)="checkout()">{{ checkoutLoading() ? 'Processing sale…' : 'Complete payment' }}</button>
+              </footer>
+            }
+          </aside>
+        </section>
+      } @else if (activeTab() === 'history') {
+        <section class="list-page">
+          <header><div><span class="eyebrow">Current location</span><h2>Recent transactions</h2><p>Review completed sales and reprint an exact server-backed receipt.</p></div><button type="button" class="button" (click)="loadRecentSales()">Refresh history</button></header>
+          <div class="history-table"><table><thead><tr><th>Receipt</th><th>Date</th><th>Customer</th><th>Cashier</th><th>Payment</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>
+            @for (sale of recentSales(); track sale.id) {<tr><td><strong>{{ sale.saleNumber }}</strong><small>{{ sale.items.length }} line{{ sale.items.length === 1 ? '' : 's' }}</small></td><td>{{ sale.paidAt | date:'medium' }}</td><td>{{ saleCustomer(sale) }}</td><td>{{ sale.soldByUser?.fullName || sale.soldByUser?.username || '—' }}</td><td>{{ paymentLabel(sale.paymentMethod) }}<small>{{ sale.referenceNumber || '' }}</small></td><td><strong>GHS {{ money(sale.total) }}</strong></td><td><span class="sale-status" [class.voided]="sale.status === 'voided'">{{ sale.status }}</span></td><td><button type="button" class="text-button" (click)="openReceipt(sale)">Receipt</button></td></tr>}
+            @empty {<tr><td colspan="8" class="state">No transactions recorded at this location.</td></tr>}
+          </tbody></table></div>
+        </section>
+      } @else {
+        <section class="closure-page">
+          <header><div><span class="eyebrow">Register control</span><h2>Close cashier shift</h2><p>Count each payment channel and document any difference before locking the session.</p></div><button type="button" class="button" (click)="loadUnclosedSales()">Recalculate</button></header>
+          @if (!activeSession()) {
+            <div class="state"><strong>No open register</strong><p>Open a register from the Sale tab before collecting payment.</p></div>
+          } @else {
+            <div class="closure-grid">
+              <section class="expected-ledger"><span class="eyebrow">System ledger</span><h3>Expected position</h3><dl><div><dt>Opening float</dt><dd>GHS {{ money(openingFloat()) }}</dd></div><div><dt>Cash sales</dt><dd>GHS {{ money(unclosedCashTotal()) }}</dd></div><div><dt>Expected cash</dt><dd>GHS {{ money(expectedCashTotal()) }}</dd></div><div><dt>Expected MoMo</dt><dd>GHS {{ money(unclosedMomoTotal()) }}</dd></div><div class="total"><dt>Total expected</dt><dd>GHS {{ money(expectedTotal()) }}</dd></div></dl><p>{{ unclosedSalesCount() }} non-voided transaction{{ unclosedSalesCount() === 1 ? '' : 's' }} in this shift.</p></section>
+              <section class="count-form"><span class="eyebrow">Physical count</span><h3>Confirm actual balances</h3><label><span>Cash counted</span><input type="number" min="0" step="0.01" [ngModel]="cashCounted()" (ngModelChange)="cashCounted.set($event === null ? null : +$event)" /></label><label><span>MoMo confirmed</span><input type="number" min="0" step="0.01" [ngModel]="momoCounted()" (ngModelChange)="momoCounted.set($event === null ? null : +$event)" /></label><div class="variance" [class.clear]="discrepancy() === 0"><span>Calculated discrepancy</span><strong>{{ discrepancy() > 0 ? '+' : '' }}GHS {{ money(discrepancy()) }}</strong></div><label><span>Reconciliation notes @if(discrepancy() !== 0){<b>required</b>}</span><textarea [ngModel]="closureNotes()" (ngModelChange)="closureNotes.set($event)" placeholder="Explain shortages, surpluses, wallet checks, or handover notes"></textarea></label><button type="button" class="button primary wide" [disabled]="!canCloseSession()" (click)="closeSession()">{{ closingSession() ? 'Closing shift…' : 'Close and lock shift' }}</button></section>
             </div>
+          }
+        </section>
+      }
 
-            <div class="form-group mb-0">
-              <label>Reconciliation & Shift Notes <span *ngIf="discrepancy() !== 0" style="color: var(--app-danger-color);">* (Mandatory for variance)</span></label>
-              <textarea
-                class="form-control"
-                style="min-height: 80px; font-family: inherit; font-size: 0.85rem;"
-                [(ngModel)]="closureNotesInput"
-                (ngModelChange)="closureNotes.set($event)"
-                placeholder="Detail discrepancies, cash count breakdowns, register discrepancies or general comments..."
-              ></textarea>
-            </div>
+      @if (receiptSale()) {
+        <div class="document-backdrop no-print" (click)="closeReceipt()"></div>
+        <section class="print-layer receipt-document" [class.narrow]="receiptWidth() === '58mm'" role="dialog" aria-modal="true" aria-labelledby="receipt-title">
+          <header><span>OFFICIAL RECEIPT</span><h2 id="receipt-title">{{ settings()?.clinicName || receiptSale().location?.name || 'PharmaFlow Pharmacy' }}</h2><p>{{ receiptSale().location?.name }} · {{ receiptSale().location?.address || settings()?.location || '' }}</p><p>{{ receiptSale().location?.phone || settings()?.phone || '' }}</p></header>
+          <div class="receipt-meta"><div><span>Receipt</span><strong>{{ receiptSale().saleNumber }}</strong></div><div><span>Date</span><strong>{{ receiptSale().paidAt | date:'yyyy-MM-dd HH:mm' }}</strong></div><div><span>Cashier</span><strong>{{ receiptSale().soldByUser?.fullName || receiptSale().soldByUser?.username || '—' }}</strong></div><div><span>Customer</span><strong>{{ saleCustomer(receiptSale()) }}</strong></div></div>
+          <table><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead><tbody>@for(item of receiptSale().items;track item.id || item.batchId){<tr><td><strong>{{item.itemName}}</strong><small>{{ receiptBatch(item) }}</small></td><td>{{item.quantity}}</td><td>{{money(item.unitPrice)}}</td><td>{{money(item.lineTotal)}}</td></tr>}</tbody></table>
+          <div class="receipt-total"><span>Total paid</span><strong>GHS {{ money(receiptSale().total) }}</strong></div>
+          <div class="receipt-payment"><span>{{ paymentLabel(receiptSale().paymentMethod) }}</span>@if(receiptSale().referenceNumber){<strong>Ref: {{receiptSale().referenceNumber}}</strong>}@if(receiptSale().paymentMethod === 'cash' && receiptSale().cashTendered !== undefined){<strong>Received GHS {{money(receiptSale().cashTendered)}} · Change GHS {{money(receiptSale().changeDue)}}</strong>}</div>
+          @if(receiptSale().status === 'voided'){<div class="void-banner">VOIDED · {{receiptSale().voidReason}}</div>}
+          <footer><p>{{ settings()?.receiptFooter || 'Thank you. Keep this receipt for your records.' }}</p><p>Medicines should be stored and used as directed.</p><div class="document-actions no-print"><div><button type="button" [class.active]="receiptWidth() === '58mm'" (click)="receiptWidth.set('58mm')">58 mm</button><button type="button" [class.active]="receiptWidth() === '80mm'" (click)="receiptWidth.set('80mm')">80 mm</button></div><button type="button" class="button" (click)="closeReceipt()">Close</button><button type="button" class="button primary" (click)="printDocument()">Print receipt</button></div></footer>
+        </section>
+      }
 
-            <button
-              class="btn btn-primary btn-block"
-              style="padding: 0.85rem;"
-              [disabled]="isSubmittingClosure() || cashCounted() === null || momoCounted() === null || (discrepancy() !== 0 && !closureNotes().trim())"
-              (click)="submitClosure()"
-            >
-              <span *ngIf="!isSubmittingClosure()">🔐 Reconcile Drawer & Close Shift (₵{{ countedTotal().toFixed(2) }})</span>
-              <span *ngIf="isSubmittingClosure()">🔐 Closing and Locking Session...</span>
-            </button>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Thermal Shift Closure slip view -->
-      <div class="panel" *ngIf="showThermalClosureSlip() && completedClosure()" style="justify-content: center; align-items: center; background: transparent; border: none; box-shadow: none; padding: 0;">
-        <div class="pharmacy-receipt-thermal" style="width: 76mm; border: 1px solid #a0aec0;">
-          <div class="header">
-            <div style="display: flex; justify-content: center; margin-bottom: 0.25rem;" *ngIf="settings()?.logo">
-              <img [src]="settings().logo" alt="Clinic Logo" style="max-height: 40px; max-width: 140px; object-fit: contain; filter: grayscale(100%);" />
-            </div>
-            <h2>SHIFT CLOSURE SLIP</h2>
-            <p>{{ settings()?.clinicName || 'ANTIGRAVITY CLINICAL PHARMACY' }}</p>
-            <p>Drawer Reconciled & Shift Terminated</p>
-          </div>
-          
-          <div class="meta">
-            <div>CLOSURE ID: CL-{{ completedClosure().id.slice(-6).toUpperCase() }}</div>
-            <div>DATE: {{ completedClosure().closureDate | date:'yyyy-MM-dd HH:mm' }}</div>
-            <div>USER: {{ completedClosure().closedByUser?.fullName || completedClosure().closedByUser?.username }}</div>
-            <div>STATUS: CLOSED & LOCKED</div>
-          </div>
-          
-          <table class="item-table">
-            <thead>
-              <tr>
-                <th>Wallet</th>
-                <th class="num">System</th>
-                <th class="num">Counted</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Cash Drawer</td>
-                <td class="num">₵{{ unclosedCashTotalBackup.toFixed(2) }}</td>
-                <td class="num">₵{{ completedClosure().cashCounted.toFixed(2) }}</td>
-              </tr>
-              <tr>
-                <td>Momo Wallet</td>
-                <td class="num">₵{{ unclosedMomoTotalBackup.toFixed(2) }}</td>
-                <td class="num">₵{{ completedClosure().momoCounted.toFixed(2) }}</td>
-              </tr>
-              <tr style="border-top: 1px dashed #000; font-weight: bold;">
-                <td>TOTAL</td>
-                <td class="num">₵{{ completedClosure().totalSalesAmount.toFixed(2) }}</td>
-                <td class="num">₵{{ completedClosure().totalCounted.toFixed(2) }}</td>
-              </tr>
-            </tbody>
-          </table>
-          
-          <div class="totals">
-            <div class="grand" [style.color]="completedClosure().discrepancy == 0 ? '#1b5e20' : '#c62828'">
-              <span>DISCREPANCY:</span>
-              <span>₵{{ completedClosure().discrepancy >= 0 ? '+' : '' }}{{ completedClosure().discrepancy.toFixed(2) }}</span>
-            </div>
-            <div style="font-size: 10px; margin-top: 4px;">
-              <span>Total sales count:</span>
-              <span>{{ completedClosure().totalSalesCount }} transactions</span>
-            </div>
-          </div>
-          
-          <div *ngIf="completedClosure().notes" style="font-size: 9px; border: 1px dashed #000; padding: 6px; margin-top: 5px; background: #fafafa;">
-            <strong>Pharmacist Notes:</strong>
-            <p style="margin: 2px 0 0 0; font-style: italic;">"{{ completedClosure().notes }}"</p>
-          </div>
-          
-          <div class="footer">
-            <p>Shift has been audited and finalized in database system.</p>
-            <p style="margin-top: 20px;">Signature: ______________________</p>
-            
-            <div class="no-print mt-3" style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 15px;">
-              <button class="btn btn-success btn-sm" (click)="printThermalReceipt()">
-                🖨️ Print Slip
-              </button>
-              <button class="btn btn-secondary btn-sm" (click)="closeClosureSlip()">
-                ❌ Back to POS
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-        <div class="pos-cart-panel">
-          <h3>Shopping Checkout Cart</h3>
-          
-          <div class="cart-items-list" *ngIf="cart().length > 0; else emptyCart">
-            <div *ngFor="let item of cart()" class="cart-item-row">
-              <div class="item-info">
-                <div class="name">{{ item.productName }}</div>
-                <div class="batch">Batch: {{ item.batchNumber }} • Price: ₵{{ item.sellingPrice.toFixed(2) }}</div>
-              </div>
-              
-              <div class="item-actions">
-                <button (click)="updateQuantity(item, -1)">-</button>
-                <span>{{ item.quantity }}</span>
-                <button (click)="updateQuantity(item, 1)">+</button>
-              </div>
-
-              <div class="item-price">
-                ₵{{ (item.sellingPrice * item.quantity).toFixed(2) }}
-              </div>
-            </div>
-          </div>
-
-          <ng-template #emptyCart>
-            <div class="empty-state" style="padding: 2.5rem 1rem;">
-              <div class="empty-icon">🛒</div>
-              <p>Your shopping checkout cart is currently empty.</p>
-            </div>
-          </ng-template>
-
-          <div class="cart-summary-card" *ngIf="cart().length > 0">
-            <div class="line">
-              <span>Selected Lines:</span>
-              <strong>{{ cart().length }} items</strong>
-            </div>
-            <div class="line grand">
-              <span>Total Bill (GHS):</span>
-              <strong>₵{{ cartTotal().toFixed(2) }}</strong>
-            </div>
-          </div>
-
-          <!-- Checkout payment form -->
-          <div class="checkout-form" *ngIf="cart().length > 0" style="display: flex; flex-direction: column; gap: 0.75rem;">
-            
-            <div class="form-group mb-2">
-              <label>Walk-In Customer Name (Optional)</label>
-              <input type="text" class="form-control form-control-sm" [(ngModel)]="customerName" placeholder="e.g. Ama Serwaa" />
-            </div>
-
-            <div class="form-group mb-2">
-              <label>Payment Method</label>
-              <div style="display: flex; gap: 0.5rem;">
-                <button
-                  class="btn"
-                  style="flex: 1; padding: 0.5rem;"
-                  [class.btn-primary]="paymentMethod() === 'cash'"
-                  [class.btn-secondary]="paymentMethod() !== 'cash'"
-                  (click)="paymentMethod.set('cash')"
-                >
-                  💵 Cash
-                </button>
-                <button
-                  class="btn"
-                  style="flex: 1; padding: 0.5rem;"
-                  [class.btn-primary]="paymentMethod() === 'mobile_money'"
-                  [class.btn-secondary]="paymentMethod() !== 'mobile_money'"
-                  (click)="paymentMethod.set('mobile_money')"
-                >
-                  📱 Momo
-                </button>
-              </div>
-            </div>
-
-            <button class="btn btn-success btn-block" [disabled]="isSubmittingCheckout()" (click)="checkoutPOS()">
-              <span *ngIf="!isSubmittingCheckout()">✓ Finalize POS Checkout (₵{{ cartTotal().toFixed(2) }})</span>
-              <span *ngIf="isSubmittingCheckout()">Dispensing Inventory...</span>
-            </button>
-          </div>
-        </div>
-
-      <!-- Thermal Receipt Print View -->
-      <div class="pharmacy-receipt-thermal" *ngIf="showThermalReceipt()">
-        <div class="header">
-          <div style="display: flex; justify-content: center; margin-bottom: 0.25rem;" *ngIf="settings()?.logo">
-            <img [src]="settings().logo" alt="Clinic Logo" style="max-height: 40px; max-width: 140px; object-fit: contain; filter: grayscale(100%);" />
-          </div>
-          <h2>{{ settings()?.clinicName || 'ANTIGRAVITY PHARMACY' }}</h2>
-          <p>{{ settings()?.tagline || 'Separate Pharmacy Inventory & diagnostics Care' }}</p>
-          <p>Phone: {{ settings()?.phone || '+233 24 123 4567' }} • {{ settings()?.location || 'Accra' }}</p>
-        </div>
-        
-        <div class="meta">
-          <div>TXN ID: PH-{{ completedSaleId().slice(-6).toUpperCase() }}</div>
-          <div>DATE: {{ receiptDateTime | date:'yyyy-MM-dd HH:mm' }}</div>
-          <div>CUST: {{ customerName() || 'Walk-In Customer' }}</div>
-          <div>PAY: {{ paymentMethod() | uppercase }}</div>
-          <div *ngIf="activePrescriptionId()">SOURCE: Clinic Prescription</div>
-        </div>
-
-        <table class="item-table">
-          <thead>
-            <tr>
-              <th>Item / Batch</th>
-              <th class="num">Qty</th>
-              <th class="num">Unit</th>
-              <th class="num">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let item of cart()">
-              <td>
-                {{ item.productName }}
-                <div style="font-size: 9px; color:#555;">[Batch: {{ item.batchNumber }}]</div>
-              </td>
-              <td class="num">{{ item.quantity }}</td>
-              <td class="num">₵{{ item.sellingPrice.toFixed(2) }}</td>
-              <td class="num">₵{{ (item.sellingPrice * item.quantity).toFixed(2) }}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div class="totals">
-          <div class="grand">
-            <span>TOTAL GHS:</span>
-            <span>₵{{ cartTotal().toFixed(2) }}</span>
-          </div>
-          <div>
-            <span>PAID:</span>
-            <span>₵{{ cartTotal().toFixed(2) }}</span>
-          </div>
-          <div>
-            <span>CHANGE DUE:</span>
-            <span>₵0.00</span>
-          </div>
-        </div>
-
-        <div class="footer">
-          <p>Thank you for your patronage!</p>
-          <p>Medicines sold are non-returnable.</p>
-          
-          <div class="no-print mt-3" style="display: flex; gap: 0.5rem; justify-content: center;">
-            <button class="btn btn-success btn-sm" (click)="printThermalReceipt()">
-              🖨️ Print Slip
-            </button>
-            <button class="btn btn-secondary btn-sm" (click)="closeReceipt()">
-              ❌ Close POS
-            </button>
-          </div>
-        </div>
-      </div>
-
-    </div>
+      @if (completedClosure()) {
+        <div class="document-backdrop no-print" (click)="closeClosureSlip()"></div>
+        <section class="print-layer receipt-document" role="dialog" aria-modal="true" aria-labelledby="closure-title">
+          <header><span>SHIFT RECONCILIATION</span><h2 id="closure-title">{{ completedClosure().location?.name || settings()?.clinicName || 'PharmaFlow Pharmacy' }}</h2><p>Closed by {{ completedClosure().closedByUser?.fullName || completedClosure().closedByUser?.username || '—' }}</p></header>
+          <div class="receipt-meta"><div><span>Closure</span><strong>{{ completedClosure().id.slice(-8).toUpperCase() }}</strong></div><div><span>Closed</span><strong>{{ completedClosure().closureDate | date:'yyyy-MM-dd HH:mm' }}</strong></div></div>
+          <table><thead><tr><th>Channel</th><th>Expected</th><th>Counted</th></tr></thead><tbody><tr><td>Cash</td><td>{{money(completedClosure().expectedCash)}}</td><td>{{money(completedClosure().cashCounted)}}</td></tr><tr><td>Mobile Money</td><td>{{money(completedClosure().expectedMomo)}}</td><td>{{money(completedClosure().momoCounted)}}</td></tr></tbody></table>
+          <div class="receipt-total"><span>Discrepancy</span><strong>{{completedClosure().discrepancy > 0 ? '+' : ''}}GHS {{money(completedClosure().discrepancy)}}</strong></div>
+          <div class="receipt-payment"><span>{{completedClosure().totalSalesCount}} transactions · sales GHS {{money(completedClosure().totalSalesAmount)}}</span></div>
+          @if(completedClosure().notes){<div class="closure-note"><strong>Notes</strong><p>{{completedClosure().notes}}</p></div>}
+          <footer><p>Cashier signature ____________________</p><p>Supervisor signature ____________________</p><div class="document-actions no-print"><button type="button" class="button" (click)="closeClosureSlip()">Close</button><button type="button" class="button primary" (click)="printDocument()">Print closure</button></div></footer>
+        </section>
+      }
+    </main>
   `,
-  styleUrl: './pharmacy-page.component.scss',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  styleUrls: ['./pharmacy-pos-sales-page.component.scss', './pharmacy-pos-sales-page.overrides.scss'],
 })
 export class PharmacyPosSalesPageComponent implements OnInit {
   private readonly api = inject(ApiService);
-  readonly settings = signal<any>(null);
+  private readonly toast = inject(ToastService);
 
-  readonly activeTab = signal<'walk_in' | 'referred' | 'end_of_day'>('walk_in');
+  readonly tabs = [
+    { label: 'Sale', value: 'sale' as const },
+    { label: 'Transactions', value: 'history' as const },
+    { label: 'Close shift', value: 'close' as const },
+  ];
+  readonly Math = Math;
+  readonly stockBars = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  readonly activeTab = signal<'sale' | 'history' | 'close'>('sale');
   readonly products = signal<any[]>([]);
-  readonly prescriptions = signal<any[]>([]);
-  readonly cart = signal<CartItem[]>([]);
-  
+  readonly productsLoading = signal(true);
+  readonly productsError = signal('');
+  readonly recentSales = signal<any[]>([]);
+  readonly settings = signal<any>(null);
   readonly searchQuery = signal('');
-  readonly selectingProductId = signal('');
-  
-  // Checkout controls
+  readonly cart = signal<CartItem[]>([]);
   readonly customerName = signal('');
   readonly paymentMethod = signal<'cash' | 'mobile_money'>('cash');
-  readonly isSubmittingCheckout = signal(false);
-  
-  // Receipt controls
-  readonly showThermalReceipt = signal(false);
-  readonly completedSaleId = signal('');
-  readonly activePrescriptionId = signal<string | null>(null);
-  
-  readonly receiptDateTime = getInternetDate();
+  readonly mobileMoneyReference = signal('');
+  readonly cashTendered = signal<number | null>(null);
+  readonly checkoutLoading = signal(false);
+  readonly receiptSale = signal<any | null>(null);
+  readonly receiptFromCheckout = signal(false);
+  readonly receiptWidth = signal<'58mm' | '80mm'>('80mm');
 
-  // Daily closure signals & bindings
+  readonly activeSession = signal<any | null>(null);
+  readonly sessionLoading = signal(true);
+  readonly openingRegister = signal(false);
+  readonly openingFloat = signal(0);
+  readonly openingFloatInput = signal(0);
   readonly unclosedSalesCount = signal(0);
   readonly unclosedSalesTotal = signal(0);
   readonly unclosedCashTotal = signal(0);
   readonly unclosedMomoTotal = signal(0);
-  readonly unclosedSales = signal<any[]>([]);
-  readonly isSubmittingClosure = signal(false);
-  readonly showThermalClosureSlip = signal(false);
-  readonly completedClosure = signal<any>(null);
-
   readonly cashCounted = signal<number | null>(null);
   readonly momoCounted = signal<number | null>(null);
   readonly closureNotes = signal('');
+  readonly closingSession = signal(false);
+  readonly completedClosure = signal<any | null>(null);
 
-  // Dual backups for rendering in final slip after resetting
-  unclosedCashTotalBackup = 0;
-  unclosedMomoTotalBackup = 0;
-
-  cashCountedInput: number | null = null;
-  momoCountedInput: number | null = null;
-  closureNotesInput = '';
-
-  readonly Math = Math;
-
-  readonly cartTotal = computed(() => {
-    return this.cart().reduce((sum, item) => sum + item.sellingPrice * item.quantity, 0);
+  readonly filteredProducts = computed(() => {
+    const query = this.searchQuery().trim().toLowerCase();
+    const matches = !query ? this.products() : this.products().filter((product) => [product.name, product.genericName, product.brandName, product.manufacturer, product.strength, product.productCode, product.barcode]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(query)));
+    return query ? matches : matches.filter((product) => this.canSellProduct(product));
   });
-
-  readonly countedTotal = computed(() => {
-    const cash = this.cashCounted() ?? 0;
-    const momo = this.momoCounted() ?? 0;
-    return cash + momo;
+  readonly cartTotal = computed(() => this.cart().reduce((sum, item) => sum + item.sellingPrice * item.quantity, 0));
+  readonly changeDue = computed(() => Number(this.cashTendered() ?? 0) - this.cartTotal());
+  readonly expectedCashTotal = computed(() => this.openingFloat() + this.unclosedCashTotal());
+  readonly expectedTotal = computed(() => this.expectedCashTotal() + this.unclosedMomoTotal());
+  readonly countedTotal = computed(() => Number(this.cashCounted() ?? 0) + Number(this.momoCounted() ?? 0));
+  readonly discrepancy = computed(() => this.countedTotal() - this.expectedTotal());
+  readonly canCheckout = computed(() => {
+    if (this.checkoutLoading() || !this.activeSession() || !this.cart().length) return false;
+    if (this.paymentMethod() === 'mobile_money') return this.mobileMoneyReference().trim().length > 0;
+    return this.cashTendered() !== null && Number(this.cashTendered()) >= this.cartTotal();
   });
-
-  readonly discrepancy = computed(() => {
-    const expected = this.unclosedSalesTotal();
-    const cash = this.cashCounted() ?? 0;
-    const momo = this.momoCounted() ?? 0;
-    const actual = cash + momo;
-    return actual - expected;
+  readonly canCloseSession = computed(() => {
+    if (!this.activeSession() || this.closingSession() || this.cashCounted() === null || this.momoCounted() === null) return false;
+    return Math.abs(this.discrepancy()) < 0.005 || this.closureNotes().trim().length >= 5;
   });
-
-  readonly isInputEntered = computed(() => {
-    return this.cashCounted() !== null || this.momoCounted() !== null;
-  });
-
-  onCashCountedChange(val: number | null): void {
-    this.cashCounted.set(val);
-  }
-
-  onMomoCountedChange(val: number | null): void {
-    this.momoCounted.set(val);
-  }
 
   ngOnInit(): void {
-    this.loadInitialData();
+    this.loadProducts();
+    this.loadRecentSales();
+    this.loadActiveSession();
+    this.api.getSettings().subscribe({ next: (settings) => this.settings.set(settings) });
   }
 
-  loadInitialData(): void {
-    // Fetch products
+  setTab(tab: 'sale' | 'history' | 'close'): void {
+    this.activeTab.set(tab);
+    if (tab === 'history') this.loadRecentSales();
+    if (tab === 'close') this.loadUnclosedSales();
+  }
+
+  loadProducts(): void {
+    this.productsLoading.set(true);
+    this.productsError.set('');
     this.api.getPharmacyProducts().subscribe({
-      next: (res) => {
-        this.products.set(res);
+      next: (products) => {
+        const now = getInternetDate();
+        this.products.set((products ?? []).filter((product) => product.isActive !== false && product.isAvailableForSale !== false).map((product) => {
+          const allBatches = product.batches ?? [];
+          const batches = allBatches.filter((batch: any) => this.availableQuantity(batch) > 0 && new Date(batch.expiryDate) > now);
+          const hasExpiredStock = allBatches.some((batch: any) => this.availableQuantity(batch) > 0 && new Date(batch.expiryDate) <= now);
+          const nearExpiryLimit = new Date(now.getTime() + 90 * 86_400_000);
+          const hasNearExpiryStock = batches.some((batch: any) => new Date(batch.expiryDate) <= nearExpiryLimit);
+          return { ...product, batches, hasExpiredStock, hasNearExpiryStock, stockOnHand: batches.reduce((sum: number, batch: any) => sum + this.availableQuantity(batch), 0) };
+        }));
+        this.productsLoading.set(false);
       },
-      error: (err) => console.error('Error fetching pharmacy products', err)
+      error: (error) => {
+        this.productsError.set(error?.error?.message ?? 'Check the active pharmacy location and try again.');
+        this.productsLoading.set(false);
+      },
     });
+  }
 
-    // Fetch active referred queue
-    this.api.getPharmacyPrescriptions().subscribe({
-      next: (res) => {
-        this.prescriptions.set(res);
-      },
-      error: (err) => console.error('Error fetching prescriptions queue', err)
-    });
+  loadRecentSales(): void {
+    this.api.getRecentPharmacySales().subscribe({ next: (sales) => this.recentSales.set(sales ?? []) });
+  }
 
-    // Fetch settings
-    this.api.getSettings().subscribe({
-      next: (res) => {
-        this.settings.set(res);
+  loadActiveSession(): void {
+    this.sessionLoading.set(true);
+    this.api.getActiveSession().subscribe({
+      next: (session) => {
+        this.activeSession.set(session ?? null);
+        this.openingFloat.set(Number(session?.openingFloat ?? 0));
+        this.sessionLoading.set(false);
       },
-      error: (err) => console.error('Error fetching settings', err)
+      error: () => { this.activeSession.set(null); this.sessionLoading.set(false); },
     });
+  }
+
+  openRegister(): void {
+    const amount = Number(this.openingFloatInput());
+    if (!Number.isFinite(amount) || amount < 0) return;
+    this.openingRegister.set(true);
+    this.api.openSession(amount).subscribe({
+      next: (session) => { this.activeSession.set(session); this.openingFloat.set(Number(session.openingFloat)); this.openingRegister.set(false); },
+      error: (error) => { this.openingRegister.set(false); this.toast.error(error?.error?.message ?? 'Unable to open register.'); },
+    });
+  }
+
+  handleSearchEnter(): void {
+    const query = this.searchQuery().trim().toLowerCase();
+    if (!query) return;
+    const product = this.products().find((item) => [item.barcode, item.productCode].some((value) => String(value ?? '').trim().toLowerCase() === query));
+    if (!product) return;
+    if (!this.canSellProduct(product)) {
+      this.toast.error(`${this.productTitle(product)} cannot be added: ${this.productUnavailableReason(product).toLowerCase()}.`);
+      return;
+    }
+    this.addToCart(product);
+    this.searchQuery.set('');
+  }
+
+  addToCart(product: any): void {
+    const rawSellingPrice = product.defaultSellingPrice;
+    const sellingPrice = Number(rawSellingPrice);
+    if (rawSellingPrice === null || rawSellingPrice === undefined || !Number.isFinite(sellingPrice)) {
+      this.toast.error(`Set a selling price for ${product.name} before adding it to a sale.`);
+      return;
+    }
+    const minimumSaleQuantity = this.effectiveMinimumSaleQuantity(product);
+    const quantityStep = this.saleQuantityStep(product);
+    this.cart.update((items) => {
+      const existing = items.find((item) => item.productId === product.id);
+      if (existing) return items.map((item) => {
+        if (item.productId !== product.id) return item;
+        const requested = Math.min(item.quantity + item.quantityStep, item.maxQuantity);
+        const quantity = item.allowLooseSale ? requested : Math.floor(requested / item.quantityStep) * item.quantityStep;
+        return { ...item, quantity: Math.max(item.minimumSaleQuantity, quantity) };
+      });
+      return [...items, {
+        productId: product.id,
+        productName: product.name,
+        productCode: product.productCode ?? '',
+        unitOfMeasure: product.sellingUnit ?? product.unitOfMeasure ?? 'unit',
+        packageLabel: this.productPackageLabel(product),
+        minimumSaleQuantity,
+        quantityStep,
+        allowLooseSale: product.allowLooseSale === true,
+        sellingPrice,
+        quantity: minimumSaleQuantity,
+        maxQuantity: Number(product.stockOnHand ?? 0),
+      }];
+    });
+  }
+
+  updateQuantity(item: CartItem, delta: number): void { this.setQuantity(item, item.quantity + delta); }
+
+  setQuantity(item: CartItem, value: number): void {
+    const quantity = Math.floor(Number(value));
+    if (!Number.isFinite(quantity)) return;
+    const normalized = item.allowLooseSale
+      ? Math.max(item.minimumSaleQuantity, Math.min(quantity, item.maxQuantity))
+      : Math.max(item.minimumSaleQuantity, Math.min(Math.floor(quantity / item.quantityStep) * item.quantityStep, item.maxQuantity));
+    this.cart.update((items) => items.map((line) => line.productId === item.productId ? { ...line, quantity: normalized } : line));
+  }
+
+  removeFromCart(productId: string): void { this.cart.update((items) => items.filter((item) => item.productId !== productId)); }
+
+  selectPayment(method: 'cash' | 'mobile_money'): void {
+    this.paymentMethod.set(method);
+    if (method === 'cash') this.mobileMoneyReference.set('');
+    else this.cashTendered.set(null);
+  }
+
+  checkout(): void {
+    if (!this.canCheckout()) return;
+    this.checkoutLoading.set(true);
+    const cashTendered = this.paymentMethod() === 'cash' ? Number(this.cashTendered()) : undefined;
+    this.api.processPharmacySale({
+      customerName: this.customerName().trim() || null,
+      paymentMethod: this.paymentMethod(),
+      referenceNumber: this.mobileMoneyReference().trim() || null,
+      items: this.cart().map((item) => ({ productId: item.productId, quantity: item.quantity })),
+    }).subscribe({
+      next: (sale) => {
+        if (sale?.id) {
+          this.completeCheckout(sale, cashTendered);
+          return;
+        }
+        this.checkoutLoading.set(false);
+        this.toast.error('The server did not return a receipt. Check Transactions before attempting another payment.');
+      },
+      error: (error) => { this.checkoutLoading.set(false); this.toast.error(error?.error?.message ?? 'Unable to complete sale.'); },
+    });
+  }
+
+  openReceipt(sale: any): void { this.receiptFromCheckout.set(false); this.receiptSale.set(sale); }
+
+  closeReceipt(): void {
+    this.receiptSale.set(null);
+    this.receiptFromCheckout.set(false);
   }
 
   loadUnclosedSales(): void {
-    this.api.getPharmacyUnclosedSales().subscribe({
-      next: (res) => {
-        this.unclosedSalesCount.set(res.salesCount);
-        this.unclosedSalesTotal.set(res.salesTotal);
-        this.unclosedCashTotal.set(res.cashTotal);
-        this.unclosedMomoTotal.set(res.momoTotal);
-        this.unclosedSales.set(res.sales);
+    this.api.getPharmacyUnclosedSales().subscribe({ next: (summary) => {
+      this.unclosedSalesCount.set(Number(summary.salesCount ?? 0));
+      this.unclosedSalesTotal.set(Number(summary.salesTotal ?? 0));
+      this.unclosedCashTotal.set(Number(summary.cashTotal ?? 0));
+      this.unclosedMomoTotal.set(Number(summary.momoTotal ?? 0));
+      this.openingFloat.set(Number(summary.openingFloat ?? this.openingFloat()));
+    }});
+  }
+
+  closeSession(): void {
+    if (!this.canCloseSession()) return;
+    this.closingSession.set(true);
+    this.api.closePharmacySales({ cashCounted: this.cashCounted(), momoCounted: this.momoCounted(), notes: this.closureNotes().trim() || null }).subscribe({
+      next: (closure) => {
+        this.closingSession.set(false);
+        this.completedClosure.set(closure);
+        this.activeSession.set(null);
+        this.openingFloat.set(0);
       },
-      error: (err) => console.error('Error fetching unclosed sales summary', err)
-    });
-  }
-
-  setTab(tab: 'walk_in' | 'referred' | 'end_of_day'): void {
-    this.activeTab.set(tab);
-    this.searchQuery.set('');
-    if (tab === 'end_of_day') {
-      this.loadUnclosedSales();
-      this.cashCounted.set(null);
-      this.momoCounted.set(null);
-      this.cashCountedInput = null;
-      this.momoCountedInput = null;
-      this.closureNotesInput = '';
-      this.closureNotes.set('');
-      this.showThermalClosureSlip.set(false);
-    }
-  }
-
-
-  readonly filteredProducts = computed(() => {
-    const text = this.searchQuery().toLowerCase().trim();
-    if (!text) return this.products();
-    return this.products().filter(p => p.name.toLowerCase().includes(text));
-  });
-
-  getProductMinPrice(p: any): number {
-    if (!p.batches || p.batches.length === 0) return 0;
-    return Math.min(...p.batches.map((b: any) => b.sellingPrice));
-  }
-
-  getProductMaxPrice(p: any): number {
-    if (!p.batches || p.batches.length === 0) return 0;
-    return Math.max(...p.batches.map((b: any) => b.sellingPrice));
-  }
-
-  openBatchSelect(p: any): void {
-    if (this.selectingProductId() === p.id) {
-      this.selectingProductId.set('');
-    } else {
-      this.selectingProductId.set(p.id);
-    }
-  }
-
-  addToCartFromSelect(p: any, batchId: string): void {
-    const batch = p.batches.find((b: any) => b.id === batchId);
-    if (!batch) return;
-
-    if (batch.quantityRemaining <= 0) {
-      alert('Selected batch has no stock remaining.');
-      return;
-    }
-
-    // Add to cart signal
-    this.cart.update(items => {
-      const idx = items.findIndex(item => item.batchId === batchId);
-      if (idx > -1) {
-        const currentQty = items[idx].quantity;
-        if (currentQty >= batch.quantityRemaining) {
-          alert('Cannot exceed available batch stock level.');
-          return items;
-        }
-        const updated = [...items];
-        updated[idx] = { ...updated[idx], quantity: currentQty + 1 };
-        return updated;
-      }
-
-      return [...items, {
-        productId: p.id,
-        productName: p.name,
-        batchId: batch.id,
-        batchNumber: batch.batchNumber,
-        sellingPrice: batch.sellingPrice,
-        quantity: 1,
-        maxQuantity: batch.quantityRemaining
-      }];
-    });
-
-    this.selectingProductId.set('');
-  }
-
-  updateQuantity(item: CartItem, delta: number): void {
-    this.cart.update(items => {
-      const idx = items.findIndex(x => x.batchId === item.batchId);
-      if (idx === -1) return items;
-
-      const newQty = items[idx].quantity + delta;
-      if (newQty <= 0) {
-        return items.filter(x => x.batchId !== item.batchId);
-      }
-      
-      if (newQty > item.maxQuantity) {
-        alert('Cannot exceed available batch stock level.');
-        return items;
-      }
-
-      const updated = [...items];
-      updated[idx] = { ...updated[idx], quantity: newQty };
-      return updated;
-    });
-  }
-
-  loadPrescriptionIntoCart(script: any): void {
-    // Pull available inventory batches for items suggested in text
-    // (This matches standard dispenser logic mapping prescription keywords to active products)
-    const scriptText = script.prescriptionText.toLowerCase();
-    
-    // Auto-fill patient name
-    this.customerName.set(`${script.visit.patient.surname}, ${script.visit.patient.firstName}`);
-    this.activePrescriptionId.set(script.id);
-
-    // Let's sweep the medicine catalog to find product names that exist in prescription text
-    let loadedAny = false;
-    this.products().forEach(p => {
-      if (scriptText.includes(p.name.toLowerCase().split(' ')[0])) {
-        // Find best active batch (e.g. oldest batch with stock)
-        const activeBatch = p.batches
-          .filter((b: any) => b.quantityRemaining > 0)
-          .sort((a: any, b: any) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime())[0];
-
-        if (activeBatch) {
-          this.cart.update(items => {
-            if (items.some(x => x.batchId === activeBatch.id)) return items;
-            return [...items, {
-              productId: p.id,
-              productName: p.name,
-              batchId: activeBatch.id,
-              batchNumber: activeBatch.batchNumber,
-              sellingPrice: activeBatch.sellingPrice,
-              quantity: 1,
-              maxQuantity: activeBatch.quantityRemaining
-            }];
-          });
-          loadedAny = true;
-        }
-      }
-    });
-
-    if (loadedAny) {
-      alert('Prescription medication recognized! Auto-loaded oldest matching active batches into checkout cart.');
-      this.setTab('walk_in');
-    } else {
-      alert('No exact medicine matches found in active catalog. Please search and add manually to cart.');
-      this.setTab('walk_in');
-    }
-  }
-
-  checkoutPOS(): void {
-    if (this.cart().length === 0) return;
-
-    this.isSubmittingCheckout.set(true);
-
-    const payload = {
-      saleSource: this.activePrescriptionId() ? 'clinic_referred' : 'walk_in',
-      prescriptionId: this.activePrescriptionId(),
-      customerName: this.customerName().trim() || null,
-      paymentMethod: this.paymentMethod(),
-      items: this.cart().map(item => ({
-        productId: item.productId,
-        batchId: item.batchId,
-        quantity: item.quantity
-      }))
-    };
-
-    this.api.processPharmacySale(payload).subscribe({
-      next: (res) => {
-        this.isSubmittingCheckout.set(false);
-        this.completedSaleId.set(res.id);
-        
-        // Open receipt preview
-        this.showThermalReceipt.set(true);
-      },
-      error: (err) => {
-        console.error('POS Checkout failed', err);
-        this.isSubmittingCheckout.set(false);
-        alert(err?.error?.message ?? 'Failed to complete POS transaction.');
-      }
-    });
-  }
-
-  printThermalReceipt(): void {
-    window.print();
-  }
-
-  closeReceipt(): void {
-    this.showThermalReceipt.set(false);
-    this.cart.set([]);
-    this.customerName.set('');
-    this.activePrescriptionId.set(null);
-    this.loadInitialData();
-  }
-
-  submitClosure(): void {
-    if (this.unclosedSalesCount() === 0) return;
-
-    const cash = this.cashCounted() ?? 0;
-    const momo = this.momoCounted() ?? 0;
-    const notes = this.closureNotes().trim();
-
-    // Cache unclosed totals for the printed receipt before resetting unclosed states
-    this.unclosedCashTotalBackup = this.unclosedCashTotal();
-    this.unclosedMomoTotalBackup = this.unclosedMomoTotal();
-
-    this.isSubmittingClosure.set(true);
-
-    const payload = {
-      cashCounted: cash,
-      momoCounted: momo,
-      notes: notes || null
-    };
-
-    this.api.closePharmacySales(payload).subscribe({
-      next: (res) => {
-        this.isSubmittingClosure.set(false);
-        this.completedClosure.set(res);
-        this.showThermalClosureSlip.set(true);
-      },
-      error: (err) => {
-        console.error('Shift closure failed', err);
-        this.isSubmittingClosure.set(false);
-        alert(err?.error?.message ?? 'Failed to reconcile drawer and close shift.');
-      }
+      error: (error) => { this.closingSession.set(false); this.toast.error(error?.error?.message ?? 'Unable to close shift.'); },
     });
   }
 
   closeClosureSlip(): void {
-    this.showThermalClosureSlip.set(false);
     this.completedClosure.set(null);
-    this.setTab('walk_in');
+    this.cashCounted.set(null);
+    this.momoCounted.set(null);
+    this.closureNotes.set('');
+    this.activeTab.set('sale');
   }
-}
 
+  printDocument(): void { window.print(); }
+  private completeCheckout(sale: any, cashTendered?: number): void {
+    this.checkoutLoading.set(false);
+    this.receiptFromCheckout.set(true);
+    this.receiptSale.set({ ...sale, cashTendered, changeDue: cashTendered === undefined ? undefined : cashTendered - Number(sale.total) });
+    this.recentSales.update((sales) => [sale, ...sales.filter((item) => item.id !== sale.id)].slice(0, 30));
+    this.cart.set([]);
+    this.customerName.set('');
+    this.mobileMoneyReference.set('');
+    this.cashTendered.set(null);
+    this.searchQuery.set('');
+    this.loadProducts();
+    this.toast.success(`Sale ${sale.saleNumber} completed.`);
+  }
+  availableQuantity(batch: any): number { return Math.max(0, Number(batch?.availableQuantity ?? batch?.quantityRemaining ?? 0)); }
+  stockTone(product: any): string {
+    const stock = Number(product.stockOnHand ?? 0);
+    const reorderLevel = Number(product.reorderLevel ?? 0);
+    if (stock <= reorderLevel) return 'stock-pill--critical';
+    if (reorderLevel > 0 && stock <= reorderLevel * 1.5) return 'stock-pill--low';
+    return 'stock-pill--healthy';
+  }
+  stockMeterLevel(product: any): number {
+    const stock = Number(product.stockOnHand ?? 0);
+    const reorderLevel = Number(product.reorderLevel ?? 0);
+    if (stock <= 0) return 0;
+    if (reorderLevel <= 0) return 10;
+    return Math.min(10, Math.max(1, Math.ceil((stock / reorderLevel) * 5)));
+  }
+  stockUnitLabel(product: any): string {
+    const unit = String(product.sellingUnit ?? product.unitOfMeasure ?? 'unit');
+    return Number(product.stockOnHand) === 1 || unit.endsWith('s') ? unit : `${unit}s`;
+  }
+  productTitle(product: any): string { return String(product.brandName || product.genericName || product.name || 'Unnamed product'); }
+  productClinicalLine(product: any): string {
+    const genericName = product.brandName && product.genericName ? product.genericName : null;
+    return [genericName, product.strength, product.dosageForm].filter(Boolean).join(' · ') || 'Clinical details not recorded';
+  }
+  productPackageLabel(product: any): string {
+    const packageType = product.packageType || product.defaultPurchaseUnit || 'package';
+    const quantity = Number(product.packageQuantity ?? product.defaultUnitsPerPack ?? 1);
+    const unit = product.packageUnit || product.sellingUnit || product.unitOfMeasure || 'unit';
+    return `${packageType} of ${quantity} ${quantity === 1 ? unit : this.pluralize(unit)}`;
+  }
+  productUnavailableReason(product: any): string {
+    if (product.defaultSellingPrice === null || product.defaultSellingPrice === undefined || !Number.isFinite(Number(product.defaultSellingPrice))) return 'No selling price';
+    if (Number(product.stockOnHand ?? 0) < this.effectiveMinimumSaleQuantity(product)) return product.hasExpiredStock ? 'Expired stock only' : 'Out of stock';
+    return 'Unavailable';
+  }
+  canSellProduct(product: any): boolean {
+    const price = Number(product.defaultSellingPrice);
+    return product.defaultSellingPrice !== null && product.defaultSellingPrice !== undefined && Number.isFinite(price) && Number(product.stockOnHand ?? 0) >= this.effectiveMinimumSaleQuantity(product);
+  }
+  private effectiveMinimumSaleQuantity(product: any): number {
+    const configuredMinimum = Math.max(1, Math.floor(Number(product.minimumSaleQuantity ?? 1)));
+    if (product.allowLooseSale === true) return configuredMinimum;
+    return Math.max(configuredMinimum, Math.floor(Number(product.packageQuantity ?? product.defaultUnitsPerPack ?? 1)));
+  }
+  private saleQuantityStep(product: any): number { return product.allowLooseSale === true ? 1 : this.effectiveMinimumSaleQuantity(product); }
+  private pluralize(unit: string): string { return unit.endsWith('s') ? unit : `${unit}s`; }
+  money(value: unknown): string { return Number(value ?? 0).toFixed(2); }
+  paymentLabel(method: string): string { return method === 'mobile_money' ? 'Mobile Money' : 'Cash'; }
+  initials(value: string): string { return String(value ?? '').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'RX'; }
+  patientName(prescription: any): string { const patient = prescription?.visit?.patient; return patient ? `${patient.surname}, ${patient.firstName}` : 'Clinic patient'; }
+  saleCustomer(sale: any): string { return sale?.customerName || (sale?.prescription ? this.patientName(sale.prescription) : 'Walk-in customer'); }
+  receiptBatch(item: any): string { return item.batch?.batchNumber ? `Batch ${item.batch.batchNumber}` : 'Batch recorded in stock ledger'; }
+}

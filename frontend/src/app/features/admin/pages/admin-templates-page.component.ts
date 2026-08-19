@@ -166,7 +166,7 @@ interface ServiceItem {
               <button class="btn btn-secondary btn-sm" [disabled]="redoStack().length === 0" (click)="redo()" title="Redo">
                 <svg viewBox="0 0 24 24" style="width: 14px; height: 14px;"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
               </button>
-              <span style="font-size: 0.7rem; color: var(--slate-400); margin-left: 0.25rem;">
+              <span style="font-size: 12px; color: var(--slate-400); margin-left: 0.25rem;">
                 {{ columns().length }} cols, {{ sortedDisplayRows().length }} rows
               </span>
             </div>
@@ -291,7 +291,7 @@ interface ServiceItem {
               <svg viewBox="0 0 24 24" style="width: 12px; height: 12px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
               Add Test Row
             </button>
-            <span style="font-size: 0.7rem; color: var(--slate-400); margin-left: auto;">
+            <span style="font-size: 12px; color: var(--slate-400); margin-left: auto;">
               Drag rows to reorder. Click column headers to configure.
             </span>
           </div>
@@ -306,7 +306,7 @@ interface ServiceItem {
           
           <!-- Footer Save Bar -->
           <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.35rem; padding: 0.35rem 0;">
-            <span style="font-size: 0.725rem; font-weight: 700; color: var(--slate-500);">
+            <span style="font-size: 12px; font-weight: 700; color: var(--slate-500);">
               Draft: {{ undoStack().length }} history steps
             </span>
             <button class="btn btn-success btn-sm" (click)="saveTemplate()" [disabled]="isSavingTemplate() || columns().length === 0">
@@ -454,8 +454,8 @@ interface ServiceItem {
             <table class="clinical-print-table" style="width: 100%; border-collapse: collapse; margin-bottom: 2rem;">
               <thead>
                 <tr>
-                  <th style="border: 1px solid #0f172a; padding: 0.5rem; background-color: #f1f5f9; font-weight: 800; font-size: 0.725rem;">Test Parameter</th>
-                  <th *ngFor="let col of columns()" style="border: 1px solid #0f172a; padding: 0.5rem; background-color: #f1f5f9; font-weight: 800; font-size: 0.725rem;">
+                  <th style="border: 1px solid #0f172a; padding: 0.5rem; background-color: #f1f5f9; font-weight: 800; font-size: 12px;">Test Parameter</th>
+                  <th *ngFor="let col of columns()" style="border: 1px solid #0f172a; padding: 0.5rem; background-color: #f1f5f9; font-weight: 800; font-size: 12px;">
                     {{ col.label }}
                   </th>
                 </tr>
@@ -473,7 +473,7 @@ interface ServiceItem {
                     </td>
                     <td *ngFor="let col of columns()" style="border: 1px solid #0f172a; padding: 0.5rem 0.75rem; font-size: 0.8rem;">
                       {{ displayRow.row!.defaultValues[col.key] || '' }}
-                      <span style="font-size: 0.65rem; color: #94a3b8; margin-left: 0.15rem;" *ngIf="col.refUnit && displayRow.row!.defaultValues[col.key]">
+                      <span style="font-size: 12px; color: #94a3b8; margin-left: 0.15rem;" *ngIf="col.refUnit && displayRow.row!.defaultValues[col.key]">
                         {{ col.refUnit }}
                       </span>
                     </td>
@@ -486,7 +486,7 @@ interface ServiceItem {
                 <p style="font-family: 'Courier New', Courier, monospace; font-size: 0.85rem; margin-bottom: 0.2rem; font-style: italic; color: #94a3b8;">Verified Electronic Signature</p>
                 <div class="sig-line" style="border-top: 1.5px solid #0f172a; margin-bottom: 0.4rem;"></div>
                 <p class="sig-name" style="font-weight: 750; font-size: 0.8rem; margin: 0; color: #0f172a;">Dr. Sophia Bako, PhD (Pathology)</p>
-                <p class="sig-title" style="font-size: 0.7rem; color: #475569; margin: 0.1rem 0 0; font-weight: 500;">Laboratory Medical Director</p>
+                <p class="sig-title" style="font-size: 12px; color: #475569; margin: 0.1rem 0 0; font-weight: 500;">Laboratory Medical Director</p>
               </div>
             </div>
           </div>

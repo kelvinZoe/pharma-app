@@ -162,7 +162,7 @@ import { ToastService } from '../../../core/services/toast.service';
     .readonly-strip span,
     .field-block span {
       color: var(--app-muted-text-color);
-      font-size: 0.72rem;
+      font-size: 12px;
       font-weight: 850;
       letter-spacing: 0.08em;
       text-transform: uppercase;
@@ -228,7 +228,7 @@ import { ToastService } from '../../../core/services/toast.service';
       background: #ecfdf5;
       color: #047857;
       border: 1px solid #a7f3d0;
-      font-size: 0.72rem;
+      font-size: 12px;
       font-weight: 850;
     }
 

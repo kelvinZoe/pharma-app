@@ -292,7 +292,7 @@ interface ServiceHistoryLine {
                       <span style="color: var(--teal-600);">VIS-{{ h.id.slice(-6).toUpperCase() }}</span>
                       <span style="color: var(--slate-400);">{{ h.createdAt | date:'mediumDate' }}</span>
                     </div>
-                    <div style="font-size: 0.725rem; color: var(--slate-600); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    <div style="font-size: 12px; color: var(--slate-600); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                       {{ getVisitDeptServicesLabel(h) }}
                     </div>
                   </div>
@@ -312,18 +312,18 @@ interface ServiceHistoryLine {
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid var(--slate-200); padding-bottom: 0.5rem; margin-bottom: 0.75rem;">
                   <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700;">Diagnostic Outcomes Summary</h4>
                   <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button *ngIf="!isEditing() && serviceLines().length > 0" class="btn btn-secondary btn-sm" (click)="startEditing()" style="font-weight: 700; font-size: 0.725rem; padding: 0.2rem 0.5rem;">
+                    <button *ngIf="!isEditing() && serviceLines().length > 0" class="btn btn-secondary btn-sm" (click)="startEditing()" style="font-weight: 700; font-size: 12px; padding: 0.2rem 0.5rem;">
                       Edit Results
                     </button>
                     <div *ngIf="isEditing()" style="display: flex; gap: 0.35rem;">
-                      <button class="btn btn-secondary btn-sm" (click)="cancelEditing()" [disabled]="isSaving()" style="font-weight: 700; font-size: 0.725rem; padding: 0.2rem 0.5rem;">
+                      <button class="btn btn-secondary btn-sm" (click)="cancelEditing()" [disabled]="isSaving()" style="font-weight: 700; font-size: 12px; padding: 0.2rem 0.5rem;">
                         Cancel
                       </button>
-                      <button class="btn btn-success btn-sm" (click)="saveEditedResults()" [disabled]="isSaving()" style="font-weight: 700; font-size: 0.725rem; padding: 0.2rem 0.5rem; background-color: var(--app-success-color); color: #fff;">
+                      <button class="btn btn-success btn-sm" (click)="saveEditedResults()" [disabled]="isSaving()" style="font-weight: 700; font-size: 12px; padding: 0.2rem 0.5rem; background-color: var(--app-success-color); color: #fff;">
                         {{ isSaving() ? 'Saving...' : 'Save' }}
                       </button>
                     </div>
-                    <span class="status-pill" [class]="v.status" style="font-size: 0.65rem; padding: 0.15rem 0.45rem;">
+                    <span class="status-pill" [class]="v.status" style="font-size: 12px; padding: 0.15rem 0.45rem;">
                       {{ getStatusLabel(v.status) }}
                     </span>
                   </div>
@@ -336,7 +336,7 @@ interface ServiceHistoryLine {
                     <!-- Service Summary Header -->
                     <div class="line-header" style="background: var(--slate-50); border: 1px solid var(--slate-200); padding: 0.5rem 0.75rem; border-radius: 0.35rem 0.35rem 0 0; display: flex; align-items: center; justify-content: space-between;">
                       <span class="service-name" style="font-size: 0.8rem; font-weight: 700; color: var(--slate-700);">{{ s.serviceName }}</span>
-                      <span class="badge-status-outcome" [class.done]="s.status === 'done'" [class.not-done]="s.status === 'not_done'" style="font-size: 0.7rem; padding: 0.1rem 0.35rem;">
+                      <span class="badge-status-outcome" [class.done]="s.status === 'done'" [class.not-done]="s.status === 'not_done'" style="font-size: 12px; padding: 0.1rem 0.35rem;">
                         {{ s.status === 'done' ? '✓ DONE' : '✗ NOT DONE' }}
                       </span>
                     </div>
@@ -362,7 +362,7 @@ interface ServiceHistoryLine {
                               <!-- Group by Sections -->
                               <ng-container *ngFor="let sec of s.template.sections">
                                 <tr style="background-color: var(--slate-50);">
-                                  <td [attr.colspan]="s.template.columns.length + 1" style="border: 1px solid var(--slate-300); padding: 0.3rem 0.45rem; font-weight: 800; font-size: 0.7rem; text-transform: uppercase; color: var(--slate-700); font-family: 'Inter', sans-serif;">
+                                  <td [attr.colspan]="s.template.columns.length + 1" style="border: 1px solid var(--slate-300); padding: 0.3rem 0.45rem; font-weight: 800; font-size: 12px; text-transform: uppercase; color: var(--slate-700); font-family: 'Inter', sans-serif;">
                                     {{ sec.name }}
                                   </td>
                                 </tr>
@@ -370,7 +370,7 @@ interface ServiceHistoryLine {
                                   <td style="border: 1px solid var(--slate-300); padding: 0.35rem 0.45rem; font-weight: 700; color: var(--slate-800); font-family: 'Inter', sans-serif;">
                                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%;">
                                       <span>{{ row.label }}</span>
-                                      <label *ngIf="isEditing()" style="font-size: 0.65rem; color: #dc2626; display: flex; align-items: center; gap: 0.15rem; cursor: pointer; user-select: none;">
+                                      <label *ngIf="isEditing()" style="font-size: 12px; color: #dc2626; display: flex; align-items: center; gap: 0.15rem; cursor: pointer; user-select: none;">
                                         <input type="checkbox" [(ngModel)]="s.resultValues[row.id].isAbnormal" />
                                         Abnormal
                                       </label>
@@ -392,7 +392,7 @@ interface ServiceHistoryLine {
                                       >
                                         {{ s.resultValues[row.id]?.[col.key] }}
                                       </span>
-                                      <span style="font-size: 0.6rem; color: var(--slate-400); font-family: 'Inter', sans-serif;" *ngIf="col.refUnit && s.resultValues[row.id]?.[col.key]">
+                                      <span style="font-size: 12px; color: var(--slate-400); font-family: 'Inter', sans-serif;" *ngIf="col.refUnit && s.resultValues[row.id]?.[col.key]">
                                         {{ col.refUnit }}
                                       </span>
                                     </div>
@@ -403,7 +403,7 @@ interface ServiceHistoryLine {
                               <!-- General parameters outside sections -->
                               <ng-container *ngIf="getRowsForSection(s, null).length > 0">
                                 <tr style="background-color: var(--slate-100);" *ngIf="s.template.sections?.length > 0">
-                                  <td [attr.colspan]="s.template.columns.length + 1" style="border: 1px solid var(--slate-300); padding: 0.3rem 0.45rem; font-weight: 800; font-size: 0.7rem; text-transform: uppercase; color: var(--slate-700);">
+                                  <td [attr.colspan]="s.template.columns.length + 1" style="border: 1px solid var(--slate-300); padding: 0.3rem 0.45rem; font-weight: 800; font-size: 12px; text-transform: uppercase; color: var(--slate-700);">
                                     General Observations
                                   </td>
                                 </tr>
@@ -411,7 +411,7 @@ interface ServiceHistoryLine {
                                   <td style="border: 1px solid var(--slate-300); padding: 0.35rem 0.45rem; font-weight: 700; color: var(--slate-800);">
                                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%;">
                                       <span>{{ row.label }}</span>
-                                      <label *ngIf="isEditing()" style="font-size: 0.65rem; color: #dc2626; display: flex; align-items: center; gap: 0.15rem; cursor: pointer; user-select: none;">
+                                      <label *ngIf="isEditing()" style="font-size: 12px; color: #dc2626; display: flex; align-items: center; gap: 0.15rem; cursor: pointer; user-select: none;">
                                         <input type="checkbox" [(ngModel)]="s.resultValues[row.id].isAbnormal" />
                                         Abnormal
                                       </label>
@@ -433,7 +433,7 @@ interface ServiceHistoryLine {
                                       >
                                         {{ s.resultValues[row.id]?.[col.key] }}
                                       </span>
-                                      <span style="font-size: 0.6rem; color: var(--slate-400); font-family: 'Inter', sans-serif;" *ngIf="col.refUnit && s.resultValues[row.id]?.[col.key]">
+                                      <span style="font-size: 12px; color: var(--slate-400); font-family: 'Inter', sans-serif;" *ngIf="col.refUnit && s.resultValues[row.id]?.[col.key]">
                                         {{ col.refUnit }}
                                       </span>
                                     </div>
@@ -485,7 +485,7 @@ interface ServiceHistoryLine {
                       <span style="font-size: 1.1rem;">⚠️</span>
                       <div>
                         <strong style="color: var(--slate-700);">Procedure Cancelled</strong>
-                        <div style="font-size: 0.725rem; color: var(--slate-500);">Reason: "{{ s.notDoneReason || 'Not stated' }}"</div>
+                        <div style="font-size: 12px; color: var(--slate-500);">Reason: "{{ s.notDoneReason || 'Not stated' }}"</div>
                       </div>
                     </div>
                   </div>
@@ -497,7 +497,7 @@ interface ServiceHistoryLine {
                       <span>Prescriptions Hand-off Note</span>
                     </div>
                     <p style="font-size: 0.8rem; font-family: monospace; white-space: pre-line; background: var(--slate-50); padding: 0.5rem; border-radius: 0.25rem; margin: 0;">
-                      {{ selectedVisit()?.prescriptions?.[0]?.medicationNotes || selectedVisit()?.prescriptionNotes }}
+                      {{ selectedVisit()?.prescriptions?.[0]?.prescriptionText || selectedVisit()?.prescriptionNotes }}
                     </p>
                   </div>
                 </div>
@@ -627,7 +627,7 @@ interface ServiceHistoryLine {
         <div class="a4-prescription-section" *ngIf="hasPrescription()">
           <h4 class="a4-section-hdr">Issued Prescriptions (Medication Guidelines)</h4>
           <div class="a4-rx-notepad">
-            <p>{{ selectedVisit()?.prescriptions?.[0]?.medicationNotes || selectedVisit()?.prescriptionNotes }}</p>
+            <p>{{ selectedVisit()?.prescriptions?.[0]?.prescriptionText || selectedVisit()?.prescriptionNotes }}</p>
           </div>
         </div>
 
@@ -976,7 +976,7 @@ export class WorklistResultsPageComponent implements OnInit {
   hasPrescription(): boolean {
     const v = this.selectedVisit();
     if (!v) return false;
-    return !!(v.prescriptionNotes || (v.prescriptions && v.prescriptions.length > 0 && v.prescriptions[0].medicationNotes));
+    return !!(v.prescriptionNotes || (v.prescriptions && v.prescriptions.length > 0 && v.prescriptions[0].prescriptionText));
   }
 
   getScientistName(): string {
@@ -1017,15 +1017,15 @@ export class WorklistResultsPageComponent implements OnInit {
           <style>
             body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 25px; color: #000; background: #fff; line-height: 1.5; font-size: 13px; }
             h2, h3, h4 { margin: 0 0 5px 0; font-weight: 800; color: #000; }
-            span { font-size: 11px; color: #000; }
+            span { font-size: 12px; color: #000; }
             .a4-letterhead { display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 12px; width: 100%; }
             .letterhead-brand-block { display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 8px; }
             .letterhead-brand-block img { max-height: 48px; max-width: 150px; object-fit: contain; margin-right: 0.75rem; }
             .letterhead-brand-block svg { width: 32px; height: 32px; stroke: #000; fill: none; flex-shrink: 0; }
             .brand-text-block { display: flex; flex-direction: column; justify-content: center; }
             .brand-text-block h2 { font-size: 18px; letter-spacing: 0.5px; color: #000; margin: 0; line-height: 1.2; }
-            .brand-text-block span { font-size: 10px; color: #000; font-weight: 700; text-transform: uppercase; margin-top: 2px; line-height: 1.2; }
-            .letterhead-contacts-row { display: flex; gap: 20px; font-size: 11px; color: #000; width: 100%; flex-wrap: wrap; margin-top: 6px; }
+            .brand-text-block span { font-size: 12px; color: #000; font-weight: 700; text-transform: uppercase; margin-top: 2px; line-height: 1.2; }
+            .letterhead-contacts-row { display: flex; gap: 20px; font-size: 12px; color: #000; width: 100%; flex-wrap: wrap; margin-top: 6px; }
             .a4-patient-grid { display: flex; justify-content: space-between; margin: 15px 0; font-size: 12px; color: #000; }
             .meta-col strong { color: #000; }
             .text-right { text-align: right; }
@@ -1036,19 +1036,19 @@ export class WorklistResultsPageComponent implements OnInit {
             .a4-result-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-family: 'Courier New', monospace; font-size: 12px; color: #000; }
             .a4-result-table th { border: 1px solid #000; padding: 6px 8px; background-color: #f1f5f9; font-weight: 700; text-align: left; color: #000; }
             .a4-result-table td { border: 1px solid #000; padding: 5px 8px; color: #000; }
-            .a4-sec-header td { font-weight: 700; background-color: #f8fafc; font-family: 'Helvetica Neue', Arial; font-size: 11px; text-transform: uppercase; color: #000; }
+            .a4-sec-header td { font-weight: 700; background-color: #f8fafc; font-family: 'Helvetica Neue', Arial; font-size: 12px; text-transform: uppercase; color: #000; }
             .row-label { font-weight: 600; font-family: 'Helvetica Neue', Arial; color: #000; }
             .abnormal { background-color: #fef2f2 !important; color: #dc2626 !important; }
             .abnormal .cell-val { font-weight: 700; }
             .a4-narrative-box { border: 1px solid #000; border-radius: 4px; padding: 10px; background-color: #f8fafc; font-style: italic; color: #000; }
-            .a4-cancelled-reason { color: #ef4444; font-size: 11px; margin: 5px 0 0 0; }
+            .a4-cancelled-reason { color: #ef4444; font-size: 12px; margin: 5px 0 0 0; }
             .a4-prescription-section { margin-top: 30px; border: 1.5px dashed #000; border-radius: 4px; padding: 12px; page-break-inside: avoid; }
-            .a4-section-hdr { font-size: 11px; text-transform: uppercase; margin: 0 0 8px 0; color: #000; }
+            .a4-section-hdr { font-size: 12px; text-transform: uppercase; margin: 0 0 8px 0; color: #000; }
             .a4-rx-notepad { font-family: 'Courier New', monospace; white-space: pre-line; font-size: 12px; color: #000; }
             .a4-footer-signature { display: flex; justify-content: flex-end; margin-top: 60px; page-break-inside: avoid; color: #000; }
             .sig-col { width: 250px; text-align: right; }
             .sig-line { width: 100%; border-bottom: 1.5px solid #000; margin-bottom: 6px; height: 75px; }
-            .sig-sub { font-size: 10px; color: #000; }
+            .sig-sub { font-size: 12px; color: #000; }
             @media print {
               body { margin: 20mm; padding: 0; }
               @page { size: A4 portrait; margin: 0; }

@@ -75,11 +75,12 @@
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                 <polyline points="22,6 12,13 2,6" />
               </svg>
-              <input formControlName="email" type="text" placeholder="clinician@example.com or sfc-karthur" autocomplete="username" />
+              <input formControlName="email" type="text" placeholder="email, username, or clinic-code/username" autocomplete="username" />
             </div>
             @if (loginForm.controls.email.touched && loginForm.controls.email.invalid) {
               <span class="error-msg">Email address or username is required.</span>
             }
+            <span class="input-tip">If a username exists at more than one clinic, use clinic-code/username.</span>
           </div>
 
           <!-- Password input -->

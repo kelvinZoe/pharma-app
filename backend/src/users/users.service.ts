@@ -20,29 +20,12 @@ export class UsersService {
       roles: u.roles ? u.roles.split(',').map(Number) : [u.role],
     });
 
-    if (page === undefined && limit === undefined && search === undefined) {
-      const data = await this.prisma.user.findMany({
-        select: {
-          id: true,
-          fullName: true,
-          username: true,
-          phone: true,
-          email: true,
-          role: true,
-          roles: true,
-          module: true,
-          isActive: true,
-          isVerified: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-      return data.map(rolesMapper);
-    }
-
-    const pageNum = page ? Math.max(1, Number(page)) : 1;
-    const limitNum = limit ? Math.max(1, Number(limit)) : 20;
+    const requestedPage = Number(page);
+    const requestedLimit = Number(limit);
+    const pageNum = Number.isFinite(requestedPage) ? Math.max(1, Math.trunc(requestedPage)) : 1;
+    const limitNum = Number.isFinite(requestedLimit)
+      ? Math.min(200, Math.max(1, Math.trunc(requestedLimit)))
+      : 20;
     const skip = (pageNum - 1) * limitNum;
 
     const where: any = {};
@@ -87,16 +70,28 @@ export class UsersService {
     };
   }
 
-  async create(data: any) {
-    if (!data.email || !data.fullName) {
+  async create(data: any, actorUserId: string) {
+    const email = String(data.email ?? '').trim().toLowerCase();
+    const fullName = String(data.fullName ?? '').trim();
+    if (!email || !fullName) {
       throw new BadRequestException('Email and full name are required');
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new BadRequestException('A valid email address is required');
+    }
+    if (fullName.length < 2) {
+      throw new BadRequestException('Full name must be at least 2 characters');
     }
 
     const existing = await this.prisma.user.findUnique({
-      where: { email: data.email },
+      where: { email },
     });
     if (existing) {
       throw new BadRequestException('Email is already taken');
+    }
+
+    if (data.isActive !== undefined && typeof data.isActive !== 'boolean') {
+      throw new BadRequestException('Active status must be true or false');
     }
 
     const inviteToken = crypto.randomBytes(32).toString('hex');
@@ -106,29 +101,25 @@ export class UsersService {
     const dummyPasswordHash = await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 10);
 
     // Resolve roles array to primary role and module
-    let primaryRole = Number(data.role ?? 1);
-    let rolesArray: number[] = [primaryRole];
-    if (Array.isArray(data.roles) && data.roles.length > 0) {
-      rolesArray = data.roles.map(Number);
-      primaryRole = rolesArray[0];
-    }
+    const rolesArray = this.normalizeRoles(data.roles, data.role);
+    const primaryRole = rolesArray[0];
     const rolesStr = rolesArray.join(',');
     const moduleResolved = this.resolveModule(primaryRole);
-    const username = await this.generateUsername(data.fullName);
+    const username = await this.generateUsername(fullName);
 
     let newUser: any;
     try {
       newUser = await this.prisma.user.create({
         data: {
-          fullName: data.fullName,
-          email: data.email,
+          fullName,
+          email,
           username,
           passwordHash: dummyPasswordHash,
-          phone: data.phone ?? null,
+          phone: data.phone ? String(data.phone).trim() : null,
           role: primaryRole,
           roles: rolesStr,
           module: moduleResolved,
-          isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
+          isActive: data.isActive ?? true,
           isVerified: false,
           inviteToken,
           inviteExpires,
@@ -143,7 +134,6 @@ export class UsersService {
           roles: true,
           module: true,
           isActive: true,
-          inviteToken: true,
         },
       });
     } catch (err: any) {
@@ -161,8 +151,37 @@ export class UsersService {
       throw err;
     }
 
+    if (rolesArray.includes(0) || rolesArray.includes(4)) {
+      const defaultLocation = await this.prisma.pharmacyLocation.findFirst({
+        where: { isActive: true },
+        orderBy: [{ code: 'asc' }, { createdAt: 'asc' }],
+      });
+      if (defaultLocation) {
+        await this.prisma.userPharmacyLocation.create({
+          data: {
+            userId: newUser.id,
+            locationId: defaultLocation.id,
+            tenantId: defaultLocation.tenantId,
+            role: rolesArray.includes(0) ? 'admin' : 'pharmacy',
+            isDefault: true,
+            isActive: true,
+          },
+        });
+      }
+    }
+
     // Send the email invite
-    await this.emailService.sendStaffInvitation(data.email, data.fullName, inviteToken);
+    await this.emailService.sendStaffInvitation(email, fullName, inviteToken);
+
+    await this.prisma.auditLog.create({
+      data: {
+        actionType: 'create',
+        entityType: 'user',
+        entityId: newUser.id,
+        afterData: JSON.stringify({ roles: rolesArray, isActive: newUser.isActive, isVerified: false }),
+        actorUserId,
+      },
+    });
 
     return {
       ...newUser,
@@ -170,7 +189,7 @@ export class UsersService {
     };
   }
 
-  async resendInvitation(id: string) {
+  async resendInvitation(id: string, actorUserId: string) {
     const inviteToken = crypto.randomBytes(32).toString('hex');
     const inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
@@ -192,24 +211,34 @@ export class UsersService {
       throw new BadRequestException('This staff account has already been verified.');
     }
 
-    await this.prisma.user.update({
-      where: { id },
-      data: {
-        inviteToken,
-        inviteExpires,
-      },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id },
+        data: {
+          inviteToken,
+          inviteExpires,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          actionType: 'resend_invitation',
+          entityType: 'user',
+          entityId: id,
+          afterData: JSON.stringify({ inviteExpires }),
+          actorUserId,
+        },
+      });
     });
 
     await this.emailService.sendStaffInvitation(user.email, user.fullName, inviteToken);
 
     return {
       message: 'Staff invitation resent successfully.',
-      inviteToken,
-      inviteExpires,
+      expiresAt: inviteExpires,
     };
   }
 
-  async remove(id: string) {
+  async remove(id: string, actorUserId: string) {
     const tenantId = TenantContextService.getTenantId();
     this.logger.log(`Deleting user ${id}${tenantId ? ` in tenant ${tenantId}` : ''}`);
 
@@ -219,18 +248,34 @@ export class UsersService {
     }
 
     // Safeguard: prevent deleting the last admin account
-    if (user.role === 0) {
-      const adminCount = await this.prisma.user.count({ where: { role: 0 } });
-      if (adminCount <= 1) {
-        throw new BadRequestException('Cannot remove the last administrator account');
-      }
+    if (this.hasAdminRole(user) && !(await this.hasAnotherActiveAdmin(id))) {
+      throw new BadRequestException('Cannot remove the last active administrator account');
     }
 
-    const deleted = await this.prisma.user.deleteMany({ where: { id } });
-    if (deleted.count === 0) {
-      throw new NotFoundException('User not found');
+    if (!user.isActive) {
+      return { message: 'Staff account is already inactive' };
     }
-    return { message: 'Staff account removed successfully' };
+
+    await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.user.updateMany({
+        where: { id, isActive: true },
+        data: { isActive: false },
+      });
+      if (updated.count !== 1) {
+        throw new BadRequestException('Staff account changed. Refresh and try again.');
+      }
+      await tx.auditLog.create({
+        data: {
+          actionType: 'deactivate',
+          entityType: 'user',
+          entityId: id,
+          beforeData: JSON.stringify({ isActive: true, role: user.role, roles: user.roles }),
+          afterData: JSON.stringify({ isActive: false }),
+          actorUserId,
+        },
+      });
+    });
+    return { message: 'Staff account deactivated successfully' };
   }
 
   async findProfile(id: string) {
@@ -328,60 +373,92 @@ export class UsersService {
     return this.toSessionProfile(updated);
   }
 
-  async update(id: string, data: any) {
+  async update(id: string, data: any, actorUserId: string) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
     const updateData: any = {};
-    if (data.fullName !== undefined) updateData.fullName = data.fullName;
-    if (data.phone !== undefined) updateData.phone = data.phone;
-    if (data.isActive !== undefined) updateData.isActive = Boolean(data.isActive);
+    if (data.fullName !== undefined) {
+      const fullName = String(data.fullName).trim();
+      if (fullName.length < 2) throw new BadRequestException('Full name must be at least 2 characters');
+      updateData.fullName = fullName;
+    }
+    if (data.phone !== undefined) updateData.phone = data.phone ? String(data.phone).trim() : null;
+    if (data.isActive !== undefined) {
+      if (typeof data.isActive !== 'boolean') throw new BadRequestException('Active status must be true or false');
+      updateData.isActive = data.isActive;
+    }
 
-    // Handle roles array update
-    if (Array.isArray(data.roles) && data.roles.length > 0) {
-      const rolesArray = data.roles.map(Number);
+    if (Array.isArray(data.roles) || data.role !== undefined) {
+      const rolesArray = this.normalizeRoles(data.roles, data.role ?? user.role);
       const primaryRole = rolesArray[0];
       updateData.roles = rolesArray.join(',');
       updateData.role = primaryRole;
       updateData.module = this.resolveModule(primaryRole);
-    } else if (data.role !== undefined) {
-      updateData.role = Number(data.role);
-      updateData.roles = String(data.role);
-      updateData.module = this.resolveModule(Number(data.role));
     }
-    if (data.module !== undefined) updateData.module = data.module;
 
     if (data.password) {
-      updateData.passwordHash = await bcrypt.hash(data.password, 10);
+      const password = String(data.password);
+      if (password.length < 6) throw new BadRequestException('Password must be at least 6 characters');
+      updateData.passwordHash = await bcrypt.hash(password, 10);
     }
 
-    // Check email change
-    if (data.email && data.email !== user.email) {
-      const existing = await this.prisma.user.findUnique({
-        where: { email: data.email },
-      });
-      if (existing) {
-        throw new BadRequestException('Email is already taken');
+    if (data.email !== undefined) {
+      const email = String(data.email).trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        throw new BadRequestException('A valid email address is required');
       }
-      updateData.email = data.email;
+      if (email === user.email) {
+        updateData.email = email;
+      } else {
+        const existing = await this.prisma.user.findUnique({
+          where: { email },
+        });
+        if (existing) {
+          throw new BadRequestException('Email is already taken');
+        }
+        updateData.email = email;
+      }
     }
 
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data: updateData,
-      select: {
-        id: true,
-        fullName: true,
-        username: true,
-        phone: true,
-        email: true,
-        role: true,
-        roles: true,
-        module: true,
-        isActive: true,
-      },
+    const resultingRoles = updateData.roles ? String(updateData.roles).split(',').map(Number) : this.getUserRoles(user);
+    const remainsActive = updateData.isActive ?? user.isActive;
+    if (id === actorUserId && (!remainsActive || !resultingRoles.includes(0))) {
+      throw new BadRequestException('Use another administrator to change your own administrator access');
+    }
+    if (this.hasAdminRole(user) && (!remainsActive || !resultingRoles.includes(0)) && !(await this.hasAnotherActiveAdmin(id))) {
+      throw new BadRequestException('Cannot remove the last active administrator account');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const changed = await tx.user.update({
+        where: { id },
+        data: updateData,
+        select: {
+          id: true,
+          fullName: true,
+          username: true,
+          phone: true,
+          email: true,
+          role: true,
+          roles: true,
+          module: true,
+          isActive: true,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          actionType: 'update',
+          entityType: 'user',
+          entityId: id,
+          beforeData: JSON.stringify({ fullName: user.fullName, email: user.email, phone: user.phone, role: user.role, roles: user.roles, isActive: user.isActive }),
+          afterData: JSON.stringify({ fullName: changed.fullName, email: changed.email, phone: changed.phone, role: changed.role, roles: changed.roles, isActive: changed.isActive }),
+          actorUserId,
+        },
+      });
+      return changed;
     });
 
     return {
@@ -400,6 +477,40 @@ export class UsersService {
       case 5:
       default: return 'accounting';
     }
+  }
+
+  private normalizeRoles(values: unknown, fallback: unknown): number[] {
+    const source = Array.isArray(values) && values.length > 0 ? values : [fallback ?? 1];
+    const roles = [...new Set(source.map(Number))];
+    if (!roles.length || roles.some((role) => !Number.isInteger(role) || role < 0 || role > 5)) {
+      throw new BadRequestException('Select one or more valid staff roles');
+    }
+    return roles.includes(0) ? [0] : roles;
+  }
+
+  private getUserRoles(user: { role: number; roles?: string | null }): number[] {
+    return user.roles ? String(user.roles).split(',').map(Number) : [Number(user.role)];
+  }
+
+  private hasAdminRole(user: { role: number; roles?: string | null }): boolean {
+    return this.getUserRoles(user).includes(0);
+  }
+
+  private async hasAnotherActiveAdmin(excludedUserId: string): Promise<boolean> {
+    const count = await this.prisma.user.count({
+      where: {
+        id: { not: excludedUserId },
+        isActive: true,
+        OR: [
+          { role: 0 },
+          { roles: '0' },
+          { roles: { startsWith: '0,' } },
+          { roles: { endsWith: ',0' } },
+          { roles: { contains: ',0,' } },
+        ],
+      },
+    });
+    return count > 0;
   }
 
   private toSessionProfile(user: any) {
@@ -435,10 +546,11 @@ export class UsersService {
 
     for (let attempt = 0; attempt < 100; attempt += 1) {
       const candidate = attempt === 0 ? baseUsername : `${baseUsername}${attempt + 1}`;
-      const existing = await this.prisma.$queryRaw<Array<{ id: string }>>`
-        SELECT "id" FROM "User" WHERE "username" = ${candidate} LIMIT 1
-      `;
-      if (existing.length === 0) {
+      const existing = await this.prisma.user.findFirst({
+        where: { username: candidate },
+        select: { id: true },
+      });
+      if (!existing) {
         return candidate;
       }
     }

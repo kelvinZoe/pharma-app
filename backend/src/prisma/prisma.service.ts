@@ -16,8 +16,29 @@ const TENANT_MODELS = new Set([
   'ClinicInvoice',
   'ClinicPayment',
   'ClinicCashSession',
+  'PharmacyMedicine',
   'PharmacyProduct',
+  'PharmacyLocation',
+  'UserPharmacyLocation',
+  'PharmacyBatch',
+  'PharmacyStockMovement',
+  'PharmacyLocationProduct',
+  'PharmacySupplier',
+  'PharmacyPurchaseOrder',
+  'PharmacyPurchaseOrderLine',
+  'PharmacyGoodsReceipt',
+  'PharmacyGoodsReceiptLine',
+  'PharmacySupplierInvoice',
+  'PharmacySupplierPayment',
+  'PharmacyPurchaseReturn',
+  'PharmacyPurchaseReturnLine',
+  'PharmacyStockCount',
+  'PharmacyStockCountLine',
+  'PharmacyStockAdjustment',
+  'PharmacyTransfer',
+  'PharmacyTransferLine',
   'PharmacySale',
+  'PharmacySaleItem',
   'PharmacyDailyClosure',
   'AuditLog',
   'Prescription',
@@ -30,18 +51,47 @@ const MODELS_WITH_CREATED_AT = new Set([
   'Tenant', 'Department', 'User', 'Patient', 'Visit', 'Service', 'VisitService',
   'ServiceResultTemplate', 'VisitResult', 'Prescription', 'ClinicInvoice',
   'ClinicPayment', 'ClinicCashSession', 'PharmacyProduct', 'PharmacyBatch', 'PharmacyStockMovement',
-  'PharmacySale', 'PharmacySaleItem', 'AuditLog', 'PharmacyDailyClosure',
+  'PharmacyLocationProduct', 'PharmacySupplier', 'PharmacyPurchaseOrder', 'PharmacyPurchaseOrderLine', 'PharmacyGoodsReceipt', 'PharmacyGoodsReceiptLine',
+  'PharmacySupplierInvoice', 'PharmacySupplierPayment', 'PharmacyPurchaseReturn', 'PharmacyPurchaseReturnLine',
+  'PharmacyStockCount', 'PharmacyStockCountLine', 'PharmacyStockAdjustment',
+  'PharmacyTransfer', 'PharmacyTransferLine',
+  'PharmacyLocation', 'UserPharmacyLocation', 'PharmacySale', 'PharmacySaleItem', 'AuditLog', 'PharmacyDailyClosure',
   'GeneralTemplate', 'Expense', 'Notification'
 ]);
 
 const MODELS_WITH_UPDATED_AT = new Set([
   'Tenant', 'Department', 'User', 'Patient', 'Visit', 'Service', 'VisitService',
   'ServiceResultTemplate', 'VisitResult', 'Prescription', 'ClinicInvoice',
-  'ClinicPayment', 'ClinicCashSession', 'PharmacyProduct', 'PharmacyBatch', 'PharmacyStockMovement',
-  'PharmacySale', 'AuditLog', 'PharmacyDailyClosure', 'GeneralTemplate', 'Expense', 'Notification'
+  'ClinicPayment', 'ClinicCashSession', 'PharmacyProduct', 'PharmacyBatch',
+  'PharmacyLocationProduct', 'PharmacySupplier', 'PharmacyPurchaseOrder', 'PharmacyPurchaseOrderLine', 'PharmacyGoodsReceipt',
+  'PharmacySupplierInvoice', 'PharmacySupplierPayment', 'PharmacyPurchaseReturn',
+  'PharmacyStockCount', 'PharmacyStockCountLine', 'PharmacyStockAdjustment',
+  'PharmacyTransfer', 'PharmacyTransferLine',
+  'PharmacyLocation', 'UserPharmacyLocation', 'PharmacySale', 'PharmacyDailyClosure', 'GeneralTemplate', 'Expense', 'Notification'
 ]);
 
 const isTenantModel = (model: string): boolean => TENANT_MODELS.has(model);
+
+const RELATION_SCOPED_MODELS = new Set([
+  'Tenant',
+  'VisitService',
+  'ServiceResultTemplate',
+  'VisitResult',
+  'GeneralTemplateService',
+]);
+
+const isTenantScopedModel = (model: string): boolean => isTenantModel(model) || RELATION_SCOPED_MODELS.has(model);
+
+function relationTenantFilter(model: string, tenantId: string): Record<string, unknown> {
+  switch (model) {
+    case 'Tenant': return { id: tenantId };
+    case 'VisitService': return { visit: { tenantId } };
+    case 'ServiceResultTemplate': return { service: { tenantId } };
+    case 'VisitResult': return { visitService: { visit: { tenantId } } };
+    case 'GeneralTemplateService': return { generalTemplate: { tenantId } };
+    default: return {};
+  }
+}
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -72,7 +122,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       adapter = new PrismaBetterSqlite3({ url: `file:${dbPath}` });
     }
 
-    super({ adapter });
+    super({
+      adapter,
+      transactionOptions: {
+        maxWait: 15_000,
+        timeout: 30_000,
+      },
+    });
 
     const self = this;
     this.extendedClient = this.$extends({
@@ -81,6 +137,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
           async $allOperations({ model, operation, args, query }) {
             const tenantId = TenantContextService.getTenantId();
             const anyArgs = args as any;
+
+            if (!tenantId && isTenantScopedModel(model) && !TenantContextService.isUnscopedAllowed()) {
+              throw new Error(`Tenant context is required for ${model}.${operation}`);
+            }
 
             // 1. Inject Tenant ID
             if (tenantId && isTenantModel(model)) {
@@ -93,6 +153,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
                 } else if (anyArgs.data) {
                   anyArgs.data.tenantId = tenantId;
                 }
+              } else if (operation === 'upsert') {
+                anyArgs.where = { ...(anyArgs.where || {}), tenantId };
+                anyArgs.create = { ...(anyArgs.create || {}), tenantId };
               } else if (operation === 'findUnique' || operation === 'findUniqueOrThrow') {
                 const findFirstOperation = operation === 'findUnique' ? 'findFirst' : 'findFirstOrThrow';
                 const currentWhere = anyArgs.where || {};
@@ -118,6 +181,30 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
               ) {
                 anyArgs.where = anyArgs.where || {};
                 anyArgs.where.tenantId = tenantId;
+              }
+            } else if (tenantId && RELATION_SCOPED_MODELS.has(model)) {
+              const tenantFilter = relationTenantFilter(model, tenantId);
+              if (operation === 'findUnique' || operation === 'findUniqueOrThrow') {
+                const findFirstOperation = operation === 'findUnique' ? 'findFirst' : 'findFirstOrThrow';
+                const newArgs = {
+                  ...args,
+                  where: { ...(anyArgs.where || {}), ...tenantFilter },
+                };
+                return (self.extendedClient as any)[model][findFirstOperation](newArgs);
+              }
+              if (
+                operation === 'findFirst' ||
+                operation === 'findFirstOrThrow' ||
+                operation === 'findMany' ||
+                operation === 'update' ||
+                operation === 'updateMany' ||
+                operation === 'delete' ||
+                operation === 'deleteMany' ||
+                operation === 'count' ||
+                operation === 'aggregate' ||
+                operation === 'groupBy'
+              ) {
+                anyArgs.where = { ...(anyArgs.where || {}), ...tenantFilter };
               }
             }
 

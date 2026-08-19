@@ -1,30 +1,29 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { getInternetDate } from '../common/clock';
+import { buildDateRange } from '../common/date-range';
+
+const DEFAULT_REPORT_DAYS = 31;
+const MAX_REPORT_DAYS = 366;
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 250;
 
 @Injectable()
 export class ReportsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getClinicStream(startDate?: string, endDate?: string, page?: number, limit?: number) {
+  async getClinicStream(startDate?: string, endDate?: string, page: number = 1, limit: number = DEFAULT_PAGE_SIZE) {
+    const safePage = Number.isInteger(page) && page > 0 ? page : 1;
+    const safeLimit = Number.isInteger(limit) ? Math.min(Math.max(limit, 1), MAX_PAGE_SIZE) : DEFAULT_PAGE_SIZE;
     const whereClause: any = {
       status: { not: 'voided' },
+      paidAt: buildDateRange(startDate, endDate, { defaultDays: DEFAULT_REPORT_DAYS, maxDays: MAX_REPORT_DAYS }),
       invoice: {
         visit: {
           status: { not: 'deleted' },
         },
       },
     };
-    if (startDate || endDate) {
-      whereClause.paidAt = {};
-      if (startDate) {
-        whereClause.paidAt.gte = new Date(startDate);
-      }
-      if (endDate) {
-        whereClause.paidAt.lte = new Date(endDate);
-      }
-    }
-
     const findOptions: any = {
       where: whereClause,
       include: {
@@ -43,34 +42,26 @@ export class ReportsService {
         },
       },
       orderBy: { paidAt: 'desc' },
+      skip: (safePage - 1) * safeLimit,
+      take: safeLimit,
     };
-
-    if (page !== undefined && limit !== undefined) {
-      findOptions.skip = (page - 1) * limit;
-      findOptions.take = limit;
-    }
 
     const [data, total] = await Promise.all([
       this.prisma.clinicPayment.findMany(findOptions),
       this.prisma.clinicPayment.count({ where: whereClause }),
     ]);
 
-    return page !== undefined ? { data, total, page, limit } : data;
+    return { data, total, page: safePage, limit: safeLimit };
   }
 
-  async getPharmacyStream(startDate?: string, endDate?: string, page?: number, limit?: number) {
+  async getPharmacyStream(startDate?: string, endDate?: string, page: number = 1, limit: number = DEFAULT_PAGE_SIZE, locationId?: string) {
+    const safePage = Number.isInteger(page) && page > 0 ? page : 1;
+    const safeLimit = Number.isInteger(limit) ? Math.min(Math.max(limit, 1), MAX_PAGE_SIZE) : DEFAULT_PAGE_SIZE;
     const whereClause: any = {
       status: { not: 'voided' },
+      ...(locationId ? { locationId } : {}),
+      paidAt: buildDateRange(startDate, endDate, { defaultDays: DEFAULT_REPORT_DAYS, maxDays: MAX_REPORT_DAYS }),
     };
-    if (startDate || endDate) {
-      whereClause.paidAt = {};
-      if (startDate) {
-        whereClause.paidAt.gte = new Date(startDate);
-      }
-      if (endDate) {
-        whereClause.paidAt.lte = new Date(endDate);
-      }
-    }
 
     const findOptions: any = {
       where: whereClause,
@@ -85,34 +76,57 @@ export class ReportsService {
           include: { patient: true },
         },
         items: true,
+        location: { select: { id: true, code: true, name: true } },
       },
       orderBy: { paidAt: 'desc' },
+      skip: (safePage - 1) * safeLimit,
+      take: safeLimit,
     };
-
-    if (page !== undefined && limit !== undefined) {
-      findOptions.skip = (page - 1) * limit;
-      findOptions.take = limit;
-    }
 
     const [data, total] = await Promise.all([
       this.prisma.pharmacySale.findMany(findOptions),
       this.prisma.pharmacySale.count({ where: whereClause }),
     ]);
 
-    return page !== undefined ? { data, total, page, limit } : data;
+    return { data, total, page: safePage, limit: safeLimit };
   }
 
-  async getCombinedSummary(startDate?: string, endDate?: string) {
-    // Fetch all for summary calculations
-    const clinicPayments = (await this.getClinicStream(startDate, endDate)) as any[];
-    const pharmacySales = (await this.getPharmacyStream(startDate, endDate)) as any[];
+  async getCombinedSummary(startDate?: string, endDate?: string, locationId?: string) {
+    const dateRange = buildDateRange(startDate, endDate, { defaultDays: DEFAULT_REPORT_DAYS, maxDays: MAX_REPORT_DAYS });
+    const [clinicPayments, pharmacySales] = await Promise.all([
+      this.prisma.clinicPayment.findMany({
+        where: {
+          status: { not: 'voided' },
+          paidAt: dateRange,
+          invoice: { visit: { status: { not: 'deleted' } } },
+        },
+        select: { amount: true, paymentMethod: true, paidAt: true },
+      }),
+      this.prisma.pharmacySale.findMany({
+        where: {
+          status: { not: 'voided' },
+          paidAt: dateRange,
+          ...(locationId ? { locationId } : {}),
+        },
+        select: {
+          total: true,
+          paymentMethod: true,
+          paidAt: true,
+          items: { select: { quantity: true, unitCost: true } },
+        },
+      }),
+    ]);
 
-    // Sum totals
     const clinicTotal = clinicPayments.reduce((sum, p) => sum + Number(p.amount), 0);
     const pharmacyTotal = pharmacySales.reduce((sum, s) => sum + Number(s.total), 0);
     const combinedTotal = clinicTotal + pharmacyTotal;
+    let missingCostLines = 0;
+    const pharmacyCogs = pharmacySales.reduce((saleSum, sale) => saleSum + (sale.items ?? []).reduce((itemSum: number, item: any) => {
+      if (item.unitCost === null || item.unitCost === undefined) missingCostLines += 1;
+      return itemSum + Number(item.unitCost ?? 0) * Number(item.quantity ?? 0);
+    }, 0), 0);
+    const pharmacyGrossProfit = pharmacyTotal - pharmacyCogs;
 
-    // Breakdown by payment method (excluding voided)
     let clinicCash = 0;
     let clinicMomo = 0;
     clinicPayments.forEach((p) => {
@@ -127,63 +141,87 @@ export class ReportsService {
       else pharmacyMomo += Number(s.total);
     });
 
-    // 7-day Daily combined revenue chart data points
-    const chartData: any[] = [];
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    for (let i = 6; i >= 0; i--) {
-      const d = getInternetDate();
-      d.setDate(d.getDate() - i);
-      const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
-      const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+    const chartData = this.buildRevenueTrend(clinicPayments, pharmacySales, dateRange);
 
-      const dayPayments = clinicPayments.filter(
-        (p) => new Date(p.paidAt) >= startOfDay && new Date(p.paidAt) <= endOfDay,
-      );
-      const daySales = pharmacySales.filter(
-        (s) => new Date(s.paidAt) >= startOfDay && new Date(s.paidAt) <= endOfDay,
-      );
-
-      const dayPaymentsTotal = dayPayments.reduce((sum, p) => sum + Number(p.amount), 0);
-      const daySalesTotal = daySales.reduce((sum, s) => sum + Number(s.total), 0);
-
-      chartData.push({
-        label: days[d.getDay()],
-        date: d.toISOString().split('T')[0],
-        total: dayPaymentsTotal + daySalesTotal,
-      });
-    }
-
-    // Expense calculations
-    const manualExpenses = await this.prisma.expense.findMany({
-      where: {
-        expenseDate: {
-          gte: startDate ? new Date(startDate) : undefined,
-          lte: endDate ? new Date(endDate) : undefined,
+    const [manualExpenses, receipts, purchaseReturns, supplierPayments, locationProducts, stockBatches, clinicClosures, pharmacyClosures] = await Promise.all([
+      this.prisma.expense.findMany({
+        where: {
+          status: { not: 'voided' },
+          expenseDate: dateRange,
         },
-      },
-    });
-    const manualExpensesTotal = manualExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
-
-    const batches = await this.prisma.pharmacyBatch.findMany({
-      where: {
-        createdAt: {
-          gte: startDate ? new Date(startDate) : undefined,
-          lte: endDate ? new Date(endDate) : undefined,
+        select: { amount: true, category: true },
+      }),
+      this.prisma.pharmacyGoodsReceipt.findMany({
+        where: {
+          status: 'posted',
+          ...(locationId ? { locationId } : {}),
+          receivedAt: dateRange,
         },
-      },
-    });
-    const inventoryExpensesTotal = batches.reduce(
-      (sum, b) => sum + Number(b.purchasePrice) * b.quantityReceived,
-      0,
-    );
+        select: { totalCost: true },
+      }),
+      this.prisma.pharmacyPurchaseReturn.findMany({
+        where: {
+          status: 'posted',
+          ...(locationId ? { locationId } : {}),
+          returnDate: dateRange,
+        },
+        select: { totalCredit: true },
+      }),
+      this.prisma.pharmacySupplierPayment.findMany({
+        where: {
+          ...(locationId ? { locationId } : {}),
+          paymentDate: dateRange,
+        },
+        select: { amount: true },
+      }),
+      this.prisma.pharmacyLocationProduct.findMany({
+        where: { isActive: true, ...(locationId ? { locationId } : {}) },
+        select: {
+          id: true,
+          productId: true,
+          locationId: true,
+          reorderLevel: true,
+          product: { select: { id: true, name: true, productCode: true, unitOfMeasure: true } },
+          location: { select: { id: true, code: true, name: true } },
+        },
+      }),
+      this.prisma.pharmacyBatch.findMany({
+        where: { ...(locationId ? { locationId } : {}) },
+        select: {
+          productId: true,
+          locationId: true,
+          batchNumber: true,
+          expiryDate: true,
+          quantityRemaining: true,
+          quantityQuarantined: true,
+          product: { select: { id: true, name: true, productCode: true, unitOfMeasure: true } },
+          location: { select: { id: true, code: true, name: true } },
+        },
+      }),
+      this.prisma.clinicCashSession.findMany({
+        where: { status: 'closed', closedAt: dateRange },
+        select: { discrepancy: true },
+      }),
+      this.prisma.pharmacyDailyClosure.findMany({
+        where: {
+          status: 'closed',
+          ...(locationId ? { locationId } : {}),
+          closureDate: dateRange,
+        },
+        select: { discrepancy: true },
+      }),
+    ]);
+    const supplierPaymentsTotal = supplierPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+    const manualExpensesTotal = manualExpenses
+      .filter((expense) => expense.category !== 'supplier_payment')
+      .reduce((sum, expense) => sum + Number(expense.amount), 0);
 
-    const totalExpenses = manualExpensesTotal + inventoryExpensesTotal;
-    const netProfit = combinedTotal - totalExpenses;
-
-    // Expiry & Stock warnings
-    const products = await this.prisma.pharmacyProduct.findMany({
-      include: { batches: true },
-    });
+    const grossInventoryPurchases = receipts.reduce((sum, receipt) => sum + Number(receipt.totalCost), 0);
+    const purchaseReturnCredits = purchaseReturns.reduce((sum, purchaseReturn) => sum + Number(purchaseReturn.totalCredit), 0);
+    const netInventoryPurchases = grossInventoryPurchases - purchaseReturnCredits;
+    const operatingExpensesTotal = manualExpensesTotal;
+    const estimatedOperatingResult = clinicTotal + pharmacyGrossProfit - operatingExpensesTotal;
+    const cashOutflowsTotal = manualExpensesTotal + supplierPaymentsTotal;
 
     const lowStockAlerts: any[] = [];
     const expiryAlerts: any[] = [];
@@ -191,35 +229,45 @@ export class ReportsService {
     const threeMonthsFromNow = getInternetDate();
     threeMonthsFromNow.setMonth(now.getMonth() + 3);
 
-    products.forEach((p) => {
-      const stock = p.batches.reduce((sum, b) => sum + b.quantityRemaining, 0);
-      if (stock <= p.reorderLevel) {
+    const stockByLocationProduct = new Map<string, number>();
+    stockBatches.forEach((batch) => {
+      const key = `${batch.locationId}:${batch.productId}`;
+      const available = Math.max(0, Number(batch.quantityRemaining) - Number(batch.quantityQuarantined ?? 0));
+      stockByLocationProduct.set(key, (stockByLocationProduct.get(key) ?? 0) + available);
+    });
+
+    locationProducts.forEach((locationProduct) => {
+      const stock = stockByLocationProduct.get(`${locationProduct.locationId}:${locationProduct.productId}`) ?? 0;
+      if (stock <= locationProduct.reorderLevel) {
         lowStockAlerts.push({
-          id: p.id,
-          name: p.name,
-          productCode: p.productCode,
+          id: locationProduct.id,
+          name: locationProduct.product.name,
+          productCode: locationProduct.product.productCode,
+          location: locationProduct.location,
           stockOnHand: stock,
-          reorderLevel: p.reorderLevel,
-          unitOfMeasure: p.unitOfMeasure,
+          reorderLevel: locationProduct.reorderLevel,
+          unitOfMeasure: locationProduct.product.unitOfMeasure,
         });
       }
-
-      p.batches.forEach((b) => {
-        const expDate = new Date(b.expiryDate);
-        if (b.quantityRemaining > 0 && expDate <= threeMonthsFromNow) {
-          const daysRemaining = Math.ceil(
-            (expDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-          );
-          expiryAlerts.push({
-            productName: p.name,
-            batchNumber: b.batchNumber,
-            quantityRemaining: b.quantityRemaining,
-            expiryDate: b.expiryDate,
-            daysRemaining,
-          });
-        }
-      });
     });
+
+    stockBatches.forEach((batch) => {
+      const expDate = new Date(batch.expiryDate);
+      if (batch.quantityRemaining > 0 && expDate <= threeMonthsFromNow) {
+        const daysRemaining = Math.ceil((expDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        expiryAlerts.push({
+          productName: batch.product.name,
+          batchNumber: batch.batchNumber,
+          location: batch.location,
+          quantityRemaining: batch.quantityRemaining,
+          expiryDate: batch.expiryDate,
+          daysRemaining,
+        });
+      }
+    });
+
+    const discrepancyCount = [...clinicClosures, ...pharmacyClosures]
+      .filter((closure) => Math.abs(Number(closure.discrepancy ?? 0)) > 0.01).length;
 
     return {
       clinicTotal,
@@ -236,11 +284,68 @@ export class ReportsService {
       lowStockAlerts: lowStockAlerts.slice(0, 10), // return top 10
       expiryAlerts: expiryAlerts.slice(0, 10), // return top 10
       chartData,
+      pharmacyCogs,
+      pharmacyGrossProfit,
+      missingCostLines,
       manualExpensesTotal,
-      inventoryExpensesTotal,
-      totalExpenses,
-      netProfit,
+      supplierPaymentsTotal,
+      purchaseReturnCredits,
+      grossInventoryPurchases,
+      netInventoryPurchases,
+      inventoryExpensesTotal: netInventoryPurchases,
+      operatingExpensesTotal,
+      totalExpenses: operatingExpensesTotal,
+      cashOutflowsTotal,
+      estimatedOperatingResult,
+      netProfit: estimatedOperatingResult,
+      reconciliation: {
+        clinicClosures: clinicClosures.length,
+        pharmacyClosures: pharmacyClosures.length,
+        discrepancyCount,
+      },
+      scope: { locationId: locationId ?? null },
     };
+  }
+
+  private buildRevenueTrend(clinicPayments: any[], pharmacySales: any[], range: { gte?: Date; lte?: Date }) {
+    const end = range.lte ? new Date(range.lte) : getInternetDate();
+    const requestedStart = range.gte ? new Date(range.gte) : null;
+    const defaultStart = new Date(end);
+    defaultStart.setUTCDate(defaultStart.getUTCDate() - 6);
+    const start = requestedStart && end.getTime() - requestedStart.getTime() <= 13 * 86_400_000 ? requestedStart : defaultStart;
+    const totalsByDay = new Map<string, { clinic: number; pharmacy: number }>();
+    clinicPayments.forEach((payment) => {
+      const key = new Date(payment.paidAt).toISOString().slice(0, 10);
+      const totals = totalsByDay.get(key) ?? { clinic: 0, pharmacy: 0 };
+      totals.clinic += Number(payment.amount);
+      totalsByDay.set(key, totals);
+    });
+    pharmacySales.forEach((sale) => {
+      const key = new Date(sale.paidAt).toISOString().slice(0, 10);
+      const totals = totalsByDay.get(key) ?? { clinic: 0, pharmacy: 0 };
+      totals.pharmacy += Number(sale.total);
+      totalsByDay.set(key, totals);
+    });
+    const points: any[] = [];
+    const cursor = new Date(start);
+    cursor.setUTCHours(0, 0, 0, 0);
+    const finalDay = new Date(end);
+    finalDay.setUTCHours(23, 59, 59, 999);
+    while (cursor <= finalDay && points.length < 14) {
+      const dayStart = new Date(cursor);
+      const totals = totalsByDay.get(dayStart.toISOString().slice(0, 10)) ?? { clinic: 0, pharmacy: 0 };
+      const clinic = totals.clinic;
+      const pharmacy = totals.pharmacy;
+      points.push({
+        label: dayStart.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' }),
+        date: dayStart.toISOString().slice(0, 10),
+        clinic,
+        pharmacy,
+        total: clinic + pharmacy,
+      });
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    return points;
   }
 
   private getRelativeTime(date: Date): string {
@@ -290,7 +395,7 @@ export class ReportsService {
       });
 
       const clinicPaymentsToday = await this.prisma.clinicPayment.findMany({
-        where: { paidAt: { gte: startOfToday, lte: endOfToday } },
+        where: { status: { not: 'voided' }, paidAt: { gte: startOfToday, lte: endOfToday } },
       });
       const pharmacySalesToday = await this.prisma.pharmacySale.findMany({
         where: { status: 'paid', paidAt: { gte: startOfToday, lte: endOfToday } },
@@ -309,7 +414,7 @@ export class ReportsService {
       stats['pendingReviews'] = String(pendingReviews);
 
       const clinicPaymentsWeek = await this.prisma.clinicPayment.findMany({
-        where: { paidAt: { gte: startOfWeek, lte: endOfWeek } },
+        where: { status: { not: 'voided' }, paidAt: { gte: startOfWeek, lte: endOfWeek } },
       });
       const pharmacySalesWeek = await this.prisma.pharmacySale.findMany({
         where: { status: 'paid', paidAt: { gte: startOfWeek, lte: endOfWeek } },
@@ -728,9 +833,10 @@ export class ReportsService {
     } else if (module === 'pharmacy') {
       const summary = await this.getCombinedSummary();
 
-      const clinicPrescriptions = await this.prisma.prescription.count({
-        where: { status: 'active' },
-      });
+      const [activeLocations, totalProducts] = await Promise.all([
+        this.prisma.pharmacyLocation.count({ where: { isActive: true } }),
+        this.prisma.pharmacyProduct.count({ where: { isActive: true } }),
+      ]);
 
       const walkInSalesToday = await this.prisma.pharmacySale.count({
         where: {
@@ -741,7 +847,7 @@ export class ReportsService {
       });
 
       stats['lowStockItems'] = String(summary.lowStockAlertsCount);
-      stats['clinicPrescriptions'] = String(clinicPrescriptions);
+      stats['activeLocations'] = String(activeLocations);
       stats['walkInSales'] = String(walkInSalesToday);
       stats['expiryAlerts'] = String(summary.expiryAlertsCount);
 
@@ -756,16 +862,9 @@ export class ReportsService {
         if (idx >= 0 && idx < 7) dailyCounts[idx]++;
       });
 
-      const totalPrescriptionsToday = await this.prisma.prescription.count({
-        where: { createdAt: { gte: startOfToday, lte: endOfToday } },
-      });
-      const dispensedPrescriptionsToday = await this.prisma.prescription.count({
-        where: {
-          createdAt: { gte: startOfToday, lte: endOfToday },
-          status: 'dispensed',
-        },
-      });
-      completionPercent = totalPrescriptionsToday > 0 ? Math.round((dispensedPrescriptionsToday / totalPrescriptionsToday) * 100) : 100;
+      completionPercent = totalProducts > 0
+        ? Math.max(0, Math.round(((totalProducts - summary.lowStockAlertsCount) / totalProducts) * 100))
+        : 100;
 
       // Pharmacy Activities Telemetry
       const recentSales = await this.prisma.pharmacySale.findMany({
@@ -773,12 +872,6 @@ export class ReportsService {
         include: { soldByUser: true, items: true },
         take: 5,
         orderBy: { paidAt: 'desc' },
-      });
-      const recentPrescriptions = await this.prisma.prescription.findMany({
-        where: { status: 'dispensed' },
-        include: { visit: { include: { patient: true } } },
-        take: 5,
-        orderBy: { updatedAt: 'desc' },
       });
       const recentMovements = await this.prisma.pharmacyStockMovement.findMany({
         where: { movementType: 'intake' },
@@ -797,17 +890,6 @@ export class ReportsService {
           timestamp: s.paidAt,
         });
       });
-      recentPrescriptions.forEach((p) => {
-        if (p.visit?.patient) {
-          activities.push({
-            title: `Referred prescription fulfilled for ${p.visit.patient.surname}`,
-            time: this.getRelativeTime(p.updatedAt),
-            status: 'success',
-            statusLabel: 'Dispensed',
-            timestamp: p.updatedAt,
-          });
-        }
-      });
       recentMovements.forEach((m) => {
         if (m.product) {
           activities.push({
@@ -822,7 +904,7 @@ export class ReportsService {
 
     } else if (module === 'accounting') {
       const clinicPaymentsToday = await this.prisma.clinicPayment.findMany({
-        where: { paidAt: { gte: startOfToday, lte: endOfToday } },
+        where: { status: { not: 'voided' }, paidAt: { gte: startOfToday, lte: endOfToday } },
       });
       const clinicStream = clinicPaymentsToday.reduce((sum, p) => sum + Number(p.amount), 0);
 
@@ -832,16 +914,26 @@ export class ReportsService {
       const pharmacyStream = pharmacySalesToday.reduce((sum, s) => sum + Number(s.total), 0);
 
       const dailyClosures = await this.prisma.pharmacyDailyClosure.count({
-        where: { createdAt: { gte: startOfToday, lte: endOfToday } },
+        where: { status: 'closed', closureDate: { gte: startOfToday, lte: endOfToday } },
       });
+      const clinicClosures = await this.prisma.clinicCashSession.findMany({
+        where: { status: 'closed', closedAt: { gte: startOfToday, lte: endOfToday } },
+        select: { discrepancy: true },
+      });
+      const pharmacyClosures = await this.prisma.pharmacyDailyClosure.findMany({
+        where: { status: 'closed', closureDate: { gte: startOfToday, lte: endOfToday } },
+        select: { discrepancy: true },
+      });
+      const reconciliationExceptions = [...clinicClosures, ...pharmacyClosures]
+        .filter((closure) => Math.abs(Number(closure.discrepancy ?? 0)) > 0.01).length;
 
       stats['clinicStream'] = clinicStream.toFixed(2);
       stats['pharmacyStream'] = pharmacyStream.toFixed(2);
-      stats['exportsReady'] = '5';
-      stats['dailyClosures'] = String(dailyClosures);
+      stats['reconciliationExceptions'] = String(reconciliationExceptions);
+      stats['dailyClosures'] = String(dailyClosures + clinicClosures.length);
 
       const clinicPaymentsWeek = await this.prisma.clinicPayment.findMany({
-        where: { paidAt: { gte: startOfWeek, lte: endOfWeek } },
+        where: { status: { not: 'voided' }, paidAt: { gte: startOfWeek, lte: endOfWeek } },
       });
       const pharmacySalesWeek = await this.prisma.pharmacySale.findMany({
         where: { status: 'paid', paidAt: { gte: startOfWeek, lte: endOfWeek } },
@@ -856,16 +948,14 @@ export class ReportsService {
         if (idx >= 0 && idx < 7) dailyCounts[idx]++;
       });
 
-      const totalVisitsToday = await this.prisma.visit.count({
-        where: { createdAt: { gte: startOfToday, lte: endOfToday } },
-      });
-      const paidVisitsToday = await this.prisma.visit.count({
-        where: { createdAt: { gte: startOfToday, lte: endOfToday }, status: 'paid' },
-      });
-      completionPercent = totalVisitsToday > 0 ? Math.round((paidVisitsToday / totalVisitsToday) * 100) : 100;
+      const closuresToday = clinicClosures.length + pharmacyClosures.length;
+      completionPercent = closuresToday > 0
+        ? Math.round(((closuresToday - reconciliationExceptions) / closuresToday) * 100)
+        : 100;
 
       // Accounting Activities Telemetry
       const recentClinicPayments = await this.prisma.clinicPayment.findMany({
+        where: { status: { not: 'voided' } },
         include: { invoice: { include: { visit: { include: { patient: true } } } }, receivedByUser: true },
         take: 5,
         orderBy: { paidAt: 'desc' },
@@ -885,29 +975,29 @@ export class ReportsService {
       recentClinicPayments.forEach((p) => {
         if (p.invoice?.visit?.patient) {
           activities.push({
-            title: `Reconciliation verified for Frontdesk cashier`,
+            title: `Clinic payment received for ${p.invoice.visit.patient.firstName} ${p.invoice.visit.patient.surname} (GHS ${Number(p.amount).toFixed(2)})`,
             time: this.getRelativeTime(p.paidAt),
             status: 'success',
-            statusLabel: 'Verified',
+            statusLabel: 'Paid',
             timestamp: p.paidAt,
           });
         }
       });
       recentPharmSales.forEach((s) => {
         activities.push({
-          title: `Pharmacy POS ledger stream audited (₵${Number(s.total).toFixed(2)})`,
+          title: `Pharmacy sale ${s.saleNumber} posted (GHS ${Number(s.total).toFixed(2)})`,
           time: this.getRelativeTime(s.paidAt),
           status: 'success',
-          statusLabel: 'Audited',
+          statusLabel: 'Posted',
           timestamp: s.paidAt,
         });
       });
       recentClosures.forEach((c) => {
         activities.push({
-          title: `Monthly audit reports prepared for Admin oversight`,
+          title: `Pharmacy register closed with discrepancy GHS ${Number(c.discrepancy ?? 0).toFixed(2)}`,
           time: this.getRelativeTime(c.createdAt),
-          status: 'success',
-          statusLabel: 'Done',
+          status: Math.abs(Number(c.discrepancy ?? 0)) > 0.01 ? 'warning' : 'success',
+          statusLabel: Math.abs(Number(c.discrepancy ?? 0)) > 0.01 ? 'Review' : 'Balanced',
           timestamp: c.createdAt,
         });
       });
@@ -931,14 +1021,15 @@ export class ReportsService {
   }
 
   async voidClinicPayment(id: string, userId: string, reason: string) {
-    if (!reason) {
-      throw new BadRequestException('Void reason is required');
+    const normalizedReason = String(reason ?? '').trim();
+    if (normalizedReason.length < 5) {
+      throw new BadRequestException('A detailed void reason is required');
     }
 
     return this.prisma.$transaction(async (tx) => {
       const payment = await tx.clinicPayment.findUnique({
         where: { id },
-        include: { invoice: true },
+        include: { invoice: true, clinicCashSession: true },
       });
 
       if (!payment) {
@@ -948,33 +1039,48 @@ export class ReportsService {
       if (payment.status === 'voided') {
         throw new BadRequestException('Payment is already voided');
       }
+      if (payment.receivedByUserId === userId) {
+        throw new BadRequestException('The payment cashier cannot approve their own void');
+      }
+      if (payment.clinicCashSession?.status === 'closed') {
+        throw new BadRequestException('This payment belongs to a closed cashier session and requires a formal reversal');
+      }
 
-      // 1. Update payment status
-      const updatedPayment = await tx.clinicPayment.update({
-        where: { id },
+      const claim = await tx.clinicPayment.updateMany({
+        where: { id, status: { not: 'voided' }, receivedByUserId: { not: userId } },
         data: {
           status: 'voided',
-          voidReason: reason,
+          voidReason: normalizedReason,
           voidedByUserId: userId,
           voidedAt: getInternetDate(),
         },
       });
+      if (claim.count !== 1) {
+        throw new BadRequestException('The payment was already changed or cannot be self-voided');
+      }
+      const updatedPayment = await tx.clinicPayment.findUniqueOrThrow({ where: { id } });
 
-      // 2. Adjust invoice amounts
-      const newPaid = Number(payment.invoice.amountPaid) - Number(payment.amount);
+      const newPaid = Math.max(0, Number(payment.invoice.amountPaid) - Number(payment.amount));
       const newDue = Number(payment.invoice.balanceDue) + Number(payment.amount);
       const newStatus = newPaid <= 0 ? 'unpaid' : 'partially_paid';
 
-      await tx.clinicInvoice.update({
-        where: { id: payment.invoiceId },
+      const invoiceUpdate = await tx.clinicInvoice.updateMany({
+        where: {
+          id: payment.invoiceId,
+          amountPaid: payment.invoice.amountPaid,
+          balanceDue: payment.invoice.balanceDue,
+        },
         data: {
           amountPaid: newPaid,
           balanceDue: newDue,
           status: newStatus,
+          paidAt: null,
         },
       });
+      if (invoiceUpdate.count !== 1) {
+        throw new BadRequestException('The invoice balance changed. Refresh and try again.');
+      }
 
-      // 3. Update associated visit status
       await tx.visit.update({
         where: { id: payment.invoice.visitId },
         data: {
@@ -982,17 +1088,13 @@ export class ReportsService {
         },
       });
 
-      if ((payment as any).clinicCashSessionId) {
-        await this.recalculateClinicCashSession(tx, (payment as any).clinicCashSessionId);
-      }
-
-      // 4. Log audit event
       await tx.auditLog.create({
         data: {
-          actionType: 'update',
+          actionType: 'void',
           entityType: 'clinic_payment_void',
           entityId: id,
-          afterData: JSON.stringify({ voidReason: reason, voidedByUserId: userId }),
+          beforeData: JSON.stringify({ status: payment.status, amount: Number(payment.amount), invoiceId: payment.invoiceId }),
+          afterData: JSON.stringify({ voidReason: normalizedReason, voidedByUserId: userId }),
           actorUserId: userId,
         },
       });
@@ -1039,15 +1141,20 @@ export class ReportsService {
     });
   }
 
-  async voidPharmacySale(id: string, userId: string, reason: string) {
-    if (!reason) {
-      throw new BadRequestException('Void reason is required');
+  async voidPharmacySale(id: string, userId: string, reason: string, stockDisposition = 'quarantine') {
+    const normalizedReason = String(reason ?? '').trim();
+    if (normalizedReason.length < 5) {
+      throw new BadRequestException('A detailed void reason is required');
+    }
+    const disposition = String(stockDisposition ?? 'quarantine').trim().toLowerCase();
+    if (disposition !== 'quarantine') {
+      throw new BadRequestException('Voided sale stock must be quarantined before it can be released');
     }
 
     return this.prisma.$transaction(async (tx) => {
       const sale = await tx.pharmacySale.findUnique({
         where: { id },
-        include: { items: true },
+        include: { items: true, closure: true },
       });
 
       if (!sale) {
@@ -1057,19 +1164,27 @@ export class ReportsService {
       if (sale.status === 'voided') {
         throw new BadRequestException('Sale is already voided');
       }
+      if (sale.soldByUserId === userId) {
+        throw new BadRequestException('The sale cashier cannot approve their own void');
+      }
+      if (sale.closure?.status === 'closed') {
+        throw new BadRequestException('This sale belongs to a closed register and requires a formal reversal');
+      }
 
-      // 1. Update sale status
-      const updatedSale = await tx.pharmacySale.update({
-        where: { id },
+      const claim = await tx.pharmacySale.updateMany({
+        where: { id, status: { not: 'voided' }, soldByUserId: { not: userId } },
         data: {
           status: 'voided',
-          voidReason: reason,
+          voidReason: normalizedReason,
           voidedByUserId: userId,
           voidedAt: getInternetDate(),
         },
       });
+      if (claim.count !== 1) {
+        throw new BadRequestException('The sale was already changed or cannot be self-voided');
+      }
+      const updatedSale = await tx.pharmacySale.findUniqueOrThrow({ where: { id } });
 
-      // 2. Restock medicine items back into batches
       for (const item of sale.items) {
         if (item.batchId) {
           const batch = await tx.pharmacyBatch.findUnique({
@@ -1077,11 +1192,11 @@ export class ReportsService {
           });
 
           if (batch) {
-            // Replenish quantity remaining
             await tx.pharmacyBatch.update({
               where: { id: item.batchId },
               data: {
-                quantityRemaining: batch.quantityRemaining + item.quantity,
+                quantityRemaining: { increment: item.quantity },
+                quantityQuarantined: { increment: item.quantity },
               },
             });
 
@@ -1090,18 +1205,22 @@ export class ReportsService {
               data: {
                 productId: item.productId,
                 batchId: item.batchId,
-                movementType: 'void_restock',
+                locationId: sale.locationId,
+                movementType: 'void_quarantine',
                 quantity: item.quantity,
-                unitCost: item.unitPrice,
+                quantityBefore: batch.quantityRemaining,
+                quantityAfter: batch.quantityRemaining + item.quantity,
+                unitCost: item.unitCost ?? item.unitPrice,
                 createdByUserId: userId,
                 referenceId: `VOID-${sale.saleNumber}`,
+                referenceType: 'sale_void',
+                reason: `${normalizedReason} Stock disposition: quarantine.`,
               },
             });
           }
         }
       }
 
-      // 3. Revert prescription status back to active if referred
       if (sale.prescriptionId) {
         await tx.prescription.update({
           where: { id: sale.prescriptionId },
@@ -1111,13 +1230,13 @@ export class ReportsService {
         });
       }
 
-      // 4. Log audit event
       await tx.auditLog.create({
         data: {
-          actionType: 'update',
+          actionType: 'void',
           entityType: 'pharmacy_sale_void',
           entityId: id,
-          afterData: JSON.stringify({ voidReason: reason, voidedByUserId: userId }),
+          beforeData: JSON.stringify({ status: sale.status, total: Number(sale.total), closureId: sale.closureId }),
+          afterData: JSON.stringify({ voidReason: normalizedReason, stockDisposition: 'quarantine', voidedByUserId: userId }),
           actorUserId: userId,
         },
       });
@@ -1126,17 +1245,52 @@ export class ReportsService {
     });
   }
 
+  private async recalculatePharmacyClosure(tx: any, closureId: string): Promise<void> {
+    const session = await tx.pharmacyDailyClosure.findUnique({
+      where: { id: closureId },
+      include: { sales: { where: { status: { not: 'voided' } } } },
+    });
+    if (!session) return;
+
+    const cashSales = session.sales.reduce(
+      (sum: number, sale: any) => sale.paymentMethod === 'cash' ? sum + Number(sale.total) : sum,
+      0,
+    );
+    const momoSales = session.sales.reduce(
+      (sum: number, sale: any) => sale.paymentMethod === 'mobile_money' ? sum + Number(sale.total) : sum,
+      0,
+    );
+    const expectedCash = Number(session.openingFloat ?? 0) + cashSales;
+    const expectedMomo = momoSales;
+    const totalCounted = Number(session.cashCounted ?? 0) + Number(session.momoCounted ?? 0);
+
+    await tx.pharmacyDailyClosure.update({
+      where: { id: closureId },
+      data: {
+        totalSalesCount: session.sales.length,
+        totalSalesAmount: cashSales + momoSales,
+        expectedCash,
+        expectedMomo,
+        ...(session.status === 'closed'
+          ? { totalCounted, discrepancy: totalCounted - expectedCash - expectedMomo }
+          : {}),
+      },
+    });
+  }
+
   async getAuditLogs(page: number, limit: number) {
-    const skip = (page - 1) * limit;
+    const safePage = Number.isInteger(page) && page > 0 ? page : 1;
+    const safeLimit = Number.isInteger(limit) ? Math.min(Math.max(limit, 1), 100) : 20;
+    const skip = (safePage - 1) * safeLimit;
     const [data, total] = await Promise.all([
       this.prisma.auditLog.findMany({
         skip,
-        take: limit,
+        take: safeLimit,
         include: { actorUser: { select: { fullName: true, username: true } } },
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.auditLog.count(),
     ]);
-    return { data, total, page, limit };
+    return { data, total, page: safePage, limit: safeLimit };
   }
 }

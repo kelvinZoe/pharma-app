@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { getInternetDate } from '../common/clock';
 import { EmailService } from '../common/email/email.service';
+import { TenantContextService } from '../common/multitenancy/tenant-context.service';
 
 @Injectable()
 export class AuthService {
@@ -14,17 +15,8 @@ export class AuthService {
     private readonly emailService: EmailService,
   ) {}
 
-  async validateUser(identifier: string, pass: string): Promise<any> {
-    const normalizedIdentifier = identifier.trim().toLowerCase();
-    const user = normalizedIdentifier.includes('@')
-      ? await this.prisma.user.findUnique({
-          where: { email: normalizedIdentifier },
-          include: { tenant: true },
-        })
-      : await this.prisma.user.findFirst({
-          where: { username: normalizedIdentifier },
-          include: { tenant: true },
-        });
+  async validateUser(identifier: string, pass: string, tenantSlug?: string): Promise<any> {
+    const user = await this.findUnambiguousUser(identifier, tenantSlug);
 
     if (user && user.isActive && user.isVerified) {
       const isMatch = await bcrypt.compare(pass, user.passwordHash);
@@ -73,30 +65,64 @@ export class AuthService {
   }
 
   async verifyToken(token: string) {
+    let payload: any;
     try {
-      const payload = this.jwtService.verify(token);
-      const user = await this.prisma.user.findUnique({
-        where: { id: payload.sub },
-        include: { tenant: true },
-      });
-
-      if (!user || !user.isActive) {
-        throw new UnauthorizedException('User is no longer active or exists');
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { passwordHash, ...result } = user;
-      const rolesRaw = (result as any).roles;
-      return {
-        ...result,
-        roles: rolesRaw ? String(rolesRaw).split(',').map(Number) : [result.role],
-      };
+      payload = this.jwtService.verify(token);
     } catch {
       throw new UnauthorizedException('Invalid token');
     }
+
+    if (!payload.tenantId) {
+      throw new UnauthorizedException('Token tenant is missing');
+    }
+    const activeTenantId = TenantContextService.getTenantId();
+    if (activeTenantId && activeTenantId !== payload.tenantId) {
+      throw new UnauthorizedException('Token tenant context mismatch');
+    }
+
+    const user = await TenantContextService.run({ tenantId: String(payload.tenantId), tenantSlug: payload.tenantSlug }, () => this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: {
+        id: true,
+        fullName: true,
+        username: true,
+        phone: true,
+        email: true,
+        role: true,
+        roles: true,
+        module: true,
+        isActive: true,
+        tenantId: true,
+        tenant: { select: { id: true, slug: true, name: true } },
+      },
+    }));
+
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('User is no longer active');
+    }
+
+    const rolesRaw = user.roles;
+    const roles = rolesRaw ? String(rolesRaw).split(',').map(Number) : [user.role];
+    const requestedRole = Number(payload.role);
+    const activeRole = Number.isInteger(requestedRole) && (roles.includes(0) || roles.includes(requestedRole))
+      ? requestedRole
+      : user.role;
+    if (!payload.tenantId || payload.tenantId !== user.tenantId) {
+      throw new UnauthorizedException('Token tenant does not match the authenticated user');
+    }
+    return {
+      ...user,
+      role: activeRole,
+      module: this.resolveModule(activeRole),
+      roles,
+    };
   }
 
   async registerClinic(data: any) {
+    return TenantContextService.runUnscoped(async () => {
+    if (process.env.NODE_ENV === 'production' && process.env.ALLOW_PUBLIC_CLINIC_REGISTRATION !== 'true') {
+      throw new NotFoundException('Clinic registration is not available');
+    }
     if (!data.clinicName || !data.clinicSlug || !data.adminEmail || !data.adminPassword || !data.adminName) {
       throw new BadRequestException('All fields (clinicName, clinicSlug, adminEmail, adminPassword, adminName) are required');
     }
@@ -147,6 +173,26 @@ export class AuthService {
       },
     });
 
+    const defaultPharmacyLocation = await this.prisma.pharmacyLocation.create({
+      data: {
+        code: 'MAIN',
+        name: 'Main Pharmacy',
+        isActive: true,
+        tenantId: tenant.id,
+      },
+    });
+
+    await this.prisma.userPharmacyLocation.create({
+      data: {
+        tenantId: tenant.id,
+        userId: adminUser.id,
+        locationId: defaultPharmacyLocation.id,
+        role: 'admin',
+        isDefault: true,
+        isActive: true,
+      },
+    });
+
     // 3. Seed default departments & clinic services for the new tenant
     await this.seedTenantData(tenant.id);
 
@@ -160,6 +206,7 @@ export class AuthService {
         fullName: adminUser.fullName,
       },
     };
+    });
   }
 
   async verifyInvite(token: string) {
@@ -167,9 +214,9 @@ export class AuthService {
       throw new BadRequestException('Invitation token is required');
     }
 
-    const user = await this.prisma.user.findUnique({
+    const user = await TenantContextService.runUnscoped(() => this.prisma.user.findUnique({
       where: { inviteToken: token },
-    });
+    }));
 
     if (!user) {
       throw new NotFoundException('Invitation token is invalid');
@@ -190,10 +237,10 @@ export class AuthService {
       throw new BadRequestException('Token and password are required');
     }
 
-    const user = await this.prisma.user.findUnique({
+    const user = await TenantContextService.runUnscoped(() => this.prisma.user.findUnique({
       where: { inviteToken: data.token },
       include: { tenant: true },
-    });
+    }));
 
     if (!user) {
       throw new NotFoundException('Invitation token is invalid');
@@ -205,7 +252,7 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(data.password, 10);
 
-    const updatedUser = await this.prisma.user.update({
+    const updatedUser = await TenantContextService.runUnscoped(() => this.prisma.user.update({
       where: { id: user.id },
       data: {
         passwordHash,
@@ -215,7 +262,7 @@ export class AuthService {
         inviteExpires: null,
       },
       include: { tenant: true },
-    });
+    }));
 
     // Log the user in directly by generating session payload
     return this.login(updatedUser);
@@ -227,9 +274,7 @@ export class AuthService {
       throw new BadRequestException('Email or username is required');
     }
 
-    const user = identifier.includes('@')
-      ? await this.prisma.user.findUnique({ where: { email: identifier } })
-      : await this.prisma.user.findFirst({ where: { username: identifier } });
+    const user = await this.findUnambiguousUser(identifier, data.tenantSlug);
 
     const genericResponse = {
       message: 'If an active account exists for those details, a password reset email has been sent.',
@@ -242,13 +287,13 @@ export class AuthService {
     const resetToken = crypto.randomBytes(32).toString('hex');
     const resetExpires = new Date(getInternetDate().getTime() + 60 * 60 * 1000);
 
-    await this.prisma.user.update({
+    await TenantContextService.runUnscoped(() => this.prisma.user.update({
       where: { id: user.id },
       data: {
         passwordResetToken: resetToken,
         passwordResetExpires: resetExpires,
       },
-    });
+    }));
 
     await this.emailService.sendPasswordReset(user.email, user.fullName, resetToken);
 
@@ -260,9 +305,9 @@ export class AuthService {
       throw new BadRequestException('Password reset token is required');
     }
 
-    const user = await this.prisma.user.findUnique({
+    const user = await TenantContextService.runUnscoped(() => this.prisma.user.findUnique({
       where: { passwordResetToken: token },
-    });
+    }));
 
     if (!user || !user.isActive || !user.isVerified) {
       throw new NotFoundException('Password reset token is invalid');
@@ -287,10 +332,10 @@ export class AuthService {
       throw new BadRequestException('Password must be at least 6 characters');
     }
 
-    const user = await this.prisma.user.findUnique({
+    const user = await TenantContextService.runUnscoped(() => this.prisma.user.findUnique({
       where: { passwordResetToken: data.token },
       include: { tenant: true },
-    });
+    }));
 
     if (!user || !user.isActive || !user.isVerified) {
       throw new NotFoundException('Password reset token is invalid');
@@ -302,7 +347,7 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(data.password, 10);
 
-    const updatedUser = await this.prisma.user.update({
+    const updatedUser = await TenantContextService.runUnscoped(() => this.prisma.user.update({
       where: { id: user.id },
       data: {
         passwordHash,
@@ -310,7 +355,7 @@ export class AuthService {
         passwordResetExpires: null,
       },
       include: { tenant: true },
-    });
+    }));
 
     return this.login(updatedUser);
   }
@@ -365,5 +410,38 @@ export class AuthService {
         data: p,
       });
     }
+  }
+
+  private resolveModule(role: number): string {
+    return ({ 0: 'admin', 1: 'frontdesk', 2: 'laboratory', 3: 'scanning', 4: 'pharmacy', 5: 'accounting' } as Record<number, string>)[role] ?? 'frontdesk';
+  }
+
+  private async findUnambiguousUser(identifier: string, tenantSlug?: string): Promise<any | null> {
+    const normalizedIdentifier = String(identifier ?? '').trim().toLowerCase();
+    if (!normalizedIdentifier) return null;
+    return TenantContextService.runUnscoped(async () => {
+      if (normalizedIdentifier.includes('@')) {
+        return this.prisma.user.findUnique({ where: { email: normalizedIdentifier }, include: { tenant: true } });
+      }
+
+      let username = normalizedIdentifier;
+      let normalizedTenantSlug = String(tenantSlug ?? '').trim().toLowerCase();
+      const separatorIndex = normalizedIdentifier.indexOf('/');
+      if (separatorIndex > 0) {
+        normalizedTenantSlug = normalizedIdentifier.slice(0, separatorIndex);
+        username = normalizedIdentifier.slice(separatorIndex + 1);
+      }
+      if (!username) return null;
+
+      const candidates = await this.prisma.user.findMany({
+        where: {
+          username,
+          ...(normalizedTenantSlug ? { tenant: { slug: normalizedTenantSlug } } : {}),
+        },
+        include: { tenant: true },
+        take: 2,
+      });
+      return candidates.length === 1 ? candidates[0] : null;
+    });
   }
 }

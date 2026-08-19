@@ -1,0 +1,208 @@
+<section class="finance-page">
+  <header class="page-intro">
+    <div>
+      <span class="eyebrow">Accounting workspace</span>
+      <h1>{{ pageTitle() }}</h1>
+      <p>{{ pageDescription() }}</p>
+    </div>
+    <div class="intro-actions">
+      <button type="button" class="button button--quiet" (click)="printView()" aria-label="Print current financial view">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z"/></svg>
+        Print
+      </button>
+      <button type="button" class="button button--primary" (click)="exportCurrentView()" [disabled]="isExporting()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v3h16v-3"/></svg>
+        {{ isExporting() ? 'Preparing…' : 'Export complete view' }}
+      </button>
+    </div>
+  </header>
+
+  <div class="scope-bar" aria-label="Financial report filters">
+    <label><span>From</span><input type="date" [ngModel]="startDate()" (ngModelChange)="startDate.set($event)" /></label>
+    <label><span>To</span><input type="date" [ngModel]="endDate()" (ngModelChange)="endDate.set($event)" /></label>
+    <label class="location-filter">
+      <span>Pharmacy location</span>
+      <select [ngModel]="selectedLocationId()" (ngModelChange)="changeLocation($event)">
+        <option value="">All pharmacy locations</option>
+        @for (location of locations(); track location.id) { <option [value]="location.id">{{ location.code }} · {{ location.name }}</option> }
+      </select>
+    </label>
+    <div class="scope-actions">
+      <button type="button" class="button button--primary" (click)="applyFilters()">Apply period</button>
+      <button type="button" class="button button--quiet" (click)="resetFilters()">Reset</button>
+    </div>
+  </div>
+
+  @if (errorMessage()) {
+    <div class="notice notice--error" role="alert">
+      <span>{{ errorMessage() }}</span>
+      <button type="button" (click)="errorMessage.set('')" aria-label="Dismiss error">Dismiss</button>
+    </div>
+  }
+
+  <nav class="section-nav" aria-label="Financial sections">
+    @for (tab of tabs; track tab.id) {
+      <button type="button" [class.active]="activeTab() === tab.id" (click)="selectTab(tab.id)">
+        <span>{{ tab.label }}</span><small>{{ tab.hint }}</small>
+      </button>
+    }
+  </nav>
+
+  @if (isLoading()) {
+    <div class="loading-layout" aria-label="Loading financial records">
+      <div class="skeleton skeleton--metric"></div><div class="skeleton skeleton--metric"></div><div class="skeleton skeleton--metric"></div>
+      <div class="skeleton skeleton--panel"></div>
+    </div>
+  } @else {
+    @if (summary(); as financial) {
+      <section class="metric-ribbon" aria-label="Financial summary">
+        <article class="metric metric--lead">
+          <span>Collections</span><strong>{{ money(financial.combinedTotal) }}</strong>
+          <small>{{ financial.clinicPaymentsCount }} clinic payments · {{ financial.pharmacySalesCount }} pharmacy sales</small>
+        </article>
+        <article class="metric"><span>Pharmacy gross profit</span><strong>{{ money(financial.pharmacyGrossProfit) }}</strong><small>Revenue less recorded item cost</small></article>
+        <article class="metric"><span>Operating expenses</span><strong>{{ money(financial.operatingExpensesTotal) }}</strong><small>Voided and supplier settlements excluded</small></article>
+        <article class="metric" [class.metric--negative]="financial.estimatedOperatingResult < 0"><span>Estimated operating result</span><strong>{{ money(financial.estimatedOperatingResult) }}</strong><small>Before clinic direct costs, tax, and depreciation</small></article>
+      </section>
+
+      @if (financial.missingCostLines > 0) {
+        <div class="notice notice--warning"><span>{{ financial.missingCostLines }} pharmacy sale line(s) have no unit cost. Gross profit is understated until those costs are corrected.</span></div>
+      }
+
+      @if (activeTab() === 'dashboard') {
+        <div class="dashboard-grid">
+          <section class="report-panel trend-panel">
+            <header><div><span class="eyebrow">Collections trend</span><h2>Clinic and pharmacy revenue</h2></div><span class="period-label">{{ startDate() }} — {{ endDate() }}</span></header>
+            <div class="trend-chart" role="img" aria-label="Daily clinic and pharmacy collections">
+              @for (point of financial.chartData; track point.date) {
+                <div class="trend-column">
+                  <div class="bars"><i class="bar bar--clinic" [style.height.%]="trendHeight(point.clinic)"></i><i class="bar bar--pharmacy" [style.height.%]="trendHeight(point.pharmacy)"></i></div>
+                  <span>{{ point.label }}</span>
+                  <strong>{{ money(point.total) }}</strong>
+                </div>
+              }
+            </div>
+            <footer class="legend"><span><i class="legend-clinic"></i>Clinic</span><span><i class="legend-pharmacy"></i>Pharmacy</span></footer>
+          </section>
+
+          <aside class="report-panel control-panel">
+            <header><div><span class="eyebrow">Control health</span><h2>Reconciliation</h2></div></header>
+            <div class="control-score" [class.has-exceptions]="financial.reconciliation?.discrepancyCount > 0">
+              <strong>{{ financial.reconciliation?.discrepancyCount || 0 }}</strong><span>exceptions</span>
+            </div>
+            <dl>
+              <div><dt>Clinic shifts closed</dt><dd>{{ financial.reconciliation?.clinicClosures || 0 }}</dd></div>
+              <div><dt>Pharmacy shifts closed</dt><dd>{{ financial.reconciliation?.pharmacyClosures || 0 }}</dd></div>
+              <div><dt>Cash collected</dt><dd>{{ money(financial.paymentMethodsBreakdown?.cash) }}</dd></div>
+              <div><dt>Mobile Money</dt><dd>{{ money(financial.paymentMethodsBreakdown?.mobileMoney) }}</dd></div>
+            </dl>
+          </aside>
+
+          <section class="report-panel movement-panel">
+            <header><div><span class="eyebrow">Do not confuse these</span><h2>Profit versus cash movement</h2></div></header>
+            <div class="movement-grid">
+              <article><span>Pharmacy revenue</span><strong>{{ money(financial.pharmacyTotal) }}</strong></article>
+              <article><span>Cost of goods sold</span><strong class="outflow">− {{ money(financial.pharmacyCogs) }}</strong></article>
+              <article><span>Supplier cash payments</span><strong>{{ money(financial.supplierPaymentsTotal) }}</strong><small>Cash-flow item, not a second expense</small></article>
+              <article><span>Net inventory purchases</span><strong>{{ money(financial.netInventoryPurchases) }}</strong><small>Procurement movement, not COGS</small></article>
+            </div>
+          </section>
+        </div>
+      } @else if (activeTab() === 'inventory') {
+        <div class="risk-grid">
+          <section class="report-panel"><header><div><span class="eyebrow">Replenishment</span><h2>Low stock by location</h2></div><strong>{{ financial.lowStockAlertsCount }}</strong></header>
+            <div class="risk-list">@for (item of financial.lowStockAlerts; track item.id) { <article><div><strong>{{ item.name }}</strong><span>{{ item.location?.code || 'Unassigned' }} · reorder at {{ item.reorderLevel }}</span></div><b>{{ item.stockOnHand }} {{ item.unitOfMeasure }}</b></article> } @empty { <div class="empty-compact">No low-stock exposure in this scope.</div> }</div>
+          </section>
+          <section class="report-panel"><header><div><span class="eyebrow">Expiry exposure</span><h2>Stock expiring within 90 days</h2></div><strong>{{ financial.expiryAlertsCount }}</strong></header>
+            <div class="risk-list">@for (item of financial.expiryAlerts; track item.batchNumber) { <article><div><strong>{{ item.productName }}</strong><span>{{ item.location?.code || 'Unassigned' }} · batch {{ item.batchNumber }}</span></div><b [class.danger-text]="item.daysRemaining <= 0">{{ item.daysRemaining <= 0 ? 'Expired' : item.daysRemaining + ' days' }}</b></article> } @empty { <div class="empty-compact">No near-expiry exposure in this scope.</div> }</div>
+          </section>
+        </div>
+      } @else {
+        <section class="ledger-panel">
+          <header class="ledger-header">
+            <div><span class="eyebrow">Detailed register</span><h2>{{ pageTitle() }}</h2><p>{{ totalRows() }} record(s) in the selected period</p></div>
+            <div class="ledger-tools">
+              <label class="search-control"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input type="search" [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" placeholder="Search the loaded register" /></label>
+              @if (activeTab() === 'expenses') { <button type="button" class="button button--primary" (click)="openExpenseModal()">Post expense</button> }
+            </div>
+          </header>
+
+          <div class="table-wrap">
+            @if (activeTab() === 'clinic') {
+              <table><thead><tr><th>Patient / invoice</th><th>Paid at</th><th>Method</th><th>Cashier</th><th class="number">Amount</th><th></th></tr></thead><tbody>
+                @for (payment of filteredRows(); track payment.id) { <tr><td><strong>{{ patientName(payment.invoice?.visit?.patient) }}</strong><small>{{ payment.invoice?.invoiceNumber || payment.id }}</small></td><td>{{ payment.paidAt | date:'medium' }}</td><td><span class="status">{{ methodLabel(payment.paymentMethod) }}</span><small>{{ payment.referenceNumber || 'No reference' }}</small></td><td>{{ userName(payment.receivedByUser) }}</td><td class="number money-value">{{ money(payment.amount) }}</td><td class="actions"><button type="button" class="text-action danger" (click)="requestVoid(payment.id, 'clinic', payment.invoice?.invoiceNumber || 'clinic payment')">Void</button></td></tr> }
+              </tbody></table>
+            } @else if (activeTab() === 'pharmacy') {
+              <table><thead><tr><th>Sale</th><th>Location</th><th>Customer</th><th>Method</th><th>Cashier</th><th class="number">Total</th><th></th></tr></thead><tbody>
+                @for (sale of filteredRows(); track sale.id) { <tr><td><strong>{{ sale.saleNumber }}</strong><small>{{ sale.items?.length || 0 }} line(s) · {{ sale.paidAt | date:'short' }}</small></td><td>{{ sale.location?.name || 'Unassigned' }}</td><td>{{ sale.customerName || patientName(sale.visit?.patient) || 'Walk-in customer' }}</td><td><span class="status">{{ methodLabel(sale.paymentMethod) }}</span><small>{{ sale.referenceNumber || 'No reference' }}</small></td><td>{{ userName(sale.soldByUser) }}</td><td class="number money-value">{{ money(sale.total) }}</td><td class="actions"><button type="button" class="text-action danger" (click)="requestVoid(sale.id, 'pharmacy', sale.saleNumber)">Void</button></td></tr> }
+              </tbody></table>
+            } @else if (activeTab() === 'closures' || activeTab() === 'clinic-closures') {
+              <table><thead><tr><th>Shift / cashier</th><th>Closed</th><th class="number">Expected cash</th><th class="number">Expected MoMo</th><th class="number">Counted</th><th>Difference</th><th></th></tr></thead><tbody>
+                @for (closure of filteredRows(); track closure.id) { <tr><td><strong>{{ userName(closure.openedByUser) }}</strong><small>Float {{ money(closure.openingFloat) }}</small></td><td>{{ closure.closedAt || closure.closureDate | date:'medium' }}</td><td class="number">{{ money(closure.expectedCash) }}</td><td class="number">{{ money(closure.expectedMomo) }}</td><td class="number money-value">{{ money(closure.totalCounted) }}</td><td><span class="difference" [ngClass]="discrepancyClass(closure.discrepancy)">{{ money(closure.discrepancy) }}</span></td><td class="actions"><button type="button" class="text-action" (click)="inspectClosure(closure.id, activeTab() === 'closures' ? 'pharmacy-closure' : 'clinic-closure')">Inspect</button></td></tr> }
+              </tbody></table>
+            } @else if (activeTab() === 'expenses') {
+              <table><thead><tr><th>Expense</th><th>Payee / evidence</th><th>Cost centre</th><th>Recorded by</th><th>Status</th><th class="number">Amount</th><th></th></tr></thead><tbody>
+                @for (expense of filteredRows(); track expense.id) { <tr [class.voided-row]="expense.status === 'voided'"><td><strong>{{ expense.title }}</strong><small>{{ expense.expenseDate | date:'mediumDate' }} · {{ statusLabel(expense.category) }}</small></td><td>{{ expense.payee || 'Not specified' }}<small>{{ methodLabel(expense.paymentMethod) }} · {{ expense.referenceNumber || 'No reference' }}</small></td><td>{{ expense.costCenter || 'General operations' }}</td><td>{{ userName(expense.createdByUser) }}</td><td><span class="status" [class.status--voided]="expense.status === 'voided'">{{ statusLabel(expense.status) }}</span><small>{{ expense.voidReason }}</small></td><td class="number money-value">{{ money(expense.amount) }}</td><td class="actions">@if (expenseCanVoid(expense)) { <button type="button" class="text-action danger" (click)="requestVoid(expense.id, 'expense', expense.title)">Void</button> }</td></tr> }
+              </tbody></table>
+            } @else if (activeTab() === 'audit-logs') {
+              <table><thead><tr><th>Action</th><th>Entity</th><th>Performed by</th><th>Timestamp</th><th>Evidence</th></tr></thead><tbody>
+                @for (log of filteredRows(); track log.id) { <tr><td><span class="status">{{ statusLabel(log.actionType) }}</span></td><td><strong>{{ statusLabel(log.entityType) }}</strong><small>{{ log.entityId }}</small></td><td>{{ userName(log.actorUser) }}</td><td>{{ log.createdAt | date:'medium' }}</td><td><code>{{ log.afterData || log.beforeData || 'No payload' }}</code></td></tr> }
+              </tbody></table>
+            }
+          </div>
+
+          @if (filteredRows().length === 0) { <div class="empty-state"><strong>No records found</strong><p>Change the period or search term, then try again.</p></div> }
+          @if (totalRows() > pageSize) { <footer class="pagination"><span>Page {{ page() }} of {{ totalPages() }}</span><div><button type="button" [disabled]="page() === 1" (click)="changePage(page() - 1)">Previous</button><button type="button" [disabled]="page() >= totalPages()" (click)="changePage(page() + 1)">Next</button></div></footer> }
+        </section>
+      }
+    }
+  }
+</section>
+
+@if (expenseModalOpen()) {
+  <div class="modal-backdrop" (click)="expenseModalOpen.set(false)"></div>
+  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="expense-title">
+    <header><div><span class="eyebrow">Immutable register entry</span><h2 id="expense-title">Post operating expense</h2></div><button type="button" class="icon-button" (click)="expenseModalOpen.set(false)" aria-label="Close expense form">×</button></header>
+    <div class="form-grid">
+      <label class="wide"><span>Expense title *</span><input [ngModel]="expenseForm().title" (ngModelChange)="updateExpenseField('title', $event)" placeholder="e.g. Generator servicing" /></label>
+      <label><span>Category *</span><select [ngModel]="expenseForm().category" (ngModelChange)="updateExpenseField('category', $event)"><option value="rent">Rent</option><option value="utilities">Utilities</option><option value="salaries">Salaries</option><option value="maintenance">Maintenance</option><option value="transport">Transport</option><option value="professional_fees">Professional fees</option><option value="inventory">Inventory adjustment</option><option value="other">Other</option></select></label>
+      <label><span>Expense date *</span><input type="date" [ngModel]="expenseForm().expenseDate" (ngModelChange)="updateExpenseField('expenseDate', $event)" /></label>
+      <label><span>Amount (GHS) *</span><input type="number" min="0.01" step="0.01" [ngModel]="expenseForm().amount" (ngModelChange)="updateExpenseField('amount', $event)" /></label>
+      <label><span>Payee</span><input [ngModel]="expenseForm().payee" (ngModelChange)="updateExpenseField('payee', $event)" placeholder="Person or organisation" /></label>
+      <label><span>Payment method</span><select [ngModel]="expenseForm().paymentMethod" (ngModelChange)="updateExpenseField('paymentMethod', $event)"><option value="cash">Cash</option><option value="mobile_money">Mobile Money</option><option value="bank_transfer">Bank transfer</option><option value="cheque">Cheque</option><option value="other">Other</option></select></label>
+      <label><span>Payment reference</span><input [ngModel]="expenseForm().referenceNumber" (ngModelChange)="updateExpenseField('referenceNumber', $event)" placeholder="Required for non-cash" /></label>
+      <label><span>Cost centre</span><input [ngModel]="expenseForm().costCenter" (ngModelChange)="updateExpenseField('costCenter', $event)" placeholder="Clinic, Lab, Scan, Pharmacy…" /></label>
+      <label><span>Evidence URL</span><input type="url" [ngModel]="expenseForm().attachmentUrl" (ngModelChange)="updateExpenseField('attachmentUrl', $event)" placeholder="Receipt or document link" /></label>
+      <label class="wide"><span>Notes</span><textarea rows="3" [ngModel]="expenseForm().notes" (ngModelChange)="updateExpenseField('notes', $event)"></textarea></label>
+    </div>
+    <footer><button type="button" class="button button--quiet" (click)="expenseModalOpen.set(false)">Cancel</button><button type="button" class="button button--primary" [disabled]="expenseSaving() || !expenseForm().title.trim() || expenseForm().amount <= 0" (click)="saveExpense()">{{ expenseSaving() ? 'Posting…' : 'Post expense' }}</button></footer>
+  </section>
+}
+
+@if (voidTarget(); as target) {
+  <div class="modal-backdrop" (click)="voidTarget.set(null)"></div>
+  <section class="modal modal--compact" role="dialog" aria-modal="true" aria-labelledby="void-title">
+    <header><div><span class="eyebrow danger-text">Controlled reversal</span><h2 id="void-title">Void {{ target.label }}</h2></div><button type="button" class="icon-button" (click)="voidTarget.set(null)" aria-label="Close void dialog">×</button></header>
+    <div class="form-grid"><label class="wide"><span>Detailed reason *</span><textarea rows="4" [ngModel]="voidReason()" (ngModelChange)="voidReason.set($event)" placeholder="Explain why this record must be reversed"></textarea></label>
+      @if (target.type === 'pharmacy') { <p class="wide void-note">Returned stock is quarantined automatically and must be inspected before release.</p> }
+    </div>
+    <footer><button type="button" class="button button--quiet" (click)="voidTarget.set(null)">Cancel</button><button type="button" class="button button--danger" [disabled]="voidReason().trim().length < 5 || voidSaving()" (click)="confirmVoid()">{{ voidSaving() ? 'Voiding…' : 'Confirm void' }}</button></footer>
+  </section>
+}
+
+@if (detailKind()) {
+  <div class="drawer-backdrop" (click)="closeDetail()"></div>
+  <aside class="detail-drawer" aria-label="Closure details">
+    <header><div><span class="eyebrow">Shift evidence</span><h2>Closure reconciliation</h2></div><button type="button" class="icon-button" (click)="closeDetail()" aria-label="Close closure details">×</button></header>
+    @if (detailLoading()) { <div class="drawer-loading"><div class="skeleton skeleton--panel"></div></div> }
+    @if (selectedRecord(); as record) {
+      <div class="drawer-content">
+        <section class="drawer-summary"><article><span>Expected cash</span><strong>{{ money(record.expectedCash) }}</strong></article><article><span>Expected MoMo</span><strong>{{ money(record.expectedMomo) }}</strong></article><article><span>Total counted</span><strong>{{ money(record.totalCounted) }}</strong></article><article><span>Difference</span><strong [class.danger-text]="Math.abs(Number(record.discrepancy)) > .01">{{ money(record.discrepancy) }}</strong></article></section>
+        <dl class="evidence-list"><div><dt>Opened by</dt><dd>{{ userName(record.openedByUser) }}</dd></div><div><dt>Closed by</dt><dd>{{ userName(record.closedByUser) }}</dd></div><div><dt>Opening float</dt><dd>{{ money(record.openingFloat) }}</dd></div><div><dt>Notes</dt><dd>{{ record.notes || 'No closure note' }}</dd></div></dl>
+        <section><span class="eyebrow">Included transactions</span><h3>{{ record.sales?.length || record.payments?.length || 0 }} posted record(s)</h3><div class="transaction-list">
+          @for (item of record.sales || record.payments || []; track item.id) { <article><div><strong>{{ item.saleNumber || item.invoice?.invoiceNumber || item.id }}</strong><span>{{ item.paidAt | date:'medium' }} · {{ methodLabel(item.paymentMethod) }}</span></div><b>{{ money(item.total || item.amount) }}</b></article> }
+        </div></section>
+      </div>
+    }
+  </aside>
+}

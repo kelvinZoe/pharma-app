@@ -1,6 +1,6 @@
 # Pharma Flow Project Handoff
 
-Last updated: 2026-06-10
+Last updated: 2026-08-19
 
 ## Overview
 
@@ -37,6 +37,7 @@ Render backend needs backend env vars. Current known required vars:
 - `ALLOWED_ORIGINS=https://pharma-uci.com` — allowed frontend origins for CORS.
 - `FRONTEND_URL=https://pharma-uci.com` — required for invitation/reset links.
 - `PORT` — Render usually provides this automatically; if set manually, prefer uppercase `PORT`, not lowercase `port`.
+- `ALLOW_PUBLIC_CLINIC_REGISTRATION` — optional; public tenant registration is disabled in production unless this is exactly `true`.
 
 If invitation emails ever show `localhost`, check `FRONTEND_URL` on Render first.
 
@@ -96,13 +97,76 @@ Production DB patch already applied manually:
 
 Patient fields did not require a DB patch because the optional fields are already nullable in Prisma.
 
+Pharmacy development now uses ordered manual Postgres patches. Apply any missing files with `npx prisma db execute --file ...` rather than Prisma migrate commands. The current pharmacy patch order is:
+
+1. `backend/prisma/migrations/20260803120000_add_pharmacy_locations/migration.sql`
+2. `backend/prisma/migrations/20260803150000_add_pharmacy_catalogue_and_receiving/migration.sql`
+3. `backend/prisma/migrations/20260804150000_expand_pharmacy_catalogue/migration.sql`
+4. `backend/prisma/migrations/20260804190000_add_pharmacy_suppliers/migration.sql`
+5. `backend/prisma/migrations/20260804210000_add_pharmacy_purchase_orders/migration.sql`
+6. `backend/prisma/migrations/20260805100000_add_pharmacy_payables_and_returns/migration.sql`
+7. `backend/prisma/migrations/20260805150000_add_pharmacy_inventory_control/migration.sql`
+8. `backend/prisma/migrations/20260805190000_add_pharmacy_stock_transfers/migration.sql`
+9. `backend/prisma/migrations/20260806100000_add_pharmacy_network_replenishment/migration.sql`
+10. `backend/prisma/migrations/20260814100000_separate_pharmacy_medicines_and_products/migration.sql`
+11. `backend/prisma/migrations/20260817120000_strengthen_financial_controls/migration.sql`
+12. `backend/prisma/migrations/20260819120000_security_financial_integrity/migration.sql`
+
+Apply the latest catalogue patch from the backend directory, then regenerate Prisma Client:
+
+```bash
+cd backend
+npx prisma db execute --file prisma/migrations/20260814100000_separate_pharmacy_medicines_and_products/migration.sql
+npx prisma db execute --file prisma/migrations/20260817120000_strengthen_financial_controls/migration.sql
+npx prisma db execute --file prisma/migrations/20260819120000_security_financial_integrity/migration.sql
+npx prisma generate
+```
+
+The latest patch separates clinical medicine definitions from commercial products while preserving existing product IDs, batches, stock movements, and sales. It adds structured medicine strength, package definitions, branch sale controls, and automatic compatibility backfill for existing products.
+
 Future recommended cleanup:
 
 - Create a proper Postgres baseline migration history.
 - Mark existing production schema as baseline.
 - Only then re-enable `prisma migrate deploy` in Render.
 
+## Security and Financial Integrity State
+
+The 19 August 2026 hardening pass closes the identified P0/P1 application risks:
+
+- Verified JWT tenant context and fail-closed tenant scoping.
+- Role and department restrictions for patient, visit, result, pricing, billing, pharmacy, and financial routes.
+- Atomic cashier/register opening, closing, payment, sale, void, count, adjustment, transfer, and quarantine transitions.
+- Maker-checker controls for price adjustments, voids, purchase orders, supplier payments/returns, counts, adjustments, and transfer decisions.
+- Normalized unique payment and supplier references, bounded reports/exports, CSV formula neutralization, and expanded audit coverage.
+- Soft deactivation for staff and templates instead of destructive history removal.
+
+The source-of-truth checklist is `SECURITY_FINANCIAL_REMEDIATION_TODO.md`. Apply `20260819120000_security_financial_integrity` to staging before deployment, then run the listed workflow smoke tests. The unchecked P2 items require dedicated architecture work and must not be treated as already delivered.
+
 ## Current Feature State
+
+### Pharmacy Catalogue Architecture
+
+- **Medicine Library** stores tenant-wide clinical identity: generic name, structured strength, dosage form, route, therapeutic class, and supply category.
+- **Product Catalogue** stores commercial SKUs: linked medicine, brand, manufacturer, barcode, package conversion, selling unit, loose-sale rule, and minimum sale quantity.
+- **PharmacyLocationProduct** stores branch controls: sale availability, current selling price, reorder level, and shelf or bin.
+- **PharmacyBatch** stores receipt-specific stock: supplier batch, expiry, acquisition cost, received quantity, and remaining quantity.
+- Existing product rows are backfilled into one medicine definition per product so historical batch, movement, sale, and reporting links remain intact.
+
+### Pharmacy POS Hardening and Redesign
+
+- The POS now uses a focused Sale, Transactions, and Close Shift workspace.
+- Product search includes medicine name, generic, brand, product code, and barcode.
+- Selecting a medicine adds it directly to the cart; cashiers adjust only the quantity.
+- Checkout allocates stock automatically across safe batches using FEFO.
+- `PharmacyLocationProduct.defaultSellingPrice` is the authoritative current price for a medicine at a shop. Catalogue edits, direct batch intake, and goods receipts synchronize all old and new batches at that location while preserving historical sale prices.
+- Cash checkout captures tendered amount and calculates change; Mobile Money requires a non-duplicate location reference.
+- Pharmacy prescription queues and digital prescription-to-sale linking have been removed. Laboratory and scan prescription notes remain attached to the visit and print on the diagnostic report for manual pharmacy entry.
+- Recent location sales can be reopened and reprinted from server data in 58 mm or 80 mm format.
+- Pharmacy and clinic void endpoints now require admin or accounting access.
+- Voided pharmacy stock defaults to quarantine for inspection, with an explicit sellable-stock option for controlled-custody mistakes.
+- Pharmacy register totals are recalculated after a void, including already closed sessions.
+- This POS update does not require another SQL patch.
 
 ### Multi-Role Staff Accounts
 
@@ -248,9 +312,10 @@ Main files:
 
 ### Visit Deletion and Auditing
 
-- **Delete/Void Visit Registration**: Frontdesk staff can delete a visit registration from the Visits Ledger.
+- **Delete Untouched Visit Registration**: Frontdesk staff can delete only a registration that has no payment or clinical work.
   - The visit status is changed to `'deleted'` (soft-deleted).
-  - Associated invoices and payments are updated to `'voided'`.
+  - Any associated unpaid draft invoice is marked `'voided'`; payment records are never silently voided.
+  - Registrations with results, prescriptions, service progress, or payment history must remain in the clinical and financial record.
   - Detailed patient before/after snapshot is recorded in the `AuditLog` table.
   - Main files:
     - `backend/src/visits/visits.service.ts`
@@ -299,6 +364,32 @@ Main files:
 12. Navigate to **Laboratory -> History & Archives**, select a finalized visit, click **Edit Results**, modify values, and check if the printable report reflects changes.
 13. Navigate to **Frontdesk -> Visits Ledger**, click the delete icon on a visit, and check if it is soft-deleted and disappears from lists.
 14. Navigate to **Admin -> Financial Summary**, select the **Audit Logs** tab, and verify that the deletion event is logged with detailed metadata.
+15. Post a pharmacy goods receipt and confirm a supplier invoice is created for its full receipt value.
+16. Record a partial supplier payment and confirm the payable balance changes and a linked `supplier_payment` expense appears in Financial Summary.
+17. Return part of the original received batch and confirm stock, invoice credit, and supplier statement update together.
+18. Print a supplier statement and confirm invoices, payments, returns, opening balance, and running balance reconcile.
+19. Start a cycle count, enter physical quantities, submit it, and confirm only an administrator can approve and post the variance.
+20. Request damaged, expired, loss, correction-in, and correction-out adjustments and confirm stock changes only after approval.
+21. Open **Stock Control → Stock ledger** and confirm each posted movement shows before, change, after, source, reason, and user.
+22. Create and submit a transfer from one pharmacy location to another, approve it, and confirm the approved quantity is no longer sellable at the source.
+23. Dispatch the transfer and confirm a `transfer_out` movement is recorded without revenue or expense.
+24. Switch to the destination, receive the exact quantity, and confirm destination stock and the `transfer_in` movement.
+25. Receive a second transfer with a shortage, confirm it enters discrepancy review, and resolve it by return-to-source or write-off.
+26. Configure reorder, safety stock, lead time, and cover policies for one medicine at two locations.
+27. Open **Network Stock** and confirm On Hand, Available, Reserved, In Transit, Quarantined, and Expired quantities are distinct.
+28. Create a transfer from a replenishment recommendation and confirm it still requires normal approval.
+29. Try selecting a later-expiry batch before an available earlier-expiry batch and confirm FEFO blocks the request unless an administrator supplies an override reason.
+30. Receive part of a transfer into quarantine and confirm those units remain physically on hand but cannot be sold or transferred.
+31. Release part of quarantined stock, write off another part, and confirm both actions appear in the stock ledger.
+32. Print the transfer request, dispatch note, and receipt and confirm route, batch, expiry, quantity, storage, and signature fields are present.
+33. Open a pharmacy register, complete one cash sale, and confirm tendered amount and change are shown correctly.
+34. Complete one Mobile Money sale and confirm a duplicate reference is rejected at the same pharmacy location.
+35. Reprint both sales from **POS Sales → Transactions** and confirm the original receipt number, sale time, cashier, location, and payment reference are preserved.
+36. Sell a quantity larger than the earliest-expiring batch and confirm checkout allocates the balance from the next safe batch automatically.
+37. Change a medicine's current shop price and confirm old and new batches use that price while earlier completed receipts retain their historical price.
+38. Void a sale as admin/accounting, choose quarantine, and confirm stock is on hand but unavailable until quarantine resolution.
+39. Confirm a pharmacy user without admin/accounting access cannot call the void endpoint.
+40. Close a shift and confirm expected cash includes opening float; print the closure and confirm cashier and channel totals are present.
 
 ## High-Risk Areas
 

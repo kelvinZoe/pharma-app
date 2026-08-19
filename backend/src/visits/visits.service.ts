@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { getInternetDate } from '../common/clock';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -32,6 +32,7 @@ export class VisitsService {
         ],
       },
       orderBy: { surname: 'asc' },
+      take: 100,
     });
   }
 
@@ -147,7 +148,7 @@ export class VisitsService {
       };
     }
 
-    return this.prisma.visit.findMany({
+    const visits = await this.prisma.visit.findMany({
       where: whereClause,
       include: {
         patient: true,
@@ -165,12 +166,23 @@ export class VisitsService {
         invoice: true,
       },
       orderBy: { visitDate: 'desc' },
+      take: 250,
     });
+    if (!departmentCode) return visits;
+    const normalizedDepartment = departmentCode.toUpperCase();
+    return visits.map((visit) => ({
+      ...visit,
+      visitServices: visit.visitServices.filter((line) => line.service.department?.code?.toUpperCase() === normalizedDepartment),
+    }));
   }
 
-  async findVisitById(id: string) {
+  async findVisitById(id: string, actorRole: number = 0) {
+    const departmentCode = this.departmentCodeForRole(actorRole);
     const visit = await this.prisma.visit.findUnique({
-      where: { id },
+      where: {
+        id,
+        ...(departmentCode ? { visitServices: { some: { service: { department: { code: departmentCode } } } } } : {}),
+      },
       include: {
         patient: true,
         visitServices: {
@@ -199,12 +211,21 @@ export class VisitsService {
     if (!visit) {
       throw new NotFoundException('Visit not found');
     }
-    return visit;
+    if (!departmentCode) return visit;
+    return {
+      ...visit,
+      visitServices: visit.visitServices.filter((line) => line.service.department?.code?.toUpperCase() === departmentCode),
+      invoice: visit.invoice ? { ...visit.invoice, payments: [] } : null,
+    };
   }
 
   async createVisit(data: any, userId: string) {
     if (!data.patientId || !data.serviceIds || !Array.isArray(data.serviceIds) || data.serviceIds.length === 0) {
       throw new BadRequestException('patientId and at least one serviceId are required');
+    }
+    const serviceIds = data.serviceIds.map((id: unknown) => String(id ?? '').trim());
+    if (serviceIds.some((id: string) => !id) || new Set(serviceIds).size !== serviceIds.length) {
+      throw new BadRequestException('Each selected service must be unique and valid');
     }
 
     // Generate V-xxxxx visit number
@@ -223,11 +244,11 @@ export class VisitsService {
 
     // Fetch services to snapshot prices
     const services = await this.prisma.service.findMany({
-      where: { id: { in: data.serviceIds } },
+      where: { id: { in: serviceIds }, isActive: true },
       include: { department: true },
     });
 
-    if (services.length !== data.serviceIds.length) {
+    if (services.length !== serviceIds.length) {
       throw new BadRequestException('Some selected services are invalid or inactive');
     }
 
@@ -245,7 +266,7 @@ export class VisitsService {
 
       // Add visit services
       let subtotal = 0;
-      for (const svcId of data.serviceIds) {
+      for (const svcId of serviceIds) {
         const svc = services.find((s) => s.id === svcId);
         if (!svc) continue;
 
@@ -330,9 +351,13 @@ export class VisitsService {
   }
 
   // --- Department Actions ---
-  async addExtraService(visitId: string, data: any) {
+  async addExtraService(visitId: string, data: any, actorRole: number) {
     if (!data.serviceId) {
       throw new BadRequestException('serviceId is required');
+    }
+    const quantity = Number(data.quantity ?? 1);
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
+      throw new BadRequestException('Service quantity must be a whole number between 1 and 100');
     }
 
     const visit = await this.prisma.visit.findUnique({
@@ -343,14 +368,17 @@ export class VisitsService {
     if (!visit) {
       throw new NotFoundException('Visit not found');
     }
+    this.assertInvoiceMutable(visit.invoice, 'add services');
 
     const service = await this.prisma.service.findUnique({
       where: { id: data.serviceId },
+      include: { department: true },
     });
 
-    if (!service) {
+    if (!service || !service.isActive) {
       throw new NotFoundException('Service not found');
     }
+    this.assertDepartmentAccess(actorRole, service.department);
 
     const line = await this.prisma.$transaction(async (tx) => {
       const approvedByPatient = data.approvedByPatient === true;
@@ -361,8 +389,8 @@ export class VisitsService {
           serviceId: service.id,
           source: 'department_added',
           unitPrice: service.price,
-          quantity: data.quantity ? Number(data.quantity) : 1,
-          lineTotal: Number(service.price) * (data.quantity ? Number(data.quantity) : 1),
+          quantity,
+          lineTotal: Number(service.price) * quantity,
           status: 'pending',
           approvedByPatient,
         },
@@ -425,6 +453,7 @@ export class VisitsService {
     if (!visit) {
       throw new NotFoundException('Visit not found');
     }
+    this.assertInvoiceMutable(visit.invoice, 'approve extra services');
 
     const line = await this.prisma.visitService.findUnique({
       where: { id: visitServiceId },
@@ -473,7 +502,7 @@ export class VisitsService {
     });
   }
 
-  async requestServicePriceAdjustment(visitId: string, visitServiceId: string, data: any, userId: string) {
+  async requestServicePriceAdjustment(visitId: string, visitServiceId: string, data: any, userId: string, actorRole: number) {
     const requestedLineTotal = Number(data.requestedLineTotal ?? data.totalAmount ?? data.lineTotal);
     if (!Number.isFinite(requestedLineTotal) || requestedLineTotal <= 0) {
       throw new BadRequestException('A valid adjusted total amount is required');
@@ -481,15 +510,26 @@ export class VisitsService {
 
     const line = await this.prisma.visitService.findUnique({
       where: { id: visitServiceId },
-      include: { visit: true, service: true },
+      include: { visit: { include: { invoice: true } }, service: { include: { department: true } } },
     });
 
     if (!line || line.visitId !== visitId) {
       throw new NotFoundException('Visit service line not found');
     }
+    this.assertDepartmentAccess(actorRole, line.service.department);
 
     if (line.status === 'not_done') {
       throw new BadRequestException('Cannot adjust the price of a service marked as not done');
+    }
+    this.assertInvoiceMutable(line.visit.invoice, 'request a price adjustment');
+
+    const currentLineTotal = Number(line.lineTotal);
+    if (requestedLineTotal <= currentLineTotal + 0.000001) {
+      throw new BadRequestException('A complexity adjustment must increase the current service charge');
+    }
+
+    if (line.priceAdjustmentStatus === 'pending') {
+      throw new BadRequestException('This service already has a pending price adjustment');
     }
 
     const reason = String(data.reason ?? '').trim();
@@ -497,16 +537,42 @@ export class VisitsService {
       throw new BadRequestException('Reason for price adjustment is required');
     }
 
-    const updatedLine = await this.prisma.visitService.update({
-      where: { id: visitServiceId },
-      data: {
-        requestedLineTotal,
-        priceAdjustmentReason: reason || null,
-        priceAdjustmentStatus: 'pending',
-        priceAdjustedAt: new Date(),
-        priceAdjustedByUserId: userId,
-      },
-      include: { service: { include: { department: true } } },
+    const updatedLine = await this.prisma.$transaction(async (tx) => {
+      const claim = await tx.visitService.updateMany({
+        where: {
+          id: visitServiceId,
+          visitId,
+          priceAdjustmentStatus: { not: 'pending' },
+          lineTotal: line.lineTotal,
+        },
+        data: {
+          requestedLineTotal,
+          priceAdjustmentReason: reason,
+          priceAdjustmentStatus: 'pending',
+          priceAdjustedAt: getInternetDate(),
+          priceAdjustedByUserId: userId,
+          priceApprovedAt: null,
+          priceApprovedByUserId: null,
+        },
+      });
+      if (claim.count !== 1) {
+        throw new BadRequestException('The service charge changed. Refresh and try again.');
+      }
+      const updated = await tx.visitService.findUniqueOrThrow({
+        where: { id: visitServiceId },
+        include: { service: { include: { department: true } } },
+      });
+      await tx.auditLog.create({
+        data: {
+          actionType: 'request_price_adjustment',
+          entityType: 'visit_service',
+          entityId: visitServiceId,
+          beforeData: JSON.stringify({ lineTotal: currentLineTotal }),
+          afterData: JSON.stringify({ requestedLineTotal, reason, visitId }),
+          actorUserId: userId,
+        },
+      });
+      return updated;
     });
 
     await this.notificationsService.create({
@@ -545,23 +611,39 @@ export class VisitsService {
     if (line.priceAdjustmentStatus !== 'pending' || line.requestedLineTotal === null) {
       throw new BadRequestException('No pending price adjustment exists for this service');
     }
+    this.assertInvoiceMutable(visit.invoice, 'approve a price adjustment');
+    if (line.priceAdjustedByUserId === userId) {
+      throw new BadRequestException('The requester cannot approve their own price adjustment');
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const requestedLineTotal = Number(line.requestedLineTotal);
-      const updatedLine = await tx.visitService.update({
-        where: { id: visitServiceId },
+      const claim = await tx.visitService.updateMany({
+        where: {
+          id: visitServiceId,
+          visitId,
+          priceAdjustmentStatus: 'pending',
+          requestedLineTotal: line.requestedLineTotal,
+          priceAdjustedByUserId: { not: userId },
+        },
         data: approved
           ? {
               lineTotal: requestedLineTotal,
               priceAdjustmentStatus: 'approved',
-              priceApprovedAt: new Date(),
+              priceApprovedAt: getInternetDate(),
               priceApprovedByUserId: userId,
             }
           : {
               priceAdjustmentStatus: 'rejected',
-              priceApprovedAt: new Date(),
+              priceApprovedAt: getInternetDate(),
               priceApprovedByUserId: userId,
             },
+      });
+      if (claim.count !== 1) {
+        throw new BadRequestException('This adjustment was already handled or changed. Refresh and try again.');
+      }
+      const updatedLine = await tx.visitService.findUniqueOrThrow({
+        where: { id: visitServiceId },
         include: { service: { include: { department: true } } },
       });
 
@@ -586,23 +668,39 @@ export class VisitsService {
         });
       }
 
+      await tx.auditLog.create({
+        data: {
+          actionType: approved ? 'approve_price_adjustment' : 'reject_price_adjustment',
+          entityType: 'visit_service',
+          entityId: visitServiceId,
+          beforeData: JSON.stringify({ lineTotal: Number(line.lineTotal), requestedLineTotal }),
+          afterData: JSON.stringify({ approved, lineTotal: Number(updatedLine.lineTotal), visitId }),
+          actorUserId: userId,
+        },
+      });
+
       return updatedLine;
     });
   }
 
-  async removeExtraService(visitId: string, visitServiceId: string) {
+  async removeExtraService(visitId: string, visitServiceId: string, actorRole: number) {
     const visit = await this.prisma.visit.findUnique({
       where: { id: visitId },
-      include: { visitServices: true, invoice: true },
+      include: { visitServices: { include: { service: { include: { department: true } } } }, invoice: true },
     });
 
     if (!visit) {
       throw new NotFoundException('Visit not found');
     }
+    this.assertInvoiceMutable(visit.invoice, 'remove services');
 
     const line = visit.visitServices.find((s) => s.id === visitServiceId);
     if (!line) {
       throw new NotFoundException('Visit service line not found');
+    }
+    this.assertDepartmentAccess(actorRole, line.service.department);
+    if (line.source !== 'department_added') {
+      throw new BadRequestException('Only department-added services can be removed');
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -636,7 +734,7 @@ export class VisitsService {
     });
   }
 
-  async updateServiceStatus(visitId: string, visitServiceId: string, data: any) {
+  async updateServiceStatus(visitId: string, visitServiceId: string, data: any, actorRole: number) {
     if (!data.status || !['pending', 'in_progress', 'done', 'not_done'].includes(data.status)) {
       throw new BadRequestException('Valid status is required');
     }
@@ -649,14 +747,17 @@ export class VisitsService {
     if (!visit) {
       throw new NotFoundException('Visit not found');
     }
+    this.assertInvoiceMutable(visit.invoice, 'change clinical service status');
 
     const visitSvc = await this.prisma.visitService.findUnique({
       where: { id: visitServiceId },
+      include: { service: { include: { department: true } } },
     });
 
     if (!visitSvc || visitSvc.visitId !== visitId) {
       throw new NotFoundException('Visit service line not found');
     }
+    this.assertDepartmentAccess(actorRole, visitSvc.service.department);
 
     const result = await this.prisma.$transaction(async (tx) => {
       const updatedSvc = await tx.visitService.update({
@@ -733,7 +834,7 @@ export class VisitsService {
   }
 
   // --- Save Results ---
-  async saveVisitResult(visitId: string, data: any, userId: string) {
+  async saveVisitResult(visitId: string, data: any, userId: string, actorRole: number) {
     // Determine if batch save or single save
     const services = Array.isArray(data.services) ? data.services : null;
 
@@ -749,11 +850,13 @@ export class VisitsService {
         for (const item of services) {
           const visitService = await tx.visitService.findUnique({
             where: { id: item.visitServiceId },
+            include: { service: { include: { department: true } } },
           });
 
           if (!visitService || visitService.visitId !== visitId) {
-            continue;
+            throw new NotFoundException('A service line was not found for this visit');
           }
+          this.assertDepartmentAccess(actorRole, visitService.service.department);
 
           if (item.status === 'not_done') {
             // Update cancellation status
@@ -768,6 +871,10 @@ export class VisitsService {
             // Observed Result Done
             // Lookup template dynamically if not provided
             let templateId = item.templateId;
+            if (templateId) {
+              const template = await tx.serviceResultTemplate.findFirst({ where: { id: String(templateId), serviceId: visitService.serviceId } });
+              if (!template) throw new BadRequestException('The selected result template does not belong to this service');
+            }
             if (!templateId) {
               const template = await tx.serviceResultTemplate.findFirst({
                 where: { serviceId: visitService.serviceId },
@@ -827,13 +934,19 @@ export class VisitsService {
         // Process Single Service Result
         const visitService = await tx.visitService.findUnique({
           where: { id: data.visitServiceId },
+          include: { service: { include: { department: true } } },
         });
 
         if (!visitService || visitService.visitId !== visitId) {
           throw new NotFoundException('Service line not found for this visit');
         }
+        this.assertDepartmentAccess(actorRole, visitService.service.department);
 
         let templateId = data.templateId;
+        if (templateId) {
+          const template = await tx.serviceResultTemplate.findFirst({ where: { id: String(templateId), serviceId: visitService.serviceId } });
+          if (!template) throw new BadRequestException('The selected result template does not belong to this service');
+        }
         if (!templateId) {
           const template = await tx.serviceResultTemplate.findFirst({
             where: { serviceId: visitService.serviceId },
@@ -911,21 +1024,24 @@ export class VisitsService {
   }
 
   // --- Prescriptions ---
-  async savePrescription(visitId: string, data: any, userId: string) {
+  async savePrescription(visitId: string, data: any, userId: string, actorRole: number) {
     if (!data.prescriptionText) {
       throw new BadRequestException('prescriptionText is required');
     }
 
     const visit = await this.prisma.visit.findUnique({
       where: { id: visitId },
-      include: { patient: true },
+      include: { patient: true, visitServices: { include: { service: { include: { department: true } } } } },
     });
     if (!visit) {
       throw new NotFoundException('Visit not found');
     }
+    const departmentCode = this.departmentCodeForRole(actorRole);
+    if (departmentCode && !visit.visitServices.some((line) => line.service.department?.code?.toUpperCase() === departmentCode)) {
+      throw new ForbiddenException('This visit is not assigned to your department');
+    }
 
-    // Create prescription linked to visit
-    const prescription = await this.prisma.prescription.create({
+    return this.prisma.prescription.create({
       data: {
         visitId,
         prescriptionText: data.prescriptionText,
@@ -933,19 +1049,6 @@ export class VisitsService {
         status: 'active',
       },
     });
-
-    await this.notificationsService.create({
-      title: 'New clinic prescription',
-      message: `${visit.patient.surname}, ${visit.patient.firstName} has a prescription waiting in pharmacy.`,
-      type: 'info',
-      module: 'pharmacy',
-      targetRole: 4,
-      entityType: 'prescription',
-      entityId: prescription.id,
-      route: '/pharmacy/clinic-prescriptions',
-    });
-
-    return prescription;
   }
 
   async deleteVisit(id: string, userId: string) {
@@ -954,6 +1057,8 @@ export class VisitsService {
         where: { id },
         include: {
           patient: true,
+          visitServices: { include: { results: { select: { id: true } } } },
+          prescriptions: { select: { id: true } },
           invoice: {
             include: { payments: true }
           }
@@ -968,38 +1073,39 @@ export class VisitsService {
         throw new BadRequestException('Visit is already deleted');
       }
 
-      // 1. Set Visit status to 'deleted'
-      await tx.visit.update({
-        where: { id },
+      if (!['registered', 'sent_to_department'].includes(visit.status)) {
+        throw new BadRequestException('Only an untouched registration can be deleted');
+      }
+
+      const hasClinicalWork = visit.visitServices.some(
+        (line) => line.status !== 'pending' || line.results.length > 0,
+      ) || visit.prescriptions.length > 0;
+      if (hasClinicalWork) {
+        throw new BadRequestException('This visit has clinical work and must remain in the patient record');
+      }
+
+      if (visit.invoice && (
+        Number(visit.invoice.amountPaid) > 0.000001 ||
+        visit.invoice.payments.length > 0
+      )) {
+        throw new BadRequestException('A visit with payment history cannot be deleted. Use an approved financial reversal instead.');
+      }
+
+      const deletion = await tx.visit.updateMany({
+        where: { id, status: visit.status },
         data: { status: 'deleted' },
       });
+      if (deletion.count !== 1) {
+        throw new BadRequestException('The visit changed. Refresh and try again.');
+      }
 
-      // 2. Set the associated ClinicInvoice.status = 'voided' (if exists)
       if (visit.invoice) {
         await tx.clinicInvoice.update({
           where: { id: visit.invoice.id },
           data: { status: 'voided' },
         });
-
-        // 3. Set associated ClinicPayment.status = 'voided'
-        if (visit.invoice.payments && visit.invoice.payments.length > 0) {
-          for (const payment of visit.invoice.payments) {
-            if (payment.status !== 'voided') {
-              await tx.clinicPayment.update({
-                where: { id: payment.id },
-                data: {
-                  status: 'voided',
-                  voidReason: 'Registration deleted by Frontdesk',
-                  voidedByUserId: userId,
-                  voidedAt: getInternetDate(),
-                },
-              });
-            }
-          }
-        }
       }
 
-      // 4. Create AuditLog entry
       await tx.auditLog.create({
         data: {
           actionType: 'delete_visit',
@@ -1017,5 +1123,26 @@ export class VisitsService {
 
       return { success: true };
     });
+  }
+
+  private departmentCodeForRole(role: number): 'LAB' | 'SCAN' | null {
+    if (role === 2) return 'LAB';
+    if (role === 3) return 'SCAN';
+    return null;
+  }
+
+  private assertDepartmentAccess(role: number, department: { code?: string | null } | null | undefined): void {
+    const requiredCode = this.departmentCodeForRole(role);
+    if (requiredCode && department?.code?.toUpperCase() !== requiredCode) {
+      throw new ForbiddenException('This clinical service belongs to another department');
+    }
+  }
+
+  private assertInvoiceMutable(invoice: any, action: string): void {
+    if (!invoice) return;
+    const amountPaid = Number(invoice.amountPaid ?? 0);
+    if (amountPaid > 0.000001 || ['partially_paid', 'paid', 'voided'].includes(String(invoice.status))) {
+      throw new BadRequestException(`Cannot ${action} after a payment has been posted`);
+    }
   }
 }

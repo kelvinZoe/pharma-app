@@ -367,10 +367,10 @@ interface ServiceLine {
                       <table style="width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-family: 'Courier New', Courier, monospace;">
                         <thead>
                           <tr>
-                            <th style="border: 1px solid var(--slate-300); padding: 0.5rem 0.65rem; background-color: var(--slate-100); font-weight: 800; font-size: 0.725rem; text-align: left; color: var(--slate-600); text-transform: uppercase; font-family: 'Inter', sans-serif; min-width: 180px; white-space: nowrap;">
+                            <th style="border: 1px solid var(--slate-300); padding: 0.5rem 0.65rem; background-color: var(--slate-100); font-weight: 800; font-size: 12px; text-align: left; color: var(--slate-600); text-transform: uppercase; font-family: 'Inter', sans-serif; min-width: 180px; white-space: nowrap;">
                               Test Parameter
                             </th>
-                            <th *ngFor="let col of s.template.columns" style="border: 1px solid var(--slate-300); padding: 0.5rem 0.65rem; background-color: var(--slate-100); font-weight: 800; font-size: 0.725rem; color: var(--slate-600); text-transform: uppercase; font-family: 'Inter', sans-serif; min-width: 120px; white-space: nowrap;" [style.textAlign]="col.alignment">
+                            <th *ngFor="let col of s.template.columns" style="border: 1px solid var(--slate-300); padding: 0.5rem 0.65rem; background-color: var(--slate-100); font-weight: 800; font-size: 12px; color: var(--slate-600); text-transform: uppercase; font-family: 'Inter', sans-serif; min-width: 120px; white-space: nowrap;" [style.textAlign]="col.alignment">
                               {{ col.label }}
                             </th>
                           </tr>
@@ -398,7 +398,7 @@ interface ServiceLine {
                                         [style.color]="s.resultValues[row.id]?.[col.key] === 'HIGH' || s.resultValues[row.id]?.[col.key] === 'ABNORMAL' || s.resultValues[row.id]?.[col.key] === 'LOW' || s.resultValues[row.id]?.isAbnormal ? 'var(--red-600)' : 'var(--slate-800)'">
                                     {{ s.resultValues[row.id]?.[col.key] }}
                                   </span>
-                                  <span style="font-size: 0.65rem; color: var(--slate-400); font-family: 'Inter', sans-serif;" *ngIf="col.refUnit && s.resultValues[row.id]?.[col.key]">
+                                  <span style="font-size: 12px; color: var(--slate-400); font-family: 'Inter', sans-serif;" *ngIf="col.refUnit && s.resultValues[row.id]?.[col.key]">
                                     {{ col.refUnit }}
                                   </span>
                                 </div>
@@ -487,7 +487,7 @@ interface ServiceLine {
                                         [style.color]="s.resultValues[row.id]?.[col.key] === 'HIGH' || s.resultValues[row.id]?.[col.key] === 'ABNORMAL' || s.resultValues[row.id]?.[col.key] === 'LOW' || s.resultValues[row.id]?.isAbnormal ? 'var(--app-danger-color)' : 'var(--slate-800)'">
                                     {{ s.resultValues[row.id]?.[col.key] }}
                                   </span>
-                                  <span style="font-size: 0.65rem; color: var(--app-muted-text-color);" *ngIf="col.refUnit && s.resultValues[row.id]?.[col.key]">
+                                  <span style="font-size: 12px; color: var(--app-muted-text-color);" *ngIf="col.refUnit && s.resultValues[row.id]?.[col.key]">
                                     {{ col.refUnit }}
                                   </span>
                                 </div>
@@ -1277,15 +1277,15 @@ export class WorklistQueuePageComponent implements OnInit {
           <style>
             body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 25px; color: #000; background: #fff; line-height: 1.5; font-size: 13px; }
             h2, h3, h4 { margin: 0 0 5px 0; font-weight: 800; color: #000; }
-            span { font-size: 11px; color: #000; }
+            span { font-size: 12px; color: #000; }
             .a4-letterhead { display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 12px; width: 100%; }
             .letterhead-brand-block { display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 8px; }
             .letterhead-brand-block img { max-height: 48px; max-width: 150px; object-fit: contain; margin-right: 0.75rem; }
             .letterhead-brand-block svg { width: 32px; height: 32px; stroke: #000; fill: none; flex-shrink: 0; }
             .brand-text-block { display: flex; flex-direction: column; justify-content: center; }
             .brand-text-block h2 { font-size: 18px; letter-spacing: 0.5px; color: #000; margin: 0; line-height: 1.2; }
-            .brand-text-block span { font-size: 10px; color: #000; font-weight: 700; text-transform: uppercase; margin-top: 2px; line-height: 1.2; }
-            .letterhead-contacts-row { display: flex; gap: 20px; font-size: 11px; color: #000; width: 100%; flex-wrap: wrap; margin-top: 6px; }
+            .brand-text-block span { font-size: 12px; color: #000; font-weight: 700; text-transform: uppercase; margin-top: 2px; line-height: 1.2; }
+            .letterhead-contacts-row { display: flex; gap: 20px; font-size: 12px; color: #000; width: 100%; flex-wrap: wrap; margin-top: 6px; }
             .a4-patient-grid { display: flex; justify-content: space-between; margin: 15px 0; font-size: 12px; color: #000; }
             .meta-col strong { color: #000; }
             .text-right { text-align: right; }
@@ -1303,14 +1303,14 @@ export class WorklistQueuePageComponent implements OnInit {
             .abnormal { background-color: #fef2f2 !important; color: #dc2626 !important; }
             .abnormal .cell-val { font-weight: 900; }
             .a4-narrative-box { border: 1.25px solid #000; border-radius: 4px; padding: 11px; background-color: #f1f5f9; font-style: italic; color: #000; font-size: 13.5px; font-weight: 700; }
-            .a4-cancelled-reason { color: #ef4444; font-size: 11px; margin: 5px 0 0 0; }
+            .a4-cancelled-reason { color: #ef4444; font-size: 12px; margin: 5px 0 0 0; }
             .a4-prescription-section { margin-top: 30px; border: 1.5px dashed #000; border-radius: 4px; padding: 12px; page-break-inside: avoid; }
-            .a4-section-hdr { font-size: 11px; text-transform: uppercase; margin: 0 0 8px 0; color: #000; }
+            .a4-section-hdr { font-size: 12px; text-transform: uppercase; margin: 0 0 8px 0; color: #000; }
             .a4-rx-notepad { font-family: 'Courier New', monospace; white-space: pre-line; font-size: 12px; color: #000; }
             .a4-footer-signature { display: flex; justify-content: flex-end; margin-top: 60px; page-break-inside: avoid; color: #000; }
             .sig-col { width: 250px; text-align: right; }
             .sig-line { width: 100%; border-bottom: 1.5px solid #000; margin-bottom: 6px; height: 75px; }
-            .sig-sub { font-size: 10px; color: #000; }
+            .sig-sub { font-size: 12px; color: #000; }
             @media print {
               body { margin: 20mm; padding: 0; }
               @page { size: A4 portrait; margin: 0; }

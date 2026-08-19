@@ -741,7 +741,7 @@
 }
 
 .service-kicker {
-  font-size: 0.64rem;
+  font-size: 12px;
   font-weight: 850;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -778,7 +778,7 @@
   min-height: 1.7rem;
   padding: 0.28rem 0.65rem;
   border-radius: 999px;
-  font-size: 0.68rem;
+  font-size: 12px;
   font-weight: 850;
   letter-spacing: 0.01em;
   border: 1px solid transparent;
@@ -816,7 +816,7 @@
   border-radius: 0.7rem;
   background: #fff;
   color: var(--slate-700);
-  font-size: 0.74rem;
+  font-size: 12px;
   font-weight: 850;
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
@@ -872,7 +872,7 @@
     display: block;
     margin-bottom: 0.25rem;
     color: var(--slate-500);
-    font-size: 0.66rem;
+    font-size: 12px;
     font-weight: 850;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -907,7 +907,7 @@
 
   span {
     color: var(--slate-600);
-    font-size: 0.72rem;
+    font-size: 12px;
     font-weight: 850;
   }
 }
@@ -953,7 +953,7 @@
 .adjustment-helper {
   margin: 0.75rem 0 0;
   color: var(--slate-500);
-  font-size: 0.74rem;
+  font-size: 12px;
   line-height: 1.45;
 }
 
@@ -1042,7 +1042,7 @@
     color: var(--red-600);
     padding: 0.2rem 0.5rem;
     border-radius: 0.35rem;
-    font-size: 0.7rem;
+    font-size: 12px;
     font-weight: 700;
     cursor: pointer;
     transition: all 0.15s ease;
@@ -1197,7 +1197,7 @@ textarea.clinical-notepad {
   margin-top: 0.5rem;
   
   .quick-tag-badge {
-    font-size: 0.7rem;
+    font-size: 12px;
     font-weight: 700;
     padding: 0.2rem 0.5rem;
     border-radius: 0.5rem;
@@ -1409,7 +1409,7 @@ textarea {
 /* Outcome badges & status badge styles */
 .badge-status-outcome {
   padding: 0.25rem 0.65rem;
-  font-size: 0.7rem;
+  font-size: 12px;
   font-weight: 800;
   border-radius: 2rem;
 
@@ -1426,7 +1426,7 @@ textarea {
 
 .status-badge {
   padding: 0.15rem 0.45rem;
-  font-size: 0.65rem;
+  font-size: 12px;
   font-weight: 800;
   border-radius: 0.25rem;
   text-transform: uppercase;
@@ -1668,7 +1668,7 @@ textarea {
         }
 
         span {
-          font-size: 0.65rem;
+          font-size: 12px;
           font-weight: 800;
           text-transform: uppercase;
           color: #000;
@@ -1792,7 +1792,7 @@ textarea {
     }
     
     .cell-unit {
-      font-size: 0.7rem;
+      font-size: 12px;
       color: #000;
     }
   }
@@ -1851,7 +1851,7 @@ textarea {
       height: 75px;
     }
     .sig-sub {
-      font-size: 0.7rem;
+      font-size: 12px;
       color: #000;
     }
   }
@@ -1974,7 +1974,7 @@ textarea {
   color: var(--slate-500) !important;
   cursor: pointer !important;
   padding: 0.35rem 0.65rem !important;
-  font-size: 0.725rem !important;
+  font-size: 12px !important;
   font-weight: 700 !important;
   font-family: 'Inter', sans-serif !important;
   transition: all 0.15s ease !important;

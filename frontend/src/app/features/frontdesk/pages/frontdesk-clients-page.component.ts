@@ -296,10 +296,10 @@ interface ServiceItem {
                     <div class="history-content">
                       <div class="history-date">
                         {{ h.createdAt | date:'MMM d, y, h:mm a' }}
-                        <span class="status-pill" [class]="h.status" style="font-size: 0.65rem; padding: 0.1rem 0.3rem;">{{ h.status | uppercase }}</span>
+                        <span class="status-pill" [class]="h.status" style="font-size: 12px; padding: 0.1rem 0.3rem;">{{ h.status | uppercase }}</span>
                       </div>
                       <div class="history-services">
-                        <span *ngFor="let s of h.visitServices" class="mini-service-tag" style="font-size: 0.725rem; background-color: var(--slate-100); color: var(--app-text-color); border: 1px solid var(--app-border-color); padding: 0.15rem 0.35rem; border-radius: 0.375rem; margin-right: 0.25rem; display: inline-block;">
+                        <span *ngFor="let s of h.visitServices" class="mini-service-tag" style="font-size: 12px; background-color: var(--slate-100); color: var(--app-text-color); border: 1px solid var(--app-border-color); padding: 0.15rem 0.35rem; border-radius: 0.375rem; margin-right: 0.25rem; display: inline-block;">
                           {{ s.service?.name }}
                         </span>
                       </div>
@@ -343,7 +343,7 @@ interface ServiceItem {
                       </div>
                       <div class="service-details" style="flex: 1; display: flex; flex-direction: column;">
                         <div class="service-name" style="font-size: 0.85rem; font-weight: 600; color: var(--app-text-color);">{{ s.name }}</div>
-                        <div class="service-dept" style="font-size: 0.725rem; color: var(--app-muted-text-color);">{{ s.department.name }}</div>
+                        <div class="service-dept" style="font-size: 12px; color: var(--app-muted-text-color);">{{ s.department.name }}</div>
                       </div>
                       <div class="service-price" style="font-size: 0.85rem; font-weight: 700; color: var(--app-primary-color);">₵{{ s.price.toFixed(2) }}</div>
                     </div>

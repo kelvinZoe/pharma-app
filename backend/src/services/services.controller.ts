@@ -16,7 +16,7 @@ export class ServicesController {
   @Post('departments')
   async createDepartment(@Req() req: any, @Body() body: any) {
     this.ensureAdmin(req.user);
-    return this.servicesService.createDepartment(body);
+    return this.servicesService.createDepartment(body, req.user.id);
   }
 
   // --- Services ---
@@ -34,19 +34,19 @@ export class ServicesController {
   @Post('services')
   async createService(@Req() req: any, @Body() body: any) {
     this.ensureAdmin(req.user);
-    return this.servicesService.createService(body);
+    return this.servicesService.createService(body, req.user.id);
   }
 
   @Put('services/:id')
   async updateService(@Req() req: any, @Param('id') id: string, @Body() body: any) {
     this.ensureAdmin(req.user);
-    return this.servicesService.updateService(id, body);
+    return this.servicesService.updateService(id, body, req.user.id);
   }
 
   @Delete('services/:id')
   async deleteService(@Req() req: any, @Param('id') id: string) {
     this.ensureAdmin(req.user);
-    return this.servicesService.deleteService(id);
+    return this.servicesService.deleteService(id, req.user.id);
   }
 
   // --- Result Templates ---
@@ -58,7 +58,7 @@ export class ServicesController {
   @Post('services/:id/template')
   async saveTemplate(@Req() req: any, @Param('id') serviceId: string, @Body() body: any) {
     this.ensureAdmin(req.user);
-    return this.servicesService.saveTemplate(serviceId, body);
+    return this.servicesService.saveTemplate(serviceId, body, req.user.id);
   }
 
   // --- General Templates ---
@@ -75,19 +75,19 @@ export class ServicesController {
   @Post('general-templates')
   async createGeneralTemplate(@Req() req: any, @Body() body: any) {
     this.ensureAdmin(req.user);
-    return this.servicesService.createGeneralTemplate(body);
+    return this.servicesService.createGeneralTemplate(body, req.user.id);
   }
 
   @Put('general-templates/:id')
   async updateGeneralTemplate(@Req() req: any, @Param('id') id: string, @Body() body: any) {
     this.ensureAdmin(req.user);
-    return this.servicesService.updateGeneralTemplate(id, body);
+    return this.servicesService.updateGeneralTemplate(id, body, req.user.id);
   }
 
   @Delete('general-templates/:id')
   async deleteGeneralTemplate(@Req() req: any, @Param('id') id: string) {
     this.ensureAdmin(req.user);
-    return this.servicesService.deleteGeneralTemplate(id);
+    return this.servicesService.deleteGeneralTemplate(id, req.user.id);
   }
 
   private ensureAdmin(user: any) {

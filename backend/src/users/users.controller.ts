@@ -23,7 +23,7 @@ export class UsersController {
   @Post()
   async create(@Req() req: any, @Body() body: any) {
     this.ensureAdmin(req.user);
-    return this.usersService.create(body);
+    return this.usersService.create(body, req.user.id);
   }
 
   @Get('me')
@@ -44,23 +44,22 @@ export class UsersController {
   @Post(':id/resend-invitation')
   async resendInvitation(@Req() req: any, @Param('id') id: string) {
     this.ensureAdmin(req.user);
-    return this.usersService.resendInvitation(id);
+    return this.usersService.resendInvitation(id, req.user.id);
   }
 
   @Put(':id')
   async update(@Req() req: any, @Param('id') id: string, @Body() body: any) {
     this.ensureAdmin(req.user);
-    return this.usersService.update(id, body);
+    return this.usersService.update(id, body, req.user.id);
   }
 
   @Delete(':id')
   async remove(@Req() req: any, @Param('id') id: string) {
     this.ensureAdmin(req.user);
-    // Prevent admins from deleting their own account
-    if (req.user.userId === id || req.user.sub === id) {
+    if (req.user.id === id || req.user.userId === id || req.user.sub === id) {
       throw new ForbiddenException('You cannot delete your own account');
     }
-    return this.usersService.remove(id);
+    return this.usersService.remove(id, req.user.id);
   }
 
   private ensureAdmin(user: any) {

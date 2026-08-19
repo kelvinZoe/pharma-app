@@ -8,37 +8,58 @@ datasource db {
 }
 
 model Tenant {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  slug      String   @unique
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  logo             String?
-  tagline          String?
-  location         String?
-  phone            String?
-  email            String?
-  tollFree         String?
-  labEmail         String?
-  accreditationId  String?
+  id              String   @id @default(uuid())
+  name            String   @unique
+  slug            String   @unique
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  logo            String?
+  tagline         String?
+  location        String?
+  phone           String?
+  email           String?
+  tollFree        String?
+  labEmail        String?
+  accreditationId String?
 
-  users            User[]
-  patients         Patient[]
-  departments      Department[]
-  services         Service[]
-  visits           Visit[]
-  clinicInvoices   ClinicInvoice[]
-  clinicPayments   ClinicPayment[]
-  clinicCashSessions ClinicCashSession[]
-  pharmacyProducts PharmacyProduct[]
-  pharmacySales    PharmacySale[]
-  prescriptions    Prescription[]
-  auditLogs        AuditLog[]
-  closures         PharmacyDailyClosure[]
-  generalTemplates GeneralTemplate[]
-  expenses         Expense[]
-  notifications    Notification[]
+  users                       User[]
+  patients                    Patient[]
+  departments                 Department[]
+  services                    Service[]
+  visits                      Visit[]
+  clinicInvoices              ClinicInvoice[]
+  clinicPayments              ClinicPayment[]
+  clinicCashSessions          ClinicCashSession[]
+  pharmacyMedicines           PharmacyMedicine[]
+  pharmacyProducts            PharmacyProduct[]
+  pharmacyLocations           PharmacyLocation[]
+  pharmacyLocationMemberships UserPharmacyLocation[]
+  pharmacyBatches             PharmacyBatch[]
+  pharmacyStockMovements      PharmacyStockMovement[]
+  pharmacyLocationProducts    PharmacyLocationProduct[]
+  pharmacySuppliers           PharmacySupplier[]
+  pharmacyPurchaseOrders      PharmacyPurchaseOrder[]
+  pharmacyPurchaseOrderLines  PharmacyPurchaseOrderLine[]
+  pharmacyGoodsReceipts       PharmacyGoodsReceipt[]
+  pharmacyGoodsReceiptLines   PharmacyGoodsReceiptLine[]
+  pharmacySupplierInvoices    PharmacySupplierInvoice[]
+  pharmacySupplierPayments    PharmacySupplierPayment[]
+  pharmacyPurchaseReturns     PharmacyPurchaseReturn[]
+  pharmacyPurchaseReturnLines PharmacyPurchaseReturnLine[]
+  pharmacyStockCounts         PharmacyStockCount[]
+  pharmacyStockCountLines     PharmacyStockCountLine[]
+  pharmacyStockAdjustments    PharmacyStockAdjustment[]
+  pharmacyTransfers           PharmacyTransfer[]
+  pharmacyTransferLines       PharmacyTransferLine[]
+  pharmacySaleItems           PharmacySaleItem[]
+  pharmacySales               PharmacySale[]
+  prescriptions               Prescription[]
+  auditLogs                   AuditLog[]
+  closures                    PharmacyDailyClosure[]
+  generalTemplates            GeneralTemplate[]
+  expenses                    Expense[]
+  notifications               Notification[]
 }
 
 model Department {
@@ -56,39 +77,58 @@ model Department {
 }
 
 model User {
-  id                    String                  @id @default(uuid())
-  fullName              String
-  username              String?
-  passwordHash          String
-  phone                 String?
-  email                 String                  @unique
-  role                  Int                     @default(1)
-  roles                 String                  @default("1")
-  module                String                  @default("frontdesk")
-  isActive              Boolean                 @default(true)
-  createdAt             DateTime                @default(now())
-  updatedAt             DateTime                @updatedAt
-  tenantId              String?
-  tenant                Tenant?                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  inviteToken           String?                 @unique
-  inviteExpires         DateTime?
-  passwordResetToken    String?                 @unique
-  passwordResetExpires  DateTime?
-  isVerified            Boolean                 @default(false)
-  auditLogs             AuditLog[]              @relation("AuditActor")
-  paymentsReceived      ClinicPayment[]         @relation("CashierUser")
-  clinicCashSessionsClosed ClinicCashSession[]  @relation("ClinicCashSessionClosedBy")
-  clinicCashSessionsOpened ClinicCashSession[]  @relation("ClinicCashSessionOpenedBy")
-  pharmacyClosures      PharmacyDailyClosure[]  @relation("PharmacyClosedBy")
-  pharmacyOpenedClosures PharmacyDailyClosure[] @relation("PharmacyOpenedBy")
-  pharmacySales         PharmacySale[]          @relation("PharmacySoldBy")
-  stockMovementsCreated PharmacyStockMovement[] @relation("StockMovementCreatedBy")
-  prescriptionsCreated  Prescription[]          @relation("PrescriptionCreatedBy")
-  visitsCreated         Visit[]                 @relation("FrontdeskUser")
-  resultsEntered        VisitResult[]           @relation("ResultEnteredBy")
-  voidedClinicPayments  ClinicPayment[]         @relation("ClinicPaymentVoidedBy")
-  voidedPharmacySales  PharmacySale[]          @relation("PharmacySaleVoidedBy")
-  expensesCreated       Expense[]               @relation("ExpenseCreatedBy")
+  id                              String                    @id @default(uuid())
+  fullName                        String
+  username                        String?
+  passwordHash                    String
+  phone                           String?
+  email                           String                    @unique
+  role                            Int                       @default(1)
+  roles                           String                    @default("1")
+  module                          String                    @default("frontdesk")
+  isActive                        Boolean                   @default(true)
+  createdAt                       DateTime                  @default(now())
+  updatedAt                       DateTime                  @updatedAt
+  tenantId                        String?
+  tenant                          Tenant?                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  inviteToken                     String?                   @unique
+  inviteExpires                   DateTime?
+  passwordResetToken              String?                   @unique
+  passwordResetExpires            DateTime?
+  isVerified                      Boolean                   @default(false)
+  auditLogs                       AuditLog[]                @relation("AuditActor")
+  paymentsReceived                ClinicPayment[]           @relation("CashierUser")
+  clinicCashSessionsClosed        ClinicCashSession[]       @relation("ClinicCashSessionClosedBy")
+  clinicCashSessionsOpened        ClinicCashSession[]       @relation("ClinicCashSessionOpenedBy")
+  pharmacyClosures                PharmacyDailyClosure[]    @relation("PharmacyClosedBy")
+  pharmacyOpenedClosures          PharmacyDailyClosure[]    @relation("PharmacyOpenedBy")
+  pharmacySales                   PharmacySale[]            @relation("PharmacySoldBy")
+  stockMovementsCreated           PharmacyStockMovement[]   @relation("StockMovementCreatedBy")
+  prescriptionsCreated            Prescription[]            @relation("PrescriptionCreatedBy")
+  visitsCreated                   Visit[]                   @relation("FrontdeskUser")
+  resultsEntered                  VisitResult[]             @relation("ResultEnteredBy")
+  voidedClinicPayments            ClinicPayment[]           @relation("ClinicPaymentVoidedBy")
+  voidedPharmacySales             PharmacySale[]            @relation("PharmacySaleVoidedBy")
+  expensesCreated                 Expense[]                 @relation("ExpenseCreatedBy")
+  expensesVoided                  Expense[]                 @relation("ExpenseVoidedBy")
+  pharmacyLocationMemberships     UserPharmacyLocation[]
+  supervisedPharmacyLocations     PharmacyLocation[]        @relation("PharmacyLocationSupervisor")
+  pharmacyGoodsReceiptsCreated    PharmacyGoodsReceipt[]    @relation("PharmacyGoodsReceiptCreatedBy")
+  pharmacyPurchaseOrdersCreated   PharmacyPurchaseOrder[]   @relation("PharmacyPurchaseOrderCreatedBy")
+  pharmacyPurchaseOrdersSubmitted PharmacyPurchaseOrder[]   @relation("PharmacyPurchaseOrderSubmittedBy")
+  pharmacyPurchaseOrdersApproved  PharmacyPurchaseOrder[]   @relation("PharmacyPurchaseOrderApprovedBy")
+  pharmacySupplierInvoicesCreated PharmacySupplierInvoice[] @relation("PharmacySupplierInvoiceCreatedBy")
+  pharmacySupplierPaymentsCreated PharmacySupplierPayment[] @relation("PharmacySupplierPaymentCreatedBy")
+  pharmacyPurchaseReturnsCreated  PharmacyPurchaseReturn[]  @relation("PharmacyPurchaseReturnCreatedBy")
+  pharmacyStockCountsCreated      PharmacyStockCount[]      @relation("PharmacyStockCountCreatedBy")
+  pharmacyStockCountsApproved     PharmacyStockCount[]      @relation("PharmacyStockCountApprovedBy")
+  pharmacyAdjustmentsCreated      PharmacyStockAdjustment[] @relation("PharmacyStockAdjustmentCreatedBy")
+  pharmacyAdjustmentsApproved     PharmacyStockAdjustment[] @relation("PharmacyStockAdjustmentApprovedBy")
+  pharmacyTransfersRequested      PharmacyTransfer[]        @relation("PharmacyTransferRequestedBy")
+  pharmacyTransfersApproved       PharmacyTransfer[]        @relation("PharmacyTransferApprovedBy")
+  pharmacyTransfersDispatched     PharmacyTransfer[]        @relation("PharmacyTransferDispatchedBy")
+  pharmacyTransfersReceived       PharmacyTransfer[]        @relation("PharmacyTransferReceivedBy")
+  pharmacyTransfersResolved       PharmacyTransfer[]        @relation("PharmacyTransferResolvedBy")
 
   @@unique([tenantId, username])
 }
@@ -163,44 +203,44 @@ model Visit {
 }
 
 model Service {
-  id            String                  @id @default(uuid())
-  name          String
-  price         Decimal
-  isActive      Boolean                 @default(true)
-  createdAt     DateTime                @default(now())
-  updatedAt     DateTime                @updatedAt
-  departmentId  String
-  tenantId      String?
-  tenant        Tenant?                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  department    Department              @relation(fields: [departmentId], references: [id])
-  templates     ServiceResultTemplate[]
-  visitServices VisitService[]
+  id                   String                   @id @default(uuid())
+  name                 String
+  price                Decimal
+  isActive             Boolean                  @default(true)
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  departmentId         String
+  tenantId             String?
+  tenant               Tenant?                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department           Department               @relation(fields: [departmentId], references: [id])
+  templates            ServiceResultTemplate[]
+  visitServices        VisitService[]
   generalTemplateItems GeneralTemplateService[]
 }
 
 model VisitService {
-  id                String        @id @default(uuid())
-  source            String        @default("frontdesk")
-  unitPrice         Decimal
-  quantity          Int           @default(1)
-  lineTotal         Decimal
-  requestedLineTotal Decimal?
+  id                    String        @id @default(uuid())
+  source                String        @default("frontdesk")
+  unitPrice             Decimal
+  quantity              Int           @default(1)
+  lineTotal             Decimal
+  requestedLineTotal    Decimal?
   priceAdjustmentReason String?
-  priceAdjustmentStatus String     @default("none")
-  priceAdjustedAt   DateTime?
+  priceAdjustmentStatus String        @default("none")
+  priceAdjustedAt       DateTime?
   priceAdjustedByUserId String?
-  priceApprovedAt   DateTime?
+  priceApprovedAt       DateTime?
   priceApprovedByUserId String?
-  status            String        @default("pending")
-  notDoneReason     String?
-  approvedByPatient Boolean       @default(true)
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  visitId           String
-  serviceId         String
-  results           VisitResult[]
-  service           Service       @relation(fields: [serviceId], references: [id])
-  visit             Visit         @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  status                String        @default("pending")
+  notDoneReason         String?
+  approvedByPatient     Boolean       @default(true)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  visitId               String
+  serviceId             String
+  results               VisitResult[]
+  service               Service       @relation(fields: [serviceId], references: [id])
+  visit                 Visit         @relation(fields: [visitId], references: [id], onDelete: Cascade)
 }
 
 model ServiceResultTemplate {
@@ -265,146 +305,776 @@ model ClinicInvoice {
 }
 
 model ClinicPayment {
-  id               String        @id @default(uuid())
-  paymentMethod    String
-  amount           Decimal
-  referenceNumber  String?
-  paidAt           DateTime      @default(now())
-  createdAt        DateTime      @default(now())
-  invoiceId        String
-  receivedByUserId String
-  status           String        @default("paid")
-  voidReason       String?
-  voidedByUserId   String?
-  voidedAt         DateTime?
-  tenantId         String?
-  tenant           Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  receivedByUser   User          @relation("CashierUser", fields: [receivedByUserId], references: [id])
-  voidedByUser     User?         @relation("ClinicPaymentVoidedBy", fields: [voidedByUserId], references: [id])
-  invoice          ClinicInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  id                  String             @id @default(uuid())
+  paymentMethod       String
+  amount              Decimal
+  referenceNumber     String?
+  paidAt              DateTime           @default(now())
+  createdAt           DateTime           @default(now())
+  invoiceId           String
+  receivedByUserId    String
+  status              String             @default("paid")
+  voidReason          String?
+  voidedByUserId      String?
+  voidedAt            DateTime?
+  tenantId            String?
+  tenant              Tenant?            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  receivedByUser      User               @relation("CashierUser", fields: [receivedByUserId], references: [id])
+  voidedByUser        User?              @relation("ClinicPaymentVoidedBy", fields: [voidedByUserId], references: [id])
+  invoice             ClinicInvoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   clinicCashSessionId String?
   clinicCashSession   ClinicCashSession? @relation("ClinicCashSessionPayments", fields: [clinicCashSessionId], references: [id])
+
+  @@index([tenantId, referenceNumber])
 }
 
 model ClinicCashSession {
-  id               String          @id @default(uuid())
-  openedByUserId   String
-  closedByUserId   String?
-  openingFloat     Decimal         @default(0.00)
-  cashCounted      Decimal?
-  momoCounted      Decimal?
-  expectedCash     Decimal?
-  expectedMomo     Decimal?
-  totalCounted     Decimal?
-  discrepancy      Decimal?
-  notes            String?
-  status           String          @default("open")
-  openedAt         DateTime        @default(now())
-  closedAt         DateTime?
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  tenantId         String?
-  tenant           Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  openedByUser     User            @relation("ClinicCashSessionOpenedBy", fields: [openedByUserId], references: [id])
-  closedByUser     User?           @relation("ClinicCashSessionClosedBy", fields: [closedByUserId], references: [id])
-  payments         ClinicPayment[] @relation("ClinicCashSessionPayments")
+  id             String          @id @default(uuid())
+  openedByUserId String
+  closedByUserId String?
+  openingFloat   Decimal         @default(0.00)
+  cashCounted    Decimal?
+  momoCounted    Decimal?
+  expectedCash   Decimal?
+  expectedMomo   Decimal?
+  totalCounted   Decimal?
+  discrepancy    Decimal?
+  notes          String?
+  status         String          @default("open")
+  openedAt       DateTime        @default(now())
+  closedAt       DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  tenantId       String?
+  tenant         Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  openedByUser   User            @relation("ClinicCashSessionOpenedBy", fields: [openedByUserId], references: [id])
+  closedByUser   User?           @relation("ClinicCashSessionClosedBy", fields: [closedByUserId], references: [id])
+  payments       ClinicPayment[] @relation("ClinicCashSessionPayments")
 
   @@index([tenantId, status])
   @@index([tenantId, openedAt])
 }
 
+model PharmacyMedicine {
+  id                    String            @id @default(uuid())
+  genericName           String
+  dosageForm            String
+  strengthValue         Decimal?
+  strengthUnit          String?
+  strengthPerValue      Decimal?
+  strengthPerUnit       String?
+  strengthDisplay       String?
+  routeOfAdministration String?
+  therapeuticClass      String?
+  prescriptionCategory  String            @default("OTC")
+  description           String?
+  lifecycleStatus       String            @default("active")
+  catalogueIdentity     String
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  tenantId              String
+  tenant                Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products              PharmacyProduct[]
+
+  @@unique([tenantId, catalogueIdentity])
+  @@index([tenantId, genericName])
+  @@index([tenantId, lifecycleStatus])
+}
+
 model PharmacyProduct {
-  id             String                  @id @default(uuid())
-  productCode    String?
-  name           String
-  unitOfMeasure  String
-  isActive       Boolean                 @default(true)
-  reorderLevel   Float                   @default(10.0)
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-  tenantId       String?
-  tenant         Tenant?                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  batches        PharmacyBatch[]
-  saleItems      PharmacySaleItem[]
-  stockMovements PharmacyStockMovement[]
+  id                       String                       @id @default(uuid())
+  productCode              String?
+  name                     String
+  description              String?
+  genericName              String?
+  brandName                String?
+  strength                 String?
+  dosageForm               String?
+  routeOfAdministration    String?
+  therapeuticClass         String?
+  prescriptionRequired     Boolean                      @default(false)
+  controlledClassification String                       @default("none")
+  taxCategory              String                       @default("standard")
+  isTaxExempt              Boolean                      @default(false)
+  storageInstructions      String?
+  lifecycleStatus          String                       @default("active")
+  defaultPurchaseUnit      String?
+  defaultUnitsPerPack      Float                        @default(1)
+  packageType              String?
+  packageQuantity          Float                        @default(1)
+  packageUnit              String?
+  packageSizeValue         Decimal?
+  packageSizeUnit          String?
+  sellingUnit              String?
+  allowLooseSale           Boolean                      @default(false)
+  minimumSaleQuantity      Float                        @default(1)
+  catalogueIdentity        String?
+  manufacturer             String?
+  barcode                  String?
+  unitOfMeasure            String
+  isActive                 Boolean                      @default(true)
+  reorderLevel             Float                        @default(10.0)
+  createdAt                DateTime                     @default(now())
+  updatedAt                DateTime                     @updatedAt
+  tenantId                 String?
+  medicineId               String?
+  tenant                   Tenant?                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  medicine                 PharmacyMedicine?            @relation(fields: [medicineId], references: [id], onDelete: Restrict)
+  batches                  PharmacyBatch[]
+  saleItems                PharmacySaleItem[]
+  stockMovements           PharmacyStockMovement[]
+  locationProducts         PharmacyLocationProduct[]
+  goodsReceiptLines        PharmacyGoodsReceiptLine[]
+  purchaseOrderLines       PharmacyPurchaseOrderLine[]
+  purchaseReturnLines      PharmacyPurchaseReturnLine[]
+  stockCountLines          PharmacyStockCountLine[]
+  stockAdjustments         PharmacyStockAdjustment[]
+  transferLines            PharmacyTransferLine[]
 
   @@unique([tenantId, productCode])
+  @@unique([tenantId, barcode])
+  @@unique([tenantId, catalogueIdentity])
+  @@index([tenantId, name])
+  @@index([tenantId, lifecycleStatus])
+  @@index([tenantId, medicineId])
+}
+
+model PharmacyLocation {
+  id                      String                     @id @default(uuid())
+  code                    String
+  name                    String
+  address                 String?
+  phone                   String?
+  licenceNumber           String?
+  supervisingPharmacistId String?
+  isActive                Boolean                    @default(true)
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+  tenantId                String
+  tenant                  Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supervisingPharmacist   User?                      @relation("PharmacyLocationSupervisor", fields: [supervisingPharmacistId], references: [id])
+  memberships             UserPharmacyLocation[]
+  batches                 PharmacyBatch[]
+  stockMovements          PharmacyStockMovement[]
+  sales                   PharmacySale[]
+  saleItems               PharmacySaleItem[]
+  closures                PharmacyDailyClosure[]
+  locationProducts        PharmacyLocationProduct[]
+  goodsReceipts           PharmacyGoodsReceipt[]
+  goodsReceiptLines       PharmacyGoodsReceiptLine[]
+  purchaseOrders          PharmacyPurchaseOrder[]
+  supplierInvoices        PharmacySupplierInvoice[]
+  supplierPayments        PharmacySupplierPayment[]
+  purchaseReturns         PharmacyPurchaseReturn[]
+  stockCounts             PharmacyStockCount[]
+  stockAdjustments        PharmacyStockAdjustment[]
+  transfersFrom           PharmacyTransfer[]         @relation("PharmacyTransferSource")
+  transfersTo             PharmacyTransfer[]         @relation("PharmacyTransferDestination")
+
+  @@unique([tenantId, code])
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+}
+
+model UserPharmacyLocation {
+  id         String           @id @default(uuid())
+  role       String?
+  isDefault  Boolean          @default(false)
+  isActive   Boolean          @default(true)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  tenantId   String
+  userId     String
+  locationId String
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location   PharmacyLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, locationId])
+  @@index([tenantId, userId, isActive])
+  @@index([tenantId, locationId, isActive])
 }
 
 model PharmacyBatch {
-  id                String                  @id @default(uuid())
-  batchNumber       String
-  expiryDate        DateTime
-  purchasePrice     Decimal
-  sellingPrice      Decimal
-  quantityReceived  Float
-  quantityRemaining Float
-  createdAt         DateTime                @default(now())
-  updatedAt         DateTime                @updatedAt
+  id                  String                       @id @default(uuid())
+  batchNumber         String
+  expiryDate          DateTime
+  purchasePrice       Decimal
+  sellingPrice        Decimal
+  quantityReceived    Float
+  quantityRemaining   Float
+  quantityReserved    Float                        @default(0)
+  quantityQuarantined Float                        @default(0)
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
+  productId           String
+  tenantId            String?
+  locationId          String?
+  tenant              Tenant?                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location            PharmacyLocation?            @relation(fields: [locationId], references: [id])
+  product             PharmacyProduct              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  saleItems           PharmacySaleItem[]
+  stockMovements      PharmacyStockMovement[]
+  goodsReceiptLine    PharmacyGoodsReceiptLine?
+  purchaseReturnLines PharmacyPurchaseReturnLine[]
+  stockCountLines     PharmacyStockCountLine[]
+  stockAdjustments    PharmacyStockAdjustment[]
+  transferSourceLines PharmacyTransferLine[]       @relation("PharmacyTransferSourceBatch")
+  transferDestLines   PharmacyTransferLine[]       @relation("PharmacyTransferDestinationBatch")
+
+  @@unique([locationId, productId, batchNumber])
+  @@index([tenantId, locationId, expiryDate])
+}
+
+model PharmacyLocationProduct {
+  id                   String           @id @default(uuid())
+  reorderLevel         Float            @default(10)
+  safetyStock          Float            @default(0)
+  maximumStock         Float?
+  supplierLeadTimeDays Int              @default(7)
+  targetCoverDays      Int              @default(14)
+  shelfLocation        String?
+  defaultSellingPrice  Decimal?
+  isAvailableForSale   Boolean          @default(true)
+  allowLooseSale       Boolean?
+  minimumSaleQuantity  Float?
+  isActive             Boolean          @default(true)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  tenantId             String
+  locationId           String
+  productId            String
+  tenant               Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location             PharmacyLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  product              PharmacyProduct  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, productId])
+  @@index([tenantId, locationId, isActive])
+}
+
+model PharmacySupplier {
+  id               String                    @id @default(uuid())
+  supplierCode     String
+  name             String
+  normalizedName   String
+  contactPerson    String?
+  phone            String?
+  email            String?
+  address          String?
+  taxId            String?
+  paymentTermsDays Int                       @default(0)
+  notes            String?
+  isActive         Boolean                   @default(true)
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  tenantId         String
+  tenant           Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  goodsReceipts    PharmacyGoodsReceipt[]
+  purchaseOrders   PharmacyPurchaseOrder[]
+  invoices         PharmacySupplierInvoice[]
+  payments         PharmacySupplierPayment[]
+  purchaseReturns  PharmacyPurchaseReturn[]
+
+  @@unique([tenantId, supplierCode])
+  @@unique([tenantId, normalizedName])
+  @@unique([tenantId, taxId])
+  @@index([tenantId, isActive, name])
+}
+
+model PharmacyPurchaseOrder {
+  id                   String                      @id @default(uuid())
+  orderNumber          String
+  status               String                      @default("draft")
+  orderDate            DateTime                    @default(now())
+  expectedDeliveryDate DateTime?
+  notes                String?
+  subtotal             Decimal                     @default(0)
+  discountTotal        Decimal                     @default(0)
+  taxTotal             Decimal                     @default(0)
+  total                Decimal                     @default(0)
+  submittedAt          DateTime?
+  approvedAt           DateTime?
+  cancelledAt          DateTime?
+  closedAt             DateTime?
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+  tenantId             String
+  locationId           String
+  supplierId           String
+  createdByUserId      String
+  submittedByUserId    String?
+  approvedByUserId     String?
+  tenant               Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location             PharmacyLocation            @relation(fields: [locationId], references: [id])
+  supplier             PharmacySupplier            @relation(fields: [supplierId], references: [id])
+  createdBy            User                        @relation("PharmacyPurchaseOrderCreatedBy", fields: [createdByUserId], references: [id])
+  submittedBy          User?                       @relation("PharmacyPurchaseOrderSubmittedBy", fields: [submittedByUserId], references: [id])
+  approvedBy           User?                       @relation("PharmacyPurchaseOrderApprovedBy", fields: [approvedByUserId], references: [id])
+  lines                PharmacyPurchaseOrderLine[]
+  goodsReceipts        PharmacyGoodsReceipt[]
+
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId, locationId, status, orderDate])
+  @@index([tenantId, supplierId, orderDate])
+}
+
+model PharmacyPurchaseOrderLine {
+  id                String                     @id @default(uuid())
+  purchaseUnit      String                     @default("box")
+  orderedPacks      Float
+  unitsPerPack      Float
+  orderedUnits      Float
+  unitCostPerPack   Decimal
+  discountAmount    Decimal                    @default(0)
+  taxAmount         Decimal                    @default(0)
+  lineTotal         Decimal
+  receivedUnits     Float                      @default(0)
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  tenantId          String
+  purchaseOrderId   String
   productId         String
-  product           PharmacyProduct         @relation(fields: [productId], references: [id], onDelete: Cascade)
-  saleItems         PharmacySaleItem[]
-  stockMovements    PharmacyStockMovement[]
+  tenant            Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  purchaseOrder     PharmacyPurchaseOrder      @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product           PharmacyProduct            @relation(fields: [productId], references: [id])
+  goodsReceiptLines PharmacyGoodsReceiptLine[]
+
+  @@unique([purchaseOrderId, productId])
+  @@index([tenantId, purchaseOrderId])
+  @@index([tenantId, productId])
+}
+
+model PharmacyGoodsReceipt {
+  id                    String                     @id @default(uuid())
+  receiptNumber         String
+  supplierName          String?
+  supplierInvoiceNumber String?
+  receivedAt            DateTime                   @default(now())
+  status                String                     @default("posted")
+  notes                 String?
+  totalCost             Decimal                    @default(0)
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+  tenantId              String
+  locationId            String
+  supplierId            String?
+  purchaseOrderId       String?
+  createdByUserId       String
+  tenant                Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location              PharmacyLocation           @relation(fields: [locationId], references: [id])
+  supplier              PharmacySupplier?          @relation(fields: [supplierId], references: [id])
+  purchaseOrder         PharmacyPurchaseOrder?     @relation(fields: [purchaseOrderId], references: [id])
+  createdBy             User                       @relation("PharmacyGoodsReceiptCreatedBy", fields: [createdByUserId], references: [id])
+  lines                 PharmacyGoodsReceiptLine[]
+  supplierInvoice       PharmacySupplierInvoice?
+  purchaseReturns       PharmacyPurchaseReturn[]
+
+  @@unique([tenantId, receiptNumber])
+  @@index([tenantId, locationId, receivedAt])
+  @@index([tenantId, supplierId, receivedAt])
+  @@index([tenantId, purchaseOrderId, receivedAt])
+}
+
+model PharmacyGoodsReceiptLine {
+  id                   String                       @id @default(uuid())
+  batchNumber          String
+  expiryDate           DateTime
+  purchaseUnit         String                       @default("unit")
+  packQuantity         Float
+  unitsPerPack         Float
+  quantityReceived     Float
+  purchasePricePerPack Decimal
+  unitCost             Decimal
+  sellingPrice         Decimal
+  lineTotal            Decimal
+  quantityReturned     Float                        @default(0)
+  createdAt            DateTime                     @default(now())
+  tenantId             String
+  locationId           String
+  receiptId            String
+  productId            String
+  batchId              String                       @unique
+  purchaseOrderLineId  String?
+  tenant               Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location             PharmacyLocation             @relation(fields: [locationId], references: [id])
+  receipt              PharmacyGoodsReceipt         @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  product              PharmacyProduct              @relation(fields: [productId], references: [id])
+  batch                PharmacyBatch                @relation(fields: [batchId], references: [id])
+  purchaseOrderLine    PharmacyPurchaseOrderLine?   @relation(fields: [purchaseOrderLineId], references: [id])
+  purchaseReturnLines  PharmacyPurchaseReturnLine[]
+
+  @@index([tenantId, locationId, createdAt])
+  @@index([tenantId, receiptId])
+  @@index([tenantId, purchaseOrderLineId])
+}
+
+model PharmacySupplierInvoice {
+  id                    String                    @id @default(uuid())
+  invoiceNumber         String
+  supplierInvoiceNumber String
+  invoiceDate           DateTime
+  dueDate               DateTime
+  totalAmount           Decimal
+  creditAmount          Decimal                   @default(0)
+  paidAmount            Decimal                   @default(0)
+  balanceDue            Decimal
+  status                String                    @default("unpaid")
+  notes                 String?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  tenantId              String
+  locationId            String
+  supplierId            String
+  receiptId             String                    @unique
+  createdByUserId       String
+  tenant                Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location              PharmacyLocation          @relation(fields: [locationId], references: [id])
+  supplier              PharmacySupplier          @relation(fields: [supplierId], references: [id])
+  receipt               PharmacyGoodsReceipt      @relation(fields: [receiptId], references: [id])
+  createdBy             User                      @relation("PharmacySupplierInvoiceCreatedBy", fields: [createdByUserId], references: [id])
+  payments              PharmacySupplierPayment[]
+  purchaseReturns       PharmacyPurchaseReturn[]
+
+  @@unique([tenantId, invoiceNumber])
+  @@unique([tenantId, supplierId, supplierInvoiceNumber])
+  @@index([tenantId, locationId, status, dueDate])
+  @@index([tenantId, supplierId, invoiceDate])
+}
+
+model PharmacySupplierPayment {
+  id              String                  @id @default(uuid())
+  paymentNumber   String
+  paymentDate     DateTime                @default(now())
+  amount          Decimal
+  paymentMethod   String
+  referenceNumber String?
+  notes           String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  tenantId        String
+  locationId      String
+  supplierId      String
+  invoiceId       String
+  createdByUserId String
+  expenseId       String?                 @unique
+  tenant          Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location        PharmacyLocation        @relation(fields: [locationId], references: [id])
+  supplier        PharmacySupplier        @relation(fields: [supplierId], references: [id])
+  invoice         PharmacySupplierInvoice @relation(fields: [invoiceId], references: [id])
+  createdBy       User                    @relation("PharmacySupplierPaymentCreatedBy", fields: [createdByUserId], references: [id])
+  expense         Expense?                @relation(fields: [expenseId], references: [id])
+
+  @@unique([tenantId, paymentNumber])
+  @@index([tenantId, referenceNumber])
+  @@index([tenantId, locationId, paymentDate])
+  @@index([tenantId, supplierId, paymentDate])
+  @@index([tenantId, invoiceId])
+}
+
+model PharmacyPurchaseReturn {
+  id              String                       @id @default(uuid())
+  returnNumber    String
+  returnDate      DateTime                     @default(now())
+  reason          String
+  notes           String?
+  totalCredit     Decimal                      @default(0)
+  status          String                       @default("posted")
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+  tenantId        String
+  locationId      String
+  supplierId      String
+  receiptId       String
+  invoiceId       String?
+  createdByUserId String
+  tenant          Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location        PharmacyLocation             @relation(fields: [locationId], references: [id])
+  supplier        PharmacySupplier             @relation(fields: [supplierId], references: [id])
+  receipt         PharmacyGoodsReceipt         @relation(fields: [receiptId], references: [id])
+  invoice         PharmacySupplierInvoice?     @relation(fields: [invoiceId], references: [id])
+  createdBy       User                         @relation("PharmacyPurchaseReturnCreatedBy", fields: [createdByUserId], references: [id])
+  lines           PharmacyPurchaseReturnLine[]
+
+  @@unique([tenantId, returnNumber])
+  @@index([tenantId, locationId, returnDate])
+  @@index([tenantId, supplierId, returnDate])
+  @@index([tenantId, receiptId])
+}
+
+model PharmacyPurchaseReturnLine {
+  id             String                   @id @default(uuid())
+  quantity       Float
+  unitCost       Decimal
+  lineTotal      Decimal
+  returnReason   String
+  createdAt      DateTime                 @default(now())
+  tenantId       String
+  returnId       String
+  receiptLineId  String
+  productId      String
+  batchId        String
+  tenant         Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  purchaseReturn PharmacyPurchaseReturn   @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  receiptLine    PharmacyGoodsReceiptLine @relation(fields: [receiptLineId], references: [id])
+  product        PharmacyProduct          @relation(fields: [productId], references: [id])
+  batch          PharmacyBatch            @relation(fields: [batchId], references: [id])
+
+  @@index([tenantId, returnId])
+  @@index([tenantId, receiptLineId])
+  @@index([tenantId, productId])
 }
 
 model PharmacyStockMovement {
-  id              String          @id @default(uuid())
+  id              String            @id @default(uuid())
   movementType    String
   quantity        Float
+  quantityBefore  Float?
+  quantityAfter   Float?
   unitCost        Decimal?
   referenceId     String?
-  createdAt       DateTime        @default(now())
+  referenceType   String?
+  reason          String?
+  createdAt       DateTime          @default(now())
   productId       String
   batchId         String?
   createdByUserId String
-  createdByUser   User            @relation("StockMovementCreatedBy", fields: [createdByUserId], references: [id])
-  batch           PharmacyBatch?  @relation(fields: [batchId], references: [id])
-  product         PharmacyProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tenantId        String?
+  locationId      String?
+  tenant          Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location        PharmacyLocation? @relation(fields: [locationId], references: [id])
+  createdByUser   User              @relation("StockMovementCreatedBy", fields: [createdByUserId], references: [id])
+  batch           PharmacyBatch?    @relation(fields: [batchId], references: [id])
+  product         PharmacyProduct   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, locationId, createdAt])
+  @@index([tenantId, locationId, productId])
+}
+
+model PharmacyTransfer {
+  id                    String                 @id @default(uuid())
+  transferNumber        String
+  status                String                 @default("draft")
+  reason                String
+  fefoOverrideReason    String?
+  notes                 String?
+  dispatchNotes         String?
+  receiptNotes          String?
+  discrepancyNotes      String?
+  transporterName       String?
+  transporterPhone      String?
+  vehicleReference      String?
+  requestedAt           DateTime?
+  approvedAt            DateTime?
+  dispatchedAt          DateTime?
+  receivedAt            DateTime?
+  resolvedAt            DateTime?
+  rejectedAt            DateTime?
+  cancelledAt           DateTime?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  tenantId              String
+  sourceLocationId      String
+  destinationLocationId String
+  requestedByUserId     String
+  approvedByUserId      String?
+  dispatchedByUserId    String?
+  receivedByUserId      String?
+  resolvedByUserId      String?
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sourceLocation        PharmacyLocation       @relation("PharmacyTransferSource", fields: [sourceLocationId], references: [id])
+  destinationLocation   PharmacyLocation       @relation("PharmacyTransferDestination", fields: [destinationLocationId], references: [id])
+  requestedBy           User                   @relation("PharmacyTransferRequestedBy", fields: [requestedByUserId], references: [id])
+  approvedBy            User?                  @relation("PharmacyTransferApprovedBy", fields: [approvedByUserId], references: [id])
+  dispatchedBy          User?                  @relation("PharmacyTransferDispatchedBy", fields: [dispatchedByUserId], references: [id])
+  receivedBy            User?                  @relation("PharmacyTransferReceivedBy", fields: [receivedByUserId], references: [id])
+  resolvedBy            User?                  @relation("PharmacyTransferResolvedBy", fields: [resolvedByUserId], references: [id])
+  lines                 PharmacyTransferLine[]
+
+  @@unique([tenantId, transferNumber])
+  @@index([tenantId, sourceLocationId, status, createdAt])
+  @@index([tenantId, destinationLocationId, status, createdAt])
+}
+
+model PharmacyTransferLine {
+  id                  String           @id @default(uuid())
+  requestedQty        Float
+  approvedQty         Float?
+  dispatchedQty       Float?
+  receivedQty         Float?
+  rejectedQty         Float?
+  quarantinedQty      Float?
+  unitCost            Decimal
+  sellingPrice        Decimal
+  batchNumber         String
+  expiryDate          DateTime
+  storageInstructions String?
+  discrepancyReason   String?
+  conditionStatus     String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  tenantId            String
+  transferId          String
+  productId           String
+  sourceBatchId       String
+  destinationBatchId  String?
+  tenant              Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transfer            PharmacyTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  product             PharmacyProduct  @relation(fields: [productId], references: [id])
+  sourceBatch         PharmacyBatch    @relation("PharmacyTransferSourceBatch", fields: [sourceBatchId], references: [id])
+  destinationBatch    PharmacyBatch?   @relation("PharmacyTransferDestinationBatch", fields: [destinationBatchId], references: [id])
+
+  @@unique([transferId, sourceBatchId])
+  @@index([tenantId, transferId])
+  @@index([tenantId, productId, sourceBatchId])
+}
+
+model PharmacyStockCount {
+  id               String                    @id @default(uuid())
+  countNumber      String
+  countType        String                    @default("cycle")
+  status           String                    @default("counting")
+  snapshotAt       DateTime                  @default(now())
+  submittedAt      DateTime?
+  approvedAt       DateTime?
+  postedAt         DateTime?
+  notes            String?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  tenantId         String
+  locationId       String
+  createdByUserId  String
+  approvedByUserId String?
+  tenant           Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location         PharmacyLocation          @relation(fields: [locationId], references: [id])
+  createdBy        User                      @relation("PharmacyStockCountCreatedBy", fields: [createdByUserId], references: [id])
+  approvedBy       User?                     @relation("PharmacyStockCountApprovedBy", fields: [approvedByUserId], references: [id])
+  lines            PharmacyStockCountLine[]
+  adjustments      PharmacyStockAdjustment[]
+
+  @@unique([tenantId, countNumber])
+  @@index([tenantId, locationId, status, createdAt])
+}
+
+model PharmacyStockCountLine {
+  id           String                   @id @default(uuid())
+  expectedQty  Float
+  countedQty   Float?
+  varianceQty  Float?
+  unitCost     Decimal
+  varianceCost Decimal?
+  notes        String?
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  tenantId     String
+  countId      String
+  productId    String
+  batchId      String
+  tenant       Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  count        PharmacyStockCount       @relation(fields: [countId], references: [id], onDelete: Cascade)
+  product      PharmacyProduct          @relation(fields: [productId], references: [id])
+  batch        PharmacyBatch            @relation(fields: [batchId], references: [id])
+  adjustment   PharmacyStockAdjustment?
+
+  @@unique([countId, batchId])
+  @@index([tenantId, countId])
+  @@index([tenantId, productId])
+}
+
+model PharmacyStockAdjustment {
+  id               String                  @id @default(uuid())
+  adjustmentNumber String
+  adjustmentType   String
+  status           String                  @default("pending")
+  quantity         Float
+  quantityBefore   Float?
+  quantityAfter    Float?
+  unitCost         Decimal
+  reason           String
+  notes            String?
+  requestedAt      DateTime                @default(now())
+  approvedAt       DateTime?
+  postedAt         DateTime?
+  rejectedAt       DateTime?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  tenantId         String
+  locationId       String
+  productId        String
+  batchId          String
+  stockCountId     String?
+  stockCountLineId String?                 @unique
+  createdByUserId  String
+  approvedByUserId String?
+  tenant           Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location         PharmacyLocation        @relation(fields: [locationId], references: [id])
+  product          PharmacyProduct         @relation(fields: [productId], references: [id])
+  batch            PharmacyBatch           @relation(fields: [batchId], references: [id])
+  stockCount       PharmacyStockCount?     @relation(fields: [stockCountId], references: [id])
+  stockCountLine   PharmacyStockCountLine? @relation(fields: [stockCountLineId], references: [id])
+  createdBy        User                    @relation("PharmacyStockAdjustmentCreatedBy", fields: [createdByUserId], references: [id])
+  approvedBy       User?                   @relation("PharmacyStockAdjustmentApprovedBy", fields: [approvedByUserId], references: [id])
+
+  @@unique([tenantId, adjustmentNumber])
+  @@index([tenantId, locationId, status, requestedAt])
+  @@index([tenantId, productId, batchId])
 }
 
 model PharmacySale {
-  id             String                @id @default(uuid())
-  saleNumber     String
-  saleSource     String                @default("walk_in")
-  subtotal       Decimal
-  total          Decimal
-  paymentMethod  String
-  status         String                @default("paid")
-  paidAt         DateTime              @default(now())
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
-  visitId        String?
-  prescriptionId String?
-  soldByUserId   String
-  closureId      String?
-  voidReason     String?
-  voidedByUserId String?
-  voidedAt       DateTime?
-  tenantId       String?
-  tenant         Tenant?               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  closure        PharmacyDailyClosure? @relation("PharmacyClosureSales", fields: [closureId], references: [id])
-  soldByUser     User                  @relation("PharmacySoldBy", fields: [soldByUserId], references: [id])
-  voidedByUser   User?                 @relation("PharmacySaleVoidedBy", fields: [voidedByUserId], references: [id])
-  prescription   Prescription?         @relation(fields: [prescriptionId], references: [id])
-  visit          Visit?                @relation(fields: [visitId], references: [id])
-  items          PharmacySaleItem[]
+  id              String                @id @default(uuid())
+  saleNumber      String
+  saleSource      String                @default("walk_in")
+  customerName    String?
+  subtotal        Decimal
+  total           Decimal
+  paymentMethod   String
+  referenceNumber String?
+  status          String                @default("paid")
+  paidAt          DateTime              @default(now())
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  visitId         String?
+  prescriptionId  String?
+  soldByUserId    String
+  closureId       String?
+  voidReason      String?
+  voidedByUserId  String?
+  voidedAt        DateTime?
+  tenantId        String?
+  locationId      String?
+  tenant          Tenant?               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location        PharmacyLocation?     @relation(fields: [locationId], references: [id])
+  closure         PharmacyDailyClosure? @relation("PharmacyClosureSales", fields: [closureId], references: [id])
+  soldByUser      User                  @relation("PharmacySoldBy", fields: [soldByUserId], references: [id])
+  voidedByUser    User?                 @relation("PharmacySaleVoidedBy", fields: [voidedByUserId], references: [id])
+  prescription    Prescription?         @relation(fields: [prescriptionId], references: [id])
+  visit           Visit?                @relation(fields: [visitId], references: [id])
+  items           PharmacySaleItem[]
 
   @@unique([tenantId, saleNumber])
+  @@index([tenantId, referenceNumber])
+  @@index([tenantId, locationId, paidAt])
 }
 
 model PharmacySaleItem {
-  id        String          @id @default(uuid())
-  itemName  String
-  quantity  Float
-  unitPrice Decimal
-  lineTotal Decimal
-  createdAt DateTime        @default(now())
-  saleId    String
-  productId String
-  batchId   String?
-  batch     PharmacyBatch?  @relation(fields: [batchId], references: [id])
-  product   PharmacyProduct @relation(fields: [productId], references: [id])
-  sale      PharmacySale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  id         String            @id @default(uuid())
+  itemName   String
+  quantity   Float
+  unitPrice  Decimal
+  unitCost   Decimal?
+  lineTotal  Decimal
+  createdAt  DateTime          @default(now())
+  saleId     String
+  productId  String
+  batchId    String?
+  tenantId   String?
+  locationId String?
+  tenant     Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location   PharmacyLocation? @relation(fields: [locationId], references: [id])
+  batch      PharmacyBatch?    @relation(fields: [batchId], references: [id])
+  product    PharmacyProduct   @relation(fields: [productId], references: [id])
+  sale       PharmacySale      @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, locationId, createdAt])
 }
 
 model AuditLog {
@@ -419,29 +1089,37 @@ model AuditLog {
   tenantId    String?
   tenant      Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   actorUser   User     @relation("AuditActor", fields: [actorUserId], references: [id])
+
+  @@index([tenantId, createdAt])
 }
 
 model PharmacyDailyClosure {
-  id               String         @id @default(uuid())
+  id               String            @id @default(uuid())
   openedByUserId   String
   closedByUserId   String?
   closureDate      DateTime?
   totalSalesCount  Int?
   totalSalesAmount Decimal?
-  openingFloat     Decimal        @default(0.00)
+  openingFloat     Decimal           @default(0.00)
+  expectedCash     Decimal?
+  expectedMomo     Decimal?
   cashCounted      Decimal?
   momoCounted      Decimal?
   totalCounted     Decimal?
   discrepancy      Decimal?
   notes            String?
-  status           String         @default("open")
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  status           String            @default("open")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
   tenantId         String?
-  tenant           Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  openedByUser     User           @relation("PharmacyOpenedBy", fields: [openedByUserId], references: [id])
-  closedByUser     User?          @relation("PharmacyClosedBy", fields: [closedByUserId], references: [id])
-  sales            PharmacySale[] @relation("PharmacyClosureSales")
+  locationId       String?
+  tenant           Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location         PharmacyLocation? @relation(fields: [locationId], references: [id])
+  openedByUser     User              @relation("PharmacyOpenedBy", fields: [openedByUserId], references: [id])
+  closedByUser     User?             @relation("PharmacyClosedBy", fields: [closedByUserId], references: [id])
+  sales            PharmacySale[]    @relation("PharmacyClosureSales")
+
+  @@index([tenantId, locationId, status])
 }
 
 model GeneralTemplate {
@@ -469,16 +1147,29 @@ model GeneralTemplateService {
 }
 
 model Expense {
-  id            String   @id @default(uuid())
-  title         String
-  category      String
-  amount        Decimal
-  expenseDate   DateTime @default(now())
-  notes         String?
-  createdById   String
-  createdByUser User     @relation("ExpenseCreatedBy", fields: [createdById], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  tenantId      String?
-  tenant        Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id              String                   @id @default(uuid())
+  title           String
+  category        String
+  amount          Decimal
+  expenseDate     DateTime                 @default(now())
+  payee           String?
+  paymentMethod   String?
+  referenceNumber String?
+  costCenter      String?
+  attachmentUrl   String?
+  notes           String?
+  status          String                   @default("posted")
+  voidReason      String?
+  voidedAt        DateTime?
+  voidedByUserId  String?
+  createdById     String
+  createdByUser   User                     @relation("ExpenseCreatedBy", fields: [createdById], references: [id])
+  voidedByUser    User?                    @relation("ExpenseVoidedBy", fields: [voidedByUserId], references: [id])
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  tenantId        String?
+  tenant          Tenant?                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplierPayment PharmacySupplierPayment?
+
+  @@index([tenantId, status, expenseDate])
 }

@@ -2,8 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { AsyncLocalStorage } from 'async_hooks';
 
 export interface TenantStore {
-  readonly tenantId: string;
+  readonly tenantId?: string;
   readonly tenantSlug?: string;
+  readonly allowUnscoped?: boolean;
 }
 
 @Injectable()
@@ -12,6 +13,14 @@ export class TenantContextService {
 
   static run<T>(store: TenantStore, callback: () => T): T {
     return this.asyncLocalStorage.run(store, callback);
+  }
+
+  static enter(store: TenantStore): void {
+    this.asyncLocalStorage.enterWith(store);
+  }
+
+  static runUnscoped<T>(callback: () => T): T {
+    return this.asyncLocalStorage.run({ allowUnscoped: true }, callback);
   }
 
   static getStore(): TenantStore | undefined {
@@ -24,5 +33,9 @@ export class TenantContextService {
 
   static getTenantSlug(): string | undefined {
     return this.asyncLocalStorage.getStore()?.tenantSlug;
+  }
+
+  static isUnscopedAllowed(): boolean {
+    return this.asyncLocalStorage.getStore()?.allowUnscoped === true;
   }
 }

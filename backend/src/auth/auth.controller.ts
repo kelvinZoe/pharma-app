@@ -12,7 +12,7 @@ export class AuthController {
       throw new UnauthorizedException('Email/username and password are required');
     }
 
-    const user = await this.authService.validateUser(identifier, body.password);
+    const user = await this.authService.validateUser(identifier, body.password, body.tenantSlug);
     if (!user) {
       throw new UnauthorizedException('Invalid email/username or password');
     }

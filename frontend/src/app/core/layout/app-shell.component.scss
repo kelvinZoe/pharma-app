@@ -8,6 +8,73 @@
   overflow: hidden;
 }
 
+.pharmacy-location-switcher {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 220px;
+  margin-inline: auto 1rem;
+
+  &__eyebrow {
+    color: var(--app-muted-text-color);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  &__control {
+    display: grid;
+    grid-template-columns: 1rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.5rem;
+    padding: 0 0.7rem;
+    border: 1px solid color-mix(in srgb, var(--app-primary-color), white 68%);
+    border-radius: 0.6rem;
+    background: color-mix(in srgb, var(--app-primary-soft-color), white 40%);
+    color: var(--app-primary-color);
+
+    svg {
+      width: 1rem;
+      height: 1rem;
+    }
+
+    select {
+      min-width: 0;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--app-text-color);
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 750;
+      cursor: pointer;
+    }
+
+    &:focus-within {
+      border-color: var(--app-primary-color);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-primary-color), transparent 88%);
+    }
+  }
+}
+
+@media (max-width: 900px) {
+  .pharmacy-location-switcher {
+    min-width: 170px;
+    margin-right: 0.5rem;
+
+    &__eyebrow {
+      display: none;
+    }
+  }
+}
+
+@media (max-width: 680px) {
+  .pharmacy-location-switcher {
+    display: none;
+  }
+}
+
 // ----------------------------------------------------
 // 1. LEFT SIDEBAR STYLE
 // ----------------------------------------------------
@@ -70,7 +137,7 @@
   }
 
   .brand-version {
-    font-size: 0.68rem;
+    font-size: 12px;
     font-weight: 750;
     color: var(--app-primary-color);
     background: var(--app-primary-soft-color);
@@ -88,7 +155,7 @@
   gap: 0.4rem;
 
   .selector-label {
-    font-size: 0.66rem;
+    font-size: 12px;
     font-weight: 850;
     color: var(--app-muted-text-color);
     text-transform: uppercase;
@@ -180,7 +247,7 @@
   margin-bottom: 1.5rem;
 
   .section-title {
-    font-size: 0.68rem;
+    font-size: 12px;
     font-weight: 850;
     color: var(--app-muted-text-color);
     text-transform: uppercase;
@@ -414,7 +481,7 @@
   }
 
   .live-label {
-    font-size: 0.68rem;
+    font-size: 12px;
     font-weight: 800;
     color: #15803d;
     letter-spacing: 0.04em;
@@ -465,7 +532,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.62rem;
+    font-size: 12px;
     font-weight: 850;
   }
 }
@@ -516,7 +583,7 @@
     color: var(--app-primary-color);
     border-radius: 0.65rem;
     padding: 0.45rem 0.65rem;
-    font-size: 0.74rem;
+    font-size: 12px;
     font-weight: 800;
     cursor: pointer;
 
@@ -544,7 +611,7 @@
   color: #64748b;
   border-radius: 999px;
   padding: 0.38rem 0.65rem;
-  font-size: 0.72rem;
+  font-size: 12px;
   font-weight: 800;
   cursor: pointer;
   transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
@@ -634,7 +701,7 @@
 
   small {
     color: #94a3b8;
-    font-size: 0.68rem;
+    font-size: 12px;
     font-weight: 750;
   }
 }
@@ -697,7 +764,7 @@
   }
 
   .user-role {
-    font-size: 0.74rem;
+    font-size: 12px;
     color: var(--app-muted-text-color);
     font-weight: 550;
   }

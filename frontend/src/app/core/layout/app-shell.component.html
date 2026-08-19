@@ -83,6 +83,9 @@
                 @case ('inventory') {
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="sidebar-icon"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
                 }
+                @case ('locations') {
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="sidebar-icon"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 12h6M9 16h6"></path></svg>
+                }
                 @case ('pos') {
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="sidebar-icon"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
                 }
@@ -185,6 +188,33 @@
           </div>
         }
       </div>
+
+      @if (activeModuleKey() === 'pharmacy') {
+        <div class="pharmacy-location-switcher">
+          <span class="pharmacy-location-switcher__eyebrow">Active pharmacy</span>
+          <label class="pharmacy-location-switcher__control">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M3 21h18M5 21V8l7-5 7 5v13M9 12h6M9 16h6" />
+            </svg>
+            <select
+              aria-label="Active pharmacy location"
+              [value]="activePharmacyLocationId() || ''"
+              [disabled]="pharmacyLocationsLoading() || pharmacyLocations().length === 0"
+              (change)="onPharmacyLocationChange($event)"
+            >
+              @if (pharmacyLocationsLoading()) {
+                <option value="">Loading locations...</option>
+              } @else {
+                @for (location of pharmacyLocations(); track location.id) {
+                  <option [value]="location.id">{{ location.code }} · {{ location.name }}</option>
+                } @empty {
+                  <option value="">No assigned location</option>
+                }
+              }
+            </select>
+          </label>
+        </div>
+      }
 
       <!-- Live telemetry status and User Profiles -->
       <div class="topbar__right">

@@ -4,7 +4,7 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { Subscription, filter, map, startWith } from 'rxjs';
 
 import { ROLE_LABELS } from '../auth/role-labels';
-import { MODULE_OPTIONS, SessionService } from '../auth/session.service';
+import { MODULE_OPTIONS, PharmacyLocation, SessionService } from '../auth/session.service';
 import { ApiService } from '../services/api.service';
 import { NotificationRealtimeService, RealtimeNotification } from '../services/notification-realtime.service';
 
@@ -43,14 +43,24 @@ const MENUS: Record<string, readonly SidebarItem[]> = {
   ],
   pharmacy: [
     { label: 'Dashboard', path: '/pharmacy/dashboard', exact: true, icon: 'dashboard' },
-    { label: 'Inventory', path: '/pharmacy/inventory', icon: 'inventory' },
-    { label: 'POS Sales', path: '/pharmacy/pos-sales', icon: 'pos' },
-    { label: 'Clinic Prescriptions', path: '/pharmacy/clinic-prescriptions', icon: 'prescriptions' }
+    { label: 'Locations', path: '/pharmacy/locations', icon: 'locations' },
+    { label: 'Stock Overview', path: '/pharmacy/inventory', icon: 'inventory' },
+    { label: 'Network Stock', path: '/pharmacy/network-stock', icon: 'dashboard' },
+    { label: 'Stock Control', path: '/pharmacy/stock-control', icon: 'reports' },
+    { label: 'Stock Transfers', path: '/pharmacy/transfers', icon: 'visits' },
+    { label: 'Medicine Library', path: '/pharmacy/medicines', icon: 'services' },
+    { label: 'Product Catalogue', path: '/pharmacy/catalogue', icon: 'services' },
+    { label: 'Suppliers', path: '/pharmacy/suppliers', icon: 'locations' },
+    { label: 'Purchase Orders', path: '/pharmacy/purchase-orders', icon: 'billing' },
+    { label: 'Supplier Payables', path: '/pharmacy/payables', icon: 'financials' },
+    { label: 'Receive Stock', path: '/pharmacy/receiving', icon: 'billing' },
+    { label: 'POS Sales', path: '/pharmacy/pos-sales', icon: 'pos' }
   ],
   accounting: [
     { label: 'Dashboard', path: '/accounting/dashboard', exact: true, icon: 'dashboard' },
     { label: 'Clinic Stream', path: '/accounting/clinic-stream', icon: 'financials' },
     { label: 'Pharmacy Stream', path: '/accounting/pharmacy-stream', icon: 'pos' },
+    { label: 'Supplier Payables', path: '/accounting/supplier-payables', icon: 'financials' },
     { label: 'Reports', path: '/accounting/reports', icon: 'reports' }
   ]
 };
@@ -73,6 +83,7 @@ export class AppShellComponent implements OnDestroy {
   private readonly notificationRealtime = inject(NotificationRealtimeService);
   private readonly realtimeSubscription = new Subscription();
   private audioContext: AudioContext | null = null;
+  private readonly pharmacyLocationsChangedHandler = () => this.loadPharmacyLocations();
 
   readonly currentUser = this.session.currentUser;
   readonly isAdmin = this.session.isAdmin;
@@ -84,6 +95,10 @@ export class AppShellComponent implements OnDestroy {
   readonly loadingNotifications = signal(false);
   readonly realtimeConnected = this.notificationRealtime.connected;
   readonly soundEnabled = signal(this.restoreSoundPreference());
+  readonly pharmacyLocations = signal<readonly PharmacyLocation[]>([]);
+  readonly pharmacyLocationsLoading = signal(false);
+  readonly activePharmacyLocationId = this.session.activePharmacyLocationId;
+  private loadedLocationsForTenant: string | null = null;
   private readonly workspaceModuleKeys = new Set(MODULE_OPTIONS.map((moduleOption) => moduleOption.key));
 
   private readonly currentUrl = toSignal(
@@ -98,6 +113,9 @@ export class AppShellComponent implements OnDestroy {
   readonly lastWorkspaceModuleKey = signal(this.resolveInitialWorkspaceModule());
 
   constructor() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pharma:locations-changed', this.pharmacyLocationsChangedHandler);
+    }
     effect(() => {
       const segment = this.currentUrl().split('/').filter(Boolean)[0];
       if (this.workspaceModuleKeys.has(segment as any)) {
@@ -111,6 +129,20 @@ export class AppShellComponent implements OnDestroy {
         this.loadNotificationCount();
       } else {
         this.notificationRealtime.disconnect();
+      }
+    });
+
+    effect(() => {
+      const user = this.currentUser();
+      if (!user || !this.session.canAccessModule('pharmacy')) {
+        this.pharmacyLocations.set([]);
+        this.loadedLocationsForTenant = null;
+        return;
+      }
+      const tenantId = user.tenantId ?? 'current';
+      if (this.loadedLocationsForTenant !== tenantId) {
+        this.loadedLocationsForTenant = tenantId;
+        this.loadPharmacyLocations();
       }
     });
 
@@ -204,6 +236,34 @@ export class AppShellComponent implements OnDestroy {
     }
   }
 
+  onPharmacyLocationChange(event: Event): void {
+    const locationId = (event.target as HTMLSelectElement).value;
+    if (!locationId || locationId === this.activePharmacyLocationId()) return;
+    this.session.setActivePharmacyLocation(locationId);
+    if (this.activeModuleKey() === 'pharmacy') {
+      this.router.navigateByUrl('/pharmacy/dashboard');
+    }
+  }
+
+  private loadPharmacyLocations(): void {
+    this.pharmacyLocationsLoading.set(true);
+    this.api.getPharmacyLocations().subscribe({
+      next: (locations) => {
+        const availableLocations = (locations ?? []).filter((location) => location.isActive !== false);
+        this.pharmacyLocations.set(availableLocations);
+        const activeId = this.activePharmacyLocationId();
+        if (!activeId || !availableLocations.some((location) => location.id === activeId)) {
+          this.session.setActivePharmacyLocation(availableLocations[0]?.id ?? '');
+        }
+        this.pharmacyLocationsLoading.set(false);
+      },
+      error: (error) => {
+        console.error('Failed to load pharmacy locations', error);
+        this.pharmacyLocationsLoading.set(false);
+      },
+    });
+  }
+
   toggleNotifications(): void {
     this.notificationsOpen.update((open) => !open);
     if (this.notificationsOpen()) {
@@ -283,6 +343,9 @@ export class AppShellComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('pharma:locations-changed', this.pharmacyLocationsChangedHandler);
+    }
     this.realtimeSubscription.unsubscribe();
     this.notificationRealtime.disconnect();
     this.audioContext?.close().catch(() => undefined);

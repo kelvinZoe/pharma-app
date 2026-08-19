@@ -25,6 +25,16 @@ import { WorklistQueuePageComponent } from './features/department-worklist/pages
 import { WorklistResultsPageComponent } from './features/department-worklist/pages/worklist-results-page.component';
 import { PharmacyInventoryPageComponent } from './features/pharmacy/pages/pharmacy-inventory-page.component';
 import { PharmacyPosSalesPageComponent } from './features/pharmacy/pages/pharmacy-pos-sales-page.component';
+import { PharmacyLocationsPageComponent } from './features/pharmacy/pages/pharmacy-locations-page.component';
+import { PharmacyCataloguePageComponent } from './features/pharmacy/pages/pharmacy-catalogue-page.component';
+import { PharmacyMedicinesPageComponent } from './features/pharmacy/pages/pharmacy-medicines-page.component';
+import { PharmacyStockReceivingPageComponent } from './features/pharmacy/pages/pharmacy-stock-receiving-page.component';
+import { PharmacySuppliersPageComponent } from './features/pharmacy/pages/pharmacy-suppliers-page.component';
+import { PharmacyPurchaseOrdersPageComponent } from './features/pharmacy/pages/pharmacy-purchase-orders-page.component';
+import { PharmacyPayablesPageComponent } from './features/pharmacy/pages/pharmacy-payables-page.component';
+import { PharmacyStockControlPageComponent } from './features/pharmacy/pages/pharmacy-stock-control-page.component';
+import { PharmacyTransfersPageComponent } from './features/pharmacy/pages/pharmacy-transfers-page.component';
+import { PharmacyNetworkStockPageComponent } from './features/pharmacy/pages/pharmacy-network-stock-page.component';
 import { ProfilePageComponent } from './features/profile/pages/profile-page.component';
 
 const adminMenu: readonly ModuleMenuItem[] = [
@@ -58,15 +68,25 @@ const scanningMenu: readonly ModuleMenuItem[] = [
 
 const pharmacyMenu: readonly ModuleMenuItem[] = [
   { label: 'Dashboard', path: '/pharmacy/dashboard', exact: true },
-  { label: 'Inventory', path: '/pharmacy/inventory' },
-  { label: 'POS Sales', path: '/pharmacy/pos-sales' },
-  { label: 'Clinic Prescriptions', path: '/pharmacy/clinic-prescriptions' }
+  { label: 'Locations', path: '/pharmacy/locations' },
+  { label: 'Stock Overview', path: '/pharmacy/inventory' },
+  { label: 'Network Stock', path: '/pharmacy/network-stock' },
+  { label: 'Stock Control', path: '/pharmacy/stock-control' },
+  { label: 'Stock Transfers', path: '/pharmacy/transfers' },
+  { label: 'Medicine Library', path: '/pharmacy/medicines' },
+  { label: 'Product Catalogue', path: '/pharmacy/catalogue' },
+  { label: 'Suppliers', path: '/pharmacy/suppliers' },
+  { label: 'Purchase Orders', path: '/pharmacy/purchase-orders' },
+  { label: 'Supplier Payables', path: '/pharmacy/payables' },
+  { label: 'Receive Stock', path: '/pharmacy/receiving' },
+  { label: 'POS Sales', path: '/pharmacy/pos-sales' }
 ];
 
 const accountingMenu: readonly ModuleMenuItem[] = [
   { label: 'Dashboard', path: '/accounting/dashboard', exact: true },
   { label: 'Clinic Stream', path: '/accounting/clinic-stream' },
   { label: 'Pharmacy Stream', path: '/accounting/pharmacy-stream' },
+  { label: 'Supplier Payables', path: '/accounting/supplier-payables' },
   { label: 'Reports', path: '/accounting/reports' }
 ];
 
@@ -142,37 +162,20 @@ const scanningDashboard: DashboardPageData = {
 
 const pharmacyDashboard: DashboardPageData = {
   eyebrow: 'Pharmacy Module',
-  title: 'Run pharmacy stock, prescriptions, and point-of-sale from a dedicated workspace.',
+  title: 'Run pharmacy stock, procurement, and point-of-sale from a dedicated workspace.',
   description:
-    'Pharmacy users should only see pharmacy operations. This dashboard separates inventory and sales while still supporting clinic-referred prescription handling.',
+    'Pharmacy users should only see pharmacy operations. This dashboard keeps inventory, purchasing, transfers, and counter sales clear and traceable.',
   stats: [
     { label: 'Low Stock Items', value: '0', hint: 'Needs attention or reorder' },
-    { label: 'Clinic Prescriptions', value: '0', hint: 'Waiting to be dispensed' },
+    { label: 'Active Locations', value: '0', hint: 'Pharmacy shops in the network' },
     { label: 'Walk-in Sales', value: '0', hint: 'Today total transactions' },
     { label: 'Expiry Alerts', value: '0', hint: 'Batch monitoring' }
   ],
   actions: [
-    { title: 'Manage inventory', description: 'Track batches, expiry, and reorder thresholds.', route: '/pharmacy/inventory' },
-    { title: 'Process POS sales', description: 'Run walk-in and clinic-referred sales independently.', route: '/pharmacy/pos-sales' },
-    { title: 'Check clinic prescriptions', description: 'See referred prescription notes from clinical modules.', route: '/pharmacy/clinic-prescriptions' }
-  ]
-};
-
-const accountingDashboard: DashboardPageData = {
-  eyebrow: 'Accounting Module',
-  title: 'Watch clinic and pharmacy streams with reporting-focused navigation.',
-  description:
-    'Accounting gets a clean financial workspace with separate views for clinic receipts, pharmacy sales, and consolidated reports.',
-  stats: [
-    { label: 'Clinic Stream (GHS)', value: '0.00', hint: 'Frontdesk payments only' },
-    { label: 'Pharmacy Stream (GHS)', value: '0.00', hint: 'Independent pharmacy receipts' },
-    { label: 'Exports Ready', value: '0', hint: 'PDF and Excel reports' },
-    { label: 'Daily Closures', value: '0', hint: 'Reconciled today' }
-  ],
-  actions: [
-    { title: 'Review clinic stream', description: 'Inspect clinic payment activity by day, cashier, and service.', route: '/accounting/clinic-stream' },
-    { title: 'Review pharmacy stream', description: 'Inspect pharmacy sales separately from clinic billing.', route: '/accounting/pharmacy-stream' },
-    { title: 'Generate reports', description: 'Prepare summary exports for management review.', route: '/accounting/reports' }
+    { title: 'Review stock', description: 'Track location quantities, batches, expiry, and reorder exposure.', route: '/pharmacy/inventory' },
+    { title: 'Receive supplier stock', description: 'Post a multi-line goods receipt with pack conversion and batch traceability.', route: '/pharmacy/receiving' },
+    { title: 'Process POS sales', description: 'Search medicines, add quantities, and complete counter sales.', route: '/pharmacy/pos-sales' },
+    { title: 'Review network stock', description: 'Compare availability across pharmacy locations before requesting a transfer.', route: '/pharmacy/network-stock' }
   ]
 };
 
@@ -278,11 +281,11 @@ const laboratoryResultsPage: WorkspacePageData = {
 const laboratoryPrescriptionsPage: WorkspacePageData = {
   eyebrow: 'Laboratory / Prescriptions',
   title: 'Laboratory prescription workspace',
-  description: 'Issue free-text prescription notes that pharmacy can later see and act upon.',
+  description: 'Issue free-text prescription notes that appear on the patient diagnostic report.',
   highlights: [
     'Enter medicine name as required text.',
     'Add optional quantity and remarks.',
-    'Link prescriptions back to the clinic visit.'
+    'Print the prescription with the visit results for patient handoff.'
   ]
 };
 
@@ -333,22 +336,11 @@ const pharmacyInventoryPage: WorkspacePageData = {
 const pharmacySalesPage: WorkspacePageData = {
   eyebrow: 'Pharmacy / POS Sales',
   title: 'Pharmacy sales workspace',
-  description: 'Run walk-in and clinic-referred pharmacy sales as a separate receipt stream from clinic billing.',
+  description: 'Run pharmacy counter sales as a separate receipt stream from clinic billing.',
   highlights: [
-    'Differentiate walk-in versus clinic-referred transactions.',
-    'Deduct stock from the correct batch during sale.',
+    'Search or scan the medicine printed on the patient report.',
+    'Allocate stock automatically from the earliest-expiring batches.',
     'Issue independent pharmacy receipts.'
-  ]
-};
-
-const pharmacyPrescriptionsPage: WorkspacePageData = {
-  eyebrow: 'Pharmacy / Clinic Prescriptions',
-  title: 'Clinic prescription workspace',
-  description: 'Receive and review prescription notes written from clinical modules before dispensing.',
-  highlights: [
-    'See prescriptions linked to clinic visits.',
-    'Use pharmacist discretion when dispensing alternates.',
-    'Keep clinic referrals distinct from normal walk-in sales.'
   ]
 };
 
@@ -437,7 +429,7 @@ export const routes: Routes = [
           { path: 'templates', component: AdminTemplatesPageComponent },
           { path: 'general-templates', component: AdminGeneralTemplatesPageComponent },
           { path: 'services/:id/template', redirectTo: 'templates' },
-          { path: 'financials', component: AdminFinancialsPageComponent },
+          { path: 'financials', component: AdminFinancialsPageComponent, data: { financialTab: 'dashboard' } },
           { path: 'settings', component: AdminSettingsPageComponent }
         ]
       },
@@ -497,15 +489,24 @@ export const routes: Routes = [
         canActivate: [moduleAccessGuard('pharmacy')],
         data: {
           title: 'Pharmacy',
-          subtitle: 'Inventory, prescriptions, and point-of-sale operations.',
+          subtitle: 'Inventory, procurement, transfers, and point-of-sale operations.',
           menu: pharmacyMenu
         },
         children: [
           { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
           { path: 'dashboard', component: RoleDashboardPageComponent, data: { page: pharmacyDashboard } },
+          { path: 'locations', component: PharmacyLocationsPageComponent },
           { path: 'inventory', component: PharmacyInventoryPageComponent },
-          { path: 'pos-sales', component: PharmacyPosSalesPageComponent },
-          { path: 'clinic-prescriptions', component: PharmacyPosSalesPageComponent }
+          { path: 'network-stock', component: PharmacyNetworkStockPageComponent },
+          { path: 'stock-control', component: PharmacyStockControlPageComponent },
+          { path: 'transfers', component: PharmacyTransfersPageComponent },
+          { path: 'medicines', component: PharmacyMedicinesPageComponent },
+          { path: 'catalogue', component: PharmacyCataloguePageComponent },
+          { path: 'suppliers', component: PharmacySuppliersPageComponent },
+          { path: 'purchase-orders', component: PharmacyPurchaseOrdersPageComponent },
+          { path: 'payables', component: PharmacyPayablesPageComponent },
+          { path: 'receiving', component: PharmacyStockReceivingPageComponent },
+          { path: 'pos-sales', component: PharmacyPosSalesPageComponent }
         ]
       },
       {
@@ -519,10 +520,11 @@ export const routes: Routes = [
         },
         children: [
           { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
-          { path: 'dashboard', component: RoleDashboardPageComponent, data: { page: accountingDashboard } },
-          { path: 'clinic-stream', component: AdminFinancialsPageComponent },
-          { path: 'pharmacy-stream', component: AdminFinancialsPageComponent },
-          { path: 'reports', component: AdminFinancialsPageComponent }
+          { path: 'dashboard', component: AdminFinancialsPageComponent, data: { financialTab: 'dashboard' } },
+          { path: 'clinic-stream', component: AdminFinancialsPageComponent, data: { financialTab: 'clinic' } },
+          { path: 'pharmacy-stream', component: AdminFinancialsPageComponent, data: { financialTab: 'pharmacy' } },
+          { path: 'supplier-payables', component: PharmacyPayablesPageComponent },
+          { path: 'reports', component: AdminFinancialsPageComponent, data: { financialTab: 'dashboard' } }
         ]
       }
     ]
