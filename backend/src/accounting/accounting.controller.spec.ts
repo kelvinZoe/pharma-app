@@ -1,5 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 import { AccountingController } from './accounting.controller';
+import { authorizeController } from '../../test/helpers/authorize-controller';
 
 describe('AccountingController authorization', () => {
   const accounting = {
@@ -15,9 +16,9 @@ describe('AccountingController authorization', () => {
     'rejects role %s for period and reversal commands',
     (role) => {
       const req = { user: { id: 'staff', role, roles: [role] } };
-      expect(() => controller.listPeriods(req)).toThrow(ForbiddenException);
+      expect(() => authorizeController(controller, 'listPeriods', req)).toThrow(ForbiddenException);
       expect(() =>
-        controller.requestReversal(req, { entityId: 'entry' }, 'request-key'),
+        authorizeController(controller, 'requestReversal', req),
       ).toThrow(ForbiddenException);
       expect(idempotency.run).not.toHaveBeenCalled();
     },
@@ -27,6 +28,7 @@ describe('AccountingController authorization', () => {
     'allows role %s and applies idempotency to approvals',
     (role) => {
       const req = { user: { id: 'reviewer', role, roles: [role] } };
+      authorizeController(controller, 'approveReversal', req);
       controller.approveReversal(req, 'reversal', 'request-key');
       expect(idempotency.run).toHaveBeenCalledWith(
         'request-key',

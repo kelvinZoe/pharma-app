@@ -112,7 +112,8 @@ This checklist tracks the financial, tenant-isolation, pharmacy, and availabilit
   - Completed: manual Postgres idempotency table patch added; clinic payment/session, pharmacy POS/register, goods receipt, direct batch add, stock count/adjustment, transfer, quarantine, purchase order, supplier payment, and purchase return commands now require/replay idempotency keys.
 - [x] Make payment retry recovery durable and receipt persistence atomic with business posting.
   - Completed: clinic, POS, and supplier payment attempts retain their original key and payload in scoped same-tab browser storage. Recovery controls use that original request after connection failure or reload; edited unresolved attempts are blocked. Business writes and cached responses share one PostgreSQL transaction with a per-request lock. Completed records are replayed even after their former expiry time; do not purge them solely on `expiresAt`. Uncertain legacy records require register review. Notifications emit only after commit. No additional SQL patch is required beyond the existing idempotency table.
-- [ ] Replace numeric role checks with named permissions and centrally enforced decorators.
+- [x] Replace numeric role checks with named permissions and centrally enforced decorators.
+  - Completed: one typed role/permission registry and deny-by-default guard protect all 137 authenticated handlers after JWT verification. Shared role parsing rejects malformed assignments; profile/notification/catalogue reads remain available to their existing roles. Six-role route snapshot tests, live HTTP guard tests, role-revocation tests, and existing resource/financial checks verify access. Stored role codes and frontend workspace selectors remain compatible. Details: `ACCESS_CONTROL_GUIDE.md`. No SQL patch is needed.
 - [ ] Add database row-level security as a second tenant-isolation layer.
 - [x] Require tenant slug or another unambiguous tenant selector for username login.
 

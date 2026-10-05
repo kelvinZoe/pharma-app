@@ -1,21 +1,21 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../common/multitenancy/tenant-context.service';
+import { hasPermission, hasRole, Permission, Role } from '../auth/authorization/permissions';
 
 @Injectable()
 export class PharmacyLocationService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listAccessibleLocations(user: any) {
-    const roles = this.getRoles(user);
-    if (roles.includes(0) || roles.includes(5)) {
+    if (hasPermission(user, Permission.PharmacyLocationsReadAll)) {
       return this.prisma.pharmacyLocation.findMany({
         where: { isActive: true },
         orderBy: [{ code: 'asc' }, { name: 'asc' }],
       });
     }
 
-    if (!roles.includes(4)) {
+    if (!hasPermission(user, Permission.PharmacyLocationsRead)) {
       throw new ForbiddenException('You do not have access to pharmacy locations');
     }
 
@@ -51,8 +51,7 @@ export class PharmacyLocationService {
   }
 
   async createLocation(data: any, user: any) {
-    const roles = this.getRoles(user);
-    if (!roles.includes(0)) {
+    if (!hasPermission(user, Permission.PharmacyLocationsManage)) {
       throw new ForbiddenException('Only administrators can create pharmacy locations');
     }
 
@@ -130,8 +129,7 @@ export class PharmacyLocationService {
       throw new NotFoundException('The selected active user was not found');
     }
 
-    const staffRoles = this.getRoles(staffUser);
-    if (!staffRoles.includes(0) && !staffRoles.includes(4)) {
+    if (!hasPermission(staffUser, Permission.PharmacySaleCreate)) {
       throw new BadRequestException('Only administrators and pharmacy staff can be assigned to pharmacy locations');
     }
 
@@ -149,7 +147,7 @@ export class PharmacyLocationService {
         tenantId: location.tenantId,
         userId,
         locationId,
-        role: staffRoles.includes(0) ? 'admin' : 'pharmacy',
+        role: hasRole(staffUser, Role.Admin) ? 'admin' : 'pharmacy',
         isDefault,
         isActive: true,
       },
@@ -184,7 +182,7 @@ export class PharmacyLocationService {
   }
 
   async assignDefaultLocationToUser(userId: string, roles: number[]) {
-    if (!roles.includes(0) && !roles.includes(4)) return;
+    if (!hasPermission({ roles }, Permission.PharmacySaleCreate)) return;
 
     const defaultLocation = await this.prisma.pharmacyLocation.findFirst({
       where: { isActive: true },
@@ -203,7 +201,7 @@ export class PharmacyLocationService {
         userId,
         locationId: defaultLocation.id,
         tenantId: defaultLocation.tenantId,
-        role: roles.includes(0) ? 'admin' : 'pharmacy',
+        role: hasRole({ roles }, Role.Admin) ? 'admin' : 'pharmacy',
         isDefault: true,
         isActive: true,
       },
@@ -213,15 +211,8 @@ export class PharmacyLocationService {
     });
   }
 
-  private getRoles(user: any): number[] {
-    const rawRoles = user?.roles;
-    if (Array.isArray(rawRoles)) return rawRoles.map(Number);
-    if (rawRoles) return String(rawRoles).split(',').map(Number);
-    return [Number(user?.role)];
-  }
-
   private ensureAdmin(user: any) {
-    if (!this.getRoles(user).includes(0)) {
+    if (!hasPermission(user, Permission.PharmacyLocationsManage)) {
       throw new ForbiddenException('Only administrators can manage pharmacy locations');
     }
   }

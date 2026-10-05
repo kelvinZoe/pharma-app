@@ -1,8 +1,6 @@
 import {
   Body,
-  Controller,
-  ForbiddenException,
-  Get,
+  Controller, Get,
   Headers,
   Param,
   Post,
@@ -11,34 +9,37 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { RequirePermissions } from '../auth/authorization/require-permissions.decorator';
+import { Permission } from '../auth/authorization/permissions';
 import { IdempotencyService } from '../common/idempotency.service';
 import { AccountingService } from './accounting.service';
 
 @Controller('accounting')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class AccountingController {
   constructor(
     private readonly accounting: AccountingService,
     private readonly idempotency: IdempotencyService,
   ) {}
 
+  @RequirePermissions(Permission.AccountingPeriodRead)
   @Get('periods')
   listPeriods(
     @Req() req: any,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    this.authorize(req.user);
     return this.accounting.listPeriods(Number(page ?? 1), Number(limit ?? 50));
   }
 
+  @RequirePermissions(Permission.AccountingPeriodLock)
   @Post('periods/lock')
   lockPeriod(
     @Req() req: any,
     @Body() body: any,
     @Headers('idempotency-key') key?: string,
   ) {
-    this.authorize(req.user);
     return this.idempotency.run(
       key,
       'accounting_period_lock',
@@ -48,26 +49,26 @@ export class AccountingController {
     );
   }
 
+  @RequirePermissions(Permission.FinancialReversalRead)
   @Get('reversals')
   listReversals(
     @Req() req: any,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    this.authorize(req.user);
     return this.accounting.listReversals(
       Number(page ?? 1),
       Number(limit ?? 50),
     );
   }
 
+  @RequirePermissions(Permission.FinancialReversalRequest)
   @Post('reversals')
   requestReversal(
     @Req() req: any,
     @Body() body: any,
     @Headers('idempotency-key') key?: string,
   ) {
-    this.authorize(req.user);
     return this.idempotency.run(
       key,
       'financial_reversal_request',
@@ -77,13 +78,13 @@ export class AccountingController {
     );
   }
 
+  @RequirePermissions(Permission.FinancialReversalReview)
   @Post('reversals/:id/approve')
   approveReversal(
     @Req() req: any,
     @Param('id') id: string,
     @Headers('idempotency-key') key?: string,
   ) {
-    this.authorize(req.user);
     return this.idempotency.run(
       key,
       'financial_reversal_approve',
@@ -93,6 +94,7 @@ export class AccountingController {
     );
   }
 
+  @RequirePermissions(Permission.FinancialReversalReview)
   @Post('reversals/:id/reject')
   rejectReversal(
     @Req() req: any,
@@ -100,7 +102,6 @@ export class AccountingController {
     @Body('reason') reason: string,
     @Headers('idempotency-key') key?: string,
   ) {
-    this.authorize(req.user);
     return this.idempotency.run(
       key,
       'financial_reversal_reject',
@@ -108,17 +109,5 @@ export class AccountingController {
       { id, reason },
       () => this.accounting.reviewReversal(id, req.user.id, false, reason),
     );
-  }
-
-  private authorize(user: any) {
-    const roles = Array.isArray(user.roles)
-      ? user.roles
-      : String(user.roles ?? user.role)
-          .split(',')
-          .map(Number);
-    if (!roles.includes(0) && !roles.includes(5))
-      throw new ForbiddenException(
-        'Only administrators and accounting staff can manage accounting periods and reversals.',
-      );
   }
 }

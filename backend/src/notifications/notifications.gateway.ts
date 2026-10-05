@@ -1,3 +1,4 @@
+import { getUserRoles } from '../auth/authorization/permissions';
 import {
   ConnectedSocket,
   MessageBody,
@@ -114,10 +115,7 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
   }
 
   private extractRoles(user: any): number[] {
-    const rawRoles = user?.roles;
-    if (Array.isArray(rawRoles)) return rawRoles.map(Number);
-    if (rawRoles) return String(rawRoles).split(',').map(Number);
-    return [Number(user?.role ?? 1)];
+    return getUserRoles(user);
   }
 
   private tenantRoom(tenantId: string): string {

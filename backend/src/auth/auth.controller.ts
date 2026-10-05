@@ -1,5 +1,9 @@
-import { Body, Controller, Get, Headers, Post, Query, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { PermissionsGuard } from './guards/permissions.guard';
+import { RequirePermissions } from './authorization/require-permissions.decorator';
+import { getUserRoles, isRole, parseRole, Permission, Role } from './authorization/permissions';
 
 @Controller('auth')
 export class AuthController {
@@ -19,20 +23,21 @@ export class AuthController {
 
     // Role-based check
     if (body.role !== undefined) {
-      const selectedRole = Number(body.role);
+      const selectedRole = parseRole(body.role);
+      if (!isRole(selectedRole)) {
+        throw new UnauthorizedException('Select a valid workspace role');
+      }
       // Parse user's roles array
-      const userRoles: number[] = user.roles
-        ? (typeof user.roles === 'string' ? user.roles.split(',').map(Number) : user.roles)
-        : [user.role];
+      const userRoles = getUserRoles(user);
 
       // Admin (role 0) can log into any module/role for administration/testing override
       // Other users can only log into their assigned roles
-      if (!userRoles.includes(0) && !userRoles.includes(selectedRole)) {
+      if (!userRoles.includes(Role.Admin) && !userRoles.includes(selectedRole)) {
         throw new UnauthorizedException('You do not have access to this module');
       }
       
       // If admin logs in as another role, we temporarily map their active session module/role
-      if (userRoles.includes(0) && selectedRole !== 0) {
+      if (userRoles.includes(Role.Admin) && selectedRole !== Role.Admin) {
         const adminAsOther = {
           ...user,
           role: selectedRole,
@@ -42,7 +47,7 @@ export class AuthController {
       }
 
       // If multi-role user selects a specific role, set that as their active session role
-      if (!userRoles.includes(0) && userRoles.includes(selectedRole) && selectedRole !== user.role) {
+      if (!userRoles.includes(Role.Admin) && userRoles.includes(selectedRole) && selectedRole !== user.role) {
         const asSelectedRole = {
           ...user,
           role: selectedRole,
@@ -56,19 +61,11 @@ export class AuthController {
   }
 
   @Get('profile')
-  async getProfile(@Headers('authorization') authHeader: string) {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Authorization token is missing or invalid');
-    }
-
-    const token = authHeader.split(' ')[1];
-    const user = await this.authService.verifyToken(token);
-    const rolesRaw = (user as any).roles;
-    const roles = Array.isArray(rolesRaw)
-      ? rolesRaw.map(Number)
-      : rolesRaw
-        ? String(rolesRaw).split(',').map(Number)
-        : [user.role];
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(Permission.ProfileRead)
+  async getProfile(@Req() req: any) {
+    const user = req.user;
+    const roles = getUserRoles(user);
     
     return {
       id: user.id,
@@ -117,12 +114,12 @@ export class AuthController {
 
   private resolveModule(role: number): string {
     switch (role) {
-      case 0: return 'admin';
-      case 1: return 'frontdesk';
-      case 2: return 'laboratory';
-      case 3: return 'scanning';
-      case 4: return 'pharmacy';
-      case 5:
+      case Role.Admin: return 'admin';
+      case Role.Frontdesk: return 'frontdesk';
+      case Role.Laboratory: return 'laboratory';
+      case Role.Scanning: return 'scanning';
+      case Role.Pharmacy: return 'pharmacy';
+      case Role.Accounting:
       default: return 'accounting';
     }
   }

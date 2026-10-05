@@ -1,35 +1,26 @@
-import { Controller, Get, Post, Query, Param, Body, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Query, Param, Body, UseGuards, Req } from '@nestjs/common';
 import { ReportsService } from './reports.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { RequirePermissions } from '../auth/authorization/require-permissions.decorator';
+import { Permission, canAccessModule } from '../auth/authorization/permissions';
 
 @Controller('reports')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
+  @RequirePermissions(Permission.DashboardRead)
   @Get('dashboard')
   async getDashboard(@Req() req: any, @Query('module') module?: string) {
     const user = req.user;
-    // Admins (role 0) can query any module dashboard.
-    // Multi-role users can view any module assigned to them.
-    const userRoles: number[] = user.roles
-      ? (Array.isArray(user.roles) ? user.roles : user.roles.split(',').map(Number))
-      : [user.role];
-
     let targetModule = user.module;
-    if (module) {
-      const moduleRoleMap: Record<string, number> = {
-        admin: 0, frontdesk: 1, laboratory: 2, scanning: 3, pharmacy: 4, accounting: 5
-      };
-      const requestedRole = moduleRoleMap[module];
-      if (userRoles.includes(0) || (requestedRole !== undefined && userRoles.includes(requestedRole))) {
-        targetModule = module;
-      }
-    }
+    if (module && canAccessModule(user, module)) targetModule = module;
 
     return this.reportsService.getDashboardAnalytics(targetModule, user.id);
   }
 
+  @RequirePermissions(Permission.FinancialReportsRead)
   @Get('clinic')
   async getClinic(
     @Req() req: any,
@@ -38,12 +29,12 @@ export class ReportsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    this.ensureRoles(req.user, [0, 5]);
     const pageNum = page ? parseInt(page, 10) : undefined;
     const limitNum = limit ? parseInt(limit, 10) : undefined;
     return this.reportsService.getClinicStream(startDate, endDate, pageNum, limitNum);
   }
 
+  @RequirePermissions(Permission.FinancialReportsRead)
   @Get('pharmacy')
   async getPharmacy(
     @Req() req: any,
@@ -53,12 +44,12 @@ export class ReportsController {
     @Query('limit') limit?: string,
     @Query('locationId') locationId?: string,
   ) {
-    this.ensureRoles(req.user, [0, 5]);
     const pageNum = page ? parseInt(page, 10) : undefined;
     const limitNum = limit ? parseInt(limit, 10) : undefined;
     return this.reportsService.getPharmacyStream(startDate, endDate, pageNum, limitNum, locationId);
   }
 
+  @RequirePermissions(Permission.FinancialReportsRead)
   @Get('summary')
   async getSummary(
     @Req() req: any,
@@ -66,36 +57,26 @@ export class ReportsController {
     @Query('endDate') endDate?: string,
     @Query('locationId') locationId?: string,
   ) {
-    this.ensureRoles(req.user, [0, 5]);
     return this.reportsService.getCombinedSummary(startDate, endDate, locationId);
   }
 
+  @RequirePermissions(Permission.FinancialPaymentVoid)
   @Post('clinic/:id/void')
   async voidClinic(@Req() req: any, @Param('id') id: string, @Body('reason') reason: string) {
-    this.ensureRoles(req.user, [0, 5]);
     return this.reportsService.voidClinicPayment(id, req.user.id, reason);
   }
 
+  @RequirePermissions(Permission.FinancialPaymentVoid)
   @Post('pharmacy/:id/void')
   async voidPharmacy(@Req() req: any, @Param('id') id: string, @Body() body: any) {
-    this.ensureRoles(req.user, [0, 5]);
     return this.reportsService.voidPharmacySale(id, req.user.id, body.reason, body.stockDisposition);
   }
 
+  @RequirePermissions(Permission.AuditRead)
   @Get('audit-logs')
   async getAuditLogs(@Req() req: any, @Query('page') page?: string, @Query('limit') limit?: string) {
-    this.ensureRoles(req.user, [0, 5]);
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 20;
     return this.reportsService.getAuditLogs(pageNum, limitNum);
-  }
-
-  private ensureRoles(user: any, allowedRoles: number[]): void {
-    const roles = Array.isArray(user?.roles)
-      ? user.roles.map(Number)
-      : String(user?.roles ?? user?.role ?? '').split(',').map(Number);
-    if (!roles.some((role: number) => allowedRoles.includes(role))) {
-      throw new ForbiddenException('You do not have permission to perform this action');
-    }
   }
 }

@@ -49,4 +49,9 @@ describe('UsersService security controls', () => {
 
     await expect(service.remove('admin-1', 'admin-2')).rejects.toThrow('last active administrator');
   });
+
+  it.each([{ roles: [false] }, { roles: [null] }, { roles: [''] }, { roles: [9] }, { roles: ['1', ''] }, { roles: [[0]] }])('rejects malformed staff role updates: %j', async ({ roles }) => {
+    prisma.user.findUnique.mockResolvedValue({ id: 'staff-1', fullName: 'Staff', role: 1, roles: '1', isActive: true });
+    await expect(service.update('staff-1', { roles }, 'admin-1')).rejects.toBeInstanceOf(BadRequestException);
+  });
 });

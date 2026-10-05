@@ -1,3 +1,4 @@
+import { getUserRoles, isRole, parseRole, Role } from './authorization/permissions';
 import { Injectable, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
@@ -30,9 +31,8 @@ export class AuthService {
   }
 
   async login(user: any) {
-    const rolesArray: number[] = user.roles
-      ? (typeof user.roles === 'string' ? user.roles.split(',').map(Number) : user.roles)
-      : [user.role];
+    const rolesArray = getUserRoles(user);
+    if (!rolesArray.length) throw new UnauthorizedException('User has no valid staff roles');
 
     const payload = {
       email: user.email,
@@ -101,12 +101,12 @@ export class AuthService {
       throw new UnauthorizedException('User is no longer active');
     }
 
-    const rolesRaw = user.roles;
-    const roles = rolesRaw ? String(rolesRaw).split(',').map(Number) : [user.role];
-    const requestedRole = Number(payload.role);
-    const activeRole = Number.isInteger(requestedRole) && (roles.includes(0) || roles.includes(requestedRole))
+    const roles = getUserRoles(user);
+    if (!roles.length) throw new UnauthorizedException('User has no valid staff roles');
+    const requestedRole = parseRole(payload.role);
+    const activeRole = isRole(requestedRole) && (roles.includes(Role.Admin) || roles.includes(requestedRole))
       ? requestedRole
-      : user.role;
+      : roles.includes(user.role) ? user.role : roles[0];
     if (!payload.tenantId || payload.tenantId !== user.tenantId) {
       throw new UnauthorizedException('Token tenant does not match the authenticated user');
     }

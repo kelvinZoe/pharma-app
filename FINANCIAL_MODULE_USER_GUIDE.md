@@ -8,6 +8,8 @@ The financial workspace brings clinic receipts, pharmacy sales, cashier closures
 
 ## Main Pages
 
+Backend financial access is enforced by named permissions, not just visible navigation. Administrators and accounting staff retain their financial review permissions; frontdesk can collect clinic payments and review their own cashier sessions without receiving unrestricted financial access. Permissions do not bypass tenant/branch boundaries or independent approval. See `ACCESS_CONTROL_GUIDE.md` for the full role summary.
+
 ### Financial Overview
 
 Use **Accounting → Dashboard** or **Accounting → Reports** to review:

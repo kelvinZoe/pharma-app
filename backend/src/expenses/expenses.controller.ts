@@ -1,18 +1,22 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { ExpensesService } from './expenses.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { RequirePermissions } from '../auth/authorization/require-permissions.decorator';
+import { Permission } from '../auth/authorization/permissions';
 
 @Controller('expenses')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ExpensesController {
   constructor(private readonly expensesService: ExpensesService) {}
 
+  @RequirePermissions(Permission.ExpenseCreate)
   @Post()
   async create(@Req() req: any, @Body() data: any) {
-    this.ensureRoles(req.user, [0, 5]);
     return this.expensesService.createExpense(data, req.user.id);
   }
 
+  @RequirePermissions(Permission.ExpenseRead)
   @Get()
   async findAll(
     @Req() req: any,
@@ -21,24 +25,14 @@ export class ExpensesController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    this.ensureRoles(req.user, [0, 5]);
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 10;
     return this.expensesService.findAllExpenses(startDate, endDate, pageNum, limitNum);
   }
 
+  @RequirePermissions(Permission.ExpenseVoid)
   @Post(':id/void')
   async voidExpense(@Req() req: any, @Param('id') id: string, @Body('reason') reason: string) {
-    this.ensureRoles(req.user, [0, 5]);
     return this.expensesService.voidExpense(id, req.user.id, reason);
-  }
-
-  private ensureRoles(user: any, allowedRoles: number[]): void {
-    const roles = Array.isArray(user?.roles)
-      ? user.roles.map(Number)
-      : String(user?.roles ?? user?.role ?? '').split(',').map(Number);
-    if (!roles.some((role: number) => allowedRoles.includes(role))) {
-      throw new ForbiddenException('Only accounting or admin users can manage expenses');
-    }
   }
 }

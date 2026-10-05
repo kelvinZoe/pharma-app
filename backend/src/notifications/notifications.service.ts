@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsGateway } from './notifications.gateway';
 import { PrismaTransactionContext } from '../common/prisma-transaction-context';
+import { getUserRoles } from '../auth/authorization/permissions';
 
 export interface CreateNotificationInput {
   title: string;
@@ -122,9 +123,6 @@ export class NotificationsService {
   }
 
   private extractRoles(user: any): number[] {
-    const rawRoles = user?.roles;
-    if (Array.isArray(rawRoles)) return rawRoles.map(Number);
-    if (rawRoles) return String(rawRoles).split(',').map(Number);
-    return [Number(user?.role ?? 1)];
+    return getUserRoles(user);
   }
 }

@@ -1,26 +1,24 @@
-import { Controller, Get, Post, Body, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req, } from '@nestjs/common';
 import { SettingsService, ClinicSettings } from './settings.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { RequirePermissions } from '../auth/authorization/require-permissions.decorator';
+import { Permission } from '../auth/authorization/permissions';
 
 @Controller('settings')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
+  @RequirePermissions(Permission.SettingsRead)
   @Get()
   async getSettings() {
     return await this.settingsService.getSettings();
   }
 
+  @RequirePermissions(Permission.SettingsManage)
   @Post()
   async saveSettings(@Req() req: any, @Body() body: Partial<ClinicSettings>) {
-    this.ensureAdmin(req.user);
     return await this.settingsService.saveSettings(body);
-  }
-
-  private ensureAdmin(user: any) {
-    if (!user || user.role !== 0) {
-      throw new ForbiddenException('Only admin accounts can modify system-wide settings');
-    }
   }
 }

@@ -1,22 +1,26 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Req, Query, ForbiddenException, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Req, Query, Headers } from '@nestjs/common';
 import { BillingService } from './billing.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { RequirePermissions } from '../auth/authorization/require-permissions.decorator';
+import { Permission, hasPermission } from '../auth/authorization/permissions';
 import { IdempotencyService } from '../common/idempotency.service';
 
 @Controller('visits/:id')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class BillingController {
   constructor(
     private readonly billingService: BillingService,
     private readonly idempotency: IdempotencyService,
   ) {}
 
+  @RequirePermissions(Permission.ClinicInvoiceRead)
   @Get('invoice')
   async getInvoice(@Req() req: any, @Param('id') visitId: string) {
-    this.ensureClinicCashier(req.user);
     return this.billingService.getVisitInvoice(visitId);
   }
 
+  @RequirePermissions(Permission.ClinicPaymentCreate)
   @Post('invoice/pay')
   async payInvoice(
     @Req() req: any,
@@ -25,7 +29,6 @@ export class BillingController {
     @Headers('idempotency-key') idempotencyKey?: string,
     @Headers('x-idempotency-key') legacyIdempotencyKey?: string,
   ) {
-    this.ensureClinicCashier(req.user);
     return this.idempotency.run(
       idempotencyKey ?? legacyIdempotencyKey,
       'clinic_invoice_payment',
@@ -34,32 +37,23 @@ export class BillingController {
       () => this.billingService.recordPayment(visitId, body, req.user.id),
     );
   }
-
-  private ensureClinicCashier(user: any) {
-    const roles = user?.roles
-      ? (Array.isArray(user.roles) ? user.roles : String(user.roles).split(',').map(Number))
-      : [user?.role];
-    const canHandleClinicCash = roles.includes(0) || roles.includes(1) || roles.includes(5);
-    if (!canHandleClinicCash) {
-      throw new ForbiddenException('Only frontdesk, accounting, or admin users can manage clinic payments');
-    }
-  }
 }
 
 @Controller('billing/sessions')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class BillingSessionsController {
   constructor(
     private readonly billingService: BillingService,
     private readonly idempotency: IdempotencyService,
   ) {}
 
+  @RequirePermissions(Permission.ClinicSessionRead)
   @Get('active')
   async getActiveSession(@Req() req: any) {
-    this.ensureClinicCashier(req.user);
     return this.billingService.findActiveClinicSession(req.user.id);
   }
 
+  @RequirePermissions(Permission.ClinicSessionManage)
   @Post('open')
   async openSession(
     @Req() req: any,
@@ -67,7 +61,6 @@ export class BillingSessionsController {
     @Headers('idempotency-key') idempotencyKey?: string,
     @Headers('x-idempotency-key') legacyIdempotencyKey?: string,
   ) {
-    this.ensureClinicCashier(req.user);
     return this.idempotency.run(
       idempotencyKey ?? legacyIdempotencyKey,
       'clinic_cash_session_open',
@@ -77,6 +70,7 @@ export class BillingSessionsController {
     );
   }
 
+  @RequirePermissions(Permission.ClinicSessionManage)
   @Post('close')
   async closeSession(
     @Req() req: any,
@@ -84,7 +78,6 @@ export class BillingSessionsController {
     @Headers('idempotency-key') idempotencyKey?: string,
     @Headers('x-idempotency-key') legacyIdempotencyKey?: string,
   ) {
-    this.ensureClinicCashier(req.user);
     return this.idempotency.run(
       idempotencyKey ?? legacyIdempotencyKey,
       'clinic_cash_session_close',
@@ -94,6 +87,7 @@ export class BillingSessionsController {
     );
   }
 
+  @RequirePermissions(Permission.ClinicSessionRead)
   @Get()
   async getSessions(
     @Req() req: any,
@@ -101,32 +95,14 @@ export class BillingSessionsController {
     @Query('endDate') endDate?: string,
     @Query('limit') limit?: string,
   ) {
-    this.ensureClinicCashier(req.user);
-    const canViewAll = this.hasRole(req.user, 0) || this.hasRole(req.user, 5);
+    const canViewAll = hasPermission(req.user, Permission.ClinicSessionReadAll);
     return this.billingService.findClinicSessions(startDate, endDate, canViewAll ? undefined : req.user.id, Number(limit));
   }
 
+  @RequirePermissions(Permission.ClinicSessionRead)
   @Get(':id')
   async getSession(@Req() req: any, @Param('id') id: string) {
-    this.ensureClinicCashier(req.user);
-    const canViewAll = this.hasRole(req.user, 0) || this.hasRole(req.user, 5);
+    const canViewAll = hasPermission(req.user, Permission.ClinicSessionReadAll);
     return this.billingService.findClinicSessionById(id, canViewAll ? undefined : req.user.id);
-  }
-
-  private ensureClinicCashier(user: any) {
-    const roles = user?.roles
-      ? (Array.isArray(user.roles) ? user.roles : String(user.roles).split(',').map(Number))
-      : [user?.role];
-    const canHandleClinicCash = roles.includes(0) || roles.includes(1) || roles.includes(5);
-    if (!canHandleClinicCash) {
-      throw new ForbiddenException('Only frontdesk, accounting, or admin users can manage clinic cashier sessions');
-    }
-  }
-
-  private hasRole(user: any, role: number): boolean {
-    const roles = user?.roles
-      ? (Array.isArray(user.roles) ? user.roles.map(Number) : String(user.roles).split(',').map(Number))
-      : [Number(user?.role)];
-    return roles.includes(role);
   }
 }

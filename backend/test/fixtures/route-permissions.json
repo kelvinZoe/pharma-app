@@ -1,0 +1,687 @@
+[
+  {
+    "controller": "PharmacyController",
+    "method": "getNetworkStock",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "updateLocationInventoryPolicy",
+    "roles": [0]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getQuarantinedStock",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "resolveQuarantine",
+    "roles": [0]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getTransferSummary",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getTransfers",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "createTransfer",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getTransfer",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "submitTransfer",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "approveTransfer",
+    "roles": [0]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "rejectTransfer",
+    "roles": [0]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "dispatchTransfer",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "receiveTransfer",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "resolveTransfer",
+    "roles": [0]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "cancelTransfer",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getInventoryControlSummary",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getStockLedger",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getStockCounts",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "createStockCount",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getStockCount",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "saveStockCount",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "submitStockCount",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "approveStockCount",
+    "roles": [0]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getStockAdjustments",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "requestStockAdjustment",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "approveStockAdjustment",
+    "roles": [0]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "rejectStockAdjustment",
+    "roles": [0]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getPayablesSummary",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getSupplierInvoices",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getSupplierInvoiceDetail",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "updateSupplierInvoice",
+    "roles": [0, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getSupplierPayments",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "recordSupplierPayment",
+    "roles": [0, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getPurchaseReturns",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "recordPurchaseReturn",
+    "roles": [0, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getSupplierStatement",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getSuppliers",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getSupplierDetail",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "createSupplier",
+    "roles": [0]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "updateSupplier",
+    "roles": [0]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getPurchaseOrders",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getPurchaseOrderDetail",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "createPurchaseOrder",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "updatePurchaseOrder",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "submitPurchaseOrder",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "approvePurchaseOrder",
+    "roles": [0]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "cancelPurchaseOrder",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getLocations",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "createLocation",
+    "roles": [0]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getLocationUsers",
+    "roles": [0]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "assignLocationUser",
+    "roles": [0]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getProducts",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getMedicines",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "createMedicine",
+    "roles": [0]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "updateMedicine",
+    "roles": [0]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getProductDetail",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "createProduct",
+    "roles": [0]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "updateProduct",
+    "roles": [0]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "addBatch",
+    "roles": [0]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getGoodsReceipts",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "receiveStock",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "checkout",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getRecentSales",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getUnclosedSales",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "closeSales",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getSale",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getActiveSession",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "openSession",
+    "roles": [0, 4]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getClosures",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "PharmacyController",
+    "method": "getClosureById",
+    "roles": [0, 4, 5]
+  },
+  {
+    "controller": "UsersController",
+    "method": "getAll",
+    "roles": [0]
+  },
+  {
+    "controller": "UsersController",
+    "method": "create",
+    "roles": [0]
+  },
+  {
+    "controller": "UsersController",
+    "method": "getProfile",
+    "roles": [0, 1, 2, 3, 4, 5]
+  },
+  {
+    "controller": "UsersController",
+    "method": "updateProfile",
+    "roles": [0, 1, 2, 3, 4, 5]
+  },
+  {
+    "controller": "UsersController",
+    "method": "updatePassword",
+    "roles": [0, 1, 2, 3, 4, 5]
+  },
+  {
+    "controller": "UsersController",
+    "method": "resendInvitation",
+    "roles": [0]
+  },
+  {
+    "controller": "UsersController",
+    "method": "update",
+    "roles": [0]
+  },
+  {
+    "controller": "UsersController",
+    "method": "remove",
+    "roles": [0]
+  },
+  {
+    "controller": "ServicesController",
+    "method": "getDepartments",
+    "roles": [0, 1, 2, 3, 4, 5]
+  },
+  {
+    "controller": "ServicesController",
+    "method": "createDepartment",
+    "roles": [0]
+  },
+  {
+    "controller": "ServicesController",
+    "method": "getServices",
+    "roles": [0, 1, 2, 3, 4, 5]
+  },
+  {
+    "controller": "ServicesController",
+    "method": "createService",
+    "roles": [0]
+  },
+  {
+    "controller": "ServicesController",
+    "method": "updateService",
+    "roles": [0]
+  },
+  {
+    "controller": "ServicesController",
+    "method": "deleteService",
+    "roles": [0]
+  },
+  {
+    "controller": "ServicesController",
+    "method": "getTemplate",
+    "roles": [0, 1, 2, 3, 4, 5]
+  },
+  {
+    "controller": "ServicesController",
+    "method": "saveTemplate",
+    "roles": [0]
+  },
+  {
+    "controller": "ServicesController",
+    "method": "getGeneralTemplates",
+    "roles": [0, 1, 2, 3, 4, 5]
+  },
+  {
+    "controller": "ServicesController",
+    "method": "getGeneralTemplate",
+    "roles": [0, 1, 2, 3, 4, 5]
+  },
+  {
+    "controller": "ServicesController",
+    "method": "createGeneralTemplate",
+    "roles": [0]
+  },
+  {
+    "controller": "ServicesController",
+    "method": "updateGeneralTemplate",
+    "roles": [0]
+  },
+  {
+    "controller": "ServicesController",
+    "method": "deleteGeneralTemplate",
+    "roles": [0]
+  },
+  {
+    "controller": "VisitsController",
+    "method": "search",
+    "roles": [0, 1]
+  },
+  {
+    "controller": "VisitsController",
+    "method": "createPatient",
+    "roles": [0, 1]
+  },
+  {
+    "controller": "VisitsController",
+    "method": "updatePatient",
+    "roles": [0, 1]
+  },
+  {
+    "controller": "VisitsController",
+    "method": "getHistory",
+    "roles": [0, 1]
+  },
+  {
+    "controller": "VisitsController",
+    "method": "getActive",
+    "roles": [0, 1, 2, 3]
+  },
+  {
+    "controller": "VisitsController",
+    "method": "getDetails",
+    "roles": [0, 1, 2, 3]
+  },
+  {
+    "controller": "VisitsController",
+    "method": "createVisit",
+    "roles": [0, 1]
+  },
+  {
+    "controller": "VisitsController",
+    "method": "deleteRegistration",
+    "roles": [0, 1]
+  },
+  {
+    "controller": "VisitsController",
+    "method": "addExtra",
+    "roles": [0, 2, 3]
+  },
+  {
+    "controller": "VisitsController",
+    "method": "updateServiceStatus",
+    "roles": [0, 2, 3]
+  },
+  {
+    "controller": "VisitsController",
+    "method": "approveExtraService",
+    "roles": [0, 1]
+  },
+  {
+    "controller": "VisitsController",
+    "method": "requestServicePriceAdjustment",
+    "roles": [0, 2, 3]
+  },
+  {
+    "controller": "VisitsController",
+    "method": "approveServicePriceAdjustment",
+    "roles": [0, 1, 5]
+  },
+  {
+    "controller": "VisitsController",
+    "method": "removeService",
+    "roles": [0, 1, 2, 3]
+  },
+  {
+    "controller": "VisitsController",
+    "method": "saveResult",
+    "roles": [0, 2, 3]
+  },
+  {
+    "controller": "VisitsController",
+    "method": "savePrescription",
+    "roles": [0, 2, 3]
+  },
+  {
+    "controller": "ReportsController",
+    "method": "getDashboard",
+    "roles": [0, 1, 2, 3, 4, 5]
+  },
+  {
+    "controller": "ReportsController",
+    "method": "getClinic",
+    "roles": [0, 5]
+  },
+  {
+    "controller": "ReportsController",
+    "method": "getPharmacy",
+    "roles": [0, 5]
+  },
+  {
+    "controller": "ReportsController",
+    "method": "getSummary",
+    "roles": [0, 5]
+  },
+  {
+    "controller": "ReportsController",
+    "method": "voidClinic",
+    "roles": [0, 5]
+  },
+  {
+    "controller": "ReportsController",
+    "method": "voidPharmacy",
+    "roles": [0, 5]
+  },
+  {
+    "controller": "ReportsController",
+    "method": "getAuditLogs",
+    "roles": [0, 5]
+  },
+  {
+    "controller": "BillingController",
+    "method": "getInvoice",
+    "roles": [0, 1, 5]
+  },
+  {
+    "controller": "BillingController",
+    "method": "payInvoice",
+    "roles": [0, 1, 5]
+  },
+  {
+    "controller": "BillingSessionsController",
+    "method": "getActiveSession",
+    "roles": [0, 1, 5]
+  },
+  {
+    "controller": "BillingSessionsController",
+    "method": "openSession",
+    "roles": [0, 1, 5]
+  },
+  {
+    "controller": "BillingSessionsController",
+    "method": "closeSession",
+    "roles": [0, 1, 5]
+  },
+  {
+    "controller": "BillingSessionsController",
+    "method": "getSessions",
+    "roles": [0, 1, 5]
+  },
+  {
+    "controller": "BillingSessionsController",
+    "method": "getSession",
+    "roles": [0, 1, 5]
+  },
+  {
+    "controller": "ExpensesController",
+    "method": "create",
+    "roles": [0, 5]
+  },
+  {
+    "controller": "ExpensesController",
+    "method": "findAll",
+    "roles": [0, 5]
+  },
+  {
+    "controller": "ExpensesController",
+    "method": "voidExpense",
+    "roles": [0, 5]
+  },
+  {
+    "controller": "AccountingController",
+    "method": "listPeriods",
+    "roles": [0, 5]
+  },
+  {
+    "controller": "AccountingController",
+    "method": "lockPeriod",
+    "roles": [0, 5]
+  },
+  {
+    "controller": "AccountingController",
+    "method": "listReversals",
+    "roles": [0, 5]
+  },
+  {
+    "controller": "AccountingController",
+    "method": "requestReversal",
+    "roles": [0, 5]
+  },
+  {
+    "controller": "AccountingController",
+    "method": "approveReversal",
+    "roles": [0, 5]
+  },
+  {
+    "controller": "AccountingController",
+    "method": "rejectReversal",
+    "roles": [0, 5]
+  },
+  {
+    "controller": "SettingsController",
+    "method": "getSettings",
+    "roles": [0, 1, 2, 3, 4, 5]
+  },
+  {
+    "controller": "SettingsController",
+    "method": "saveSettings",
+    "roles": [0]
+  },
+  {
+    "controller": "NotificationsController",
+    "method": "findMine",
+    "roles": [0, 1, 2, 3, 4, 5]
+  },
+  {
+    "controller": "NotificationsController",
+    "method": "unreadCount",
+    "roles": [0, 1, 2, 3, 4, 5]
+  },
+  {
+    "controller": "NotificationsController",
+    "method": "markRead",
+    "roles": [0, 1, 2, 3, 4, 5]
+  },
+  {
+    "controller": "NotificationsController",
+    "method": "markAllRead",
+    "roles": [0, 1, 2, 3, 4, 5]
+  },
+  {
+    "controller": "AuthController",
+    "method": "getProfile",
+    "roles": [0, 1, 2, 3, 4, 5]
+  }
+]

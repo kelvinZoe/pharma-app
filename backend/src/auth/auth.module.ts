@@ -4,6 +4,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { EmailModule } from '../common/email/email.module';
+import { PermissionsGuard } from './guards/permissions.guard';
 
 const jwtSecret = process.env.JWT_SECRET;
 if (!jwtSecret && process.env.NODE_ENV === 'production') {
@@ -20,8 +21,8 @@ if (!jwtSecret && process.env.NODE_ENV === 'production') {
       signOptions: { expiresIn: '12h' },
     }),
   ],
-  providers: [AuthService],
+  providers: [AuthService, PermissionsGuard],
   controllers: [AuthController],
-  exports: [AuthService],
+  exports: [AuthService, PermissionsGuard],
 })
 export class AuthModule {}

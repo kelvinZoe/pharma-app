@@ -1,3 +1,4 @@
+import { getUserRoles, hasPermission, isRole, parseRole, Permission, Role } from '../auth/authorization/permissions';
 import { Injectable, BadRequestException, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../common/email/email.service';
@@ -151,7 +152,7 @@ export class UsersService {
       throw err;
     }
 
-    if (rolesArray.includes(0) || rolesArray.includes(4)) {
+    if (hasPermission({ roles: rolesArray }, Permission.PharmacySaleCreate)) {
       const defaultLocation = await this.prisma.pharmacyLocation.findFirst({
         where: { isActive: true },
         orderBy: [{ code: 'asc' }, { createdAt: 'asc' }],
@@ -162,7 +163,7 @@ export class UsersService {
             userId: newUser.id,
             locationId: defaultLocation.id,
             tenantId: defaultLocation.tenantId,
-            role: rolesArray.includes(0) ? 'admin' : 'pharmacy',
+            role: rolesArray.includes(Role.Admin) ? 'admin' : 'pharmacy',
             isDefault: true,
             isActive: true,
           },
@@ -425,10 +426,10 @@ export class UsersService {
 
     const resultingRoles = updateData.roles ? String(updateData.roles).split(',').map(Number) : this.getUserRoles(user);
     const remainsActive = updateData.isActive ?? user.isActive;
-    if (id === actorUserId && (!remainsActive || !resultingRoles.includes(0))) {
+    if (id === actorUserId && (!remainsActive || !resultingRoles.includes(Role.Admin))) {
       throw new BadRequestException('Use another administrator to change your own administrator access');
     }
-    if (this.hasAdminRole(user) && (!remainsActive || !resultingRoles.includes(0)) && !(await this.hasAnotherActiveAdmin(id))) {
+    if (this.hasAdminRole(user) && (!remainsActive || !resultingRoles.includes(Role.Admin)) && !(await this.hasAnotherActiveAdmin(id))) {
       throw new BadRequestException('Cannot remove the last active administrator account');
     }
 
@@ -469,31 +470,31 @@ export class UsersService {
 
   private resolveModule(role: number): string {
     switch (role) {
-      case 0: return 'admin';
-      case 1: return 'frontdesk';
-      case 2: return 'laboratory';
-      case 3: return 'scanning';
-      case 4: return 'pharmacy';
-      case 5:
+      case Role.Admin: return 'admin';
+      case Role.Frontdesk: return 'frontdesk';
+      case Role.Laboratory: return 'laboratory';
+      case Role.Scanning: return 'scanning';
+      case Role.Pharmacy: return 'pharmacy';
+      case Role.Accounting:
       default: return 'accounting';
     }
   }
 
   private normalizeRoles(values: unknown, fallback: unknown): number[] {
-    const source = Array.isArray(values) && values.length > 0 ? values : [fallback ?? 1];
-    const roles = [...new Set(source.map(Number))];
-    if (!roles.length || roles.some((role) => !Number.isInteger(role) || role < 0 || role > 5)) {
+    const source = Array.isArray(values) && values.length > 0 ? values : [fallback ?? Role.Frontdesk];
+    const roles = [...new Set(source.map(parseRole))];
+    if (!roles.length || !roles.every(isRole)) {
       throw new BadRequestException('Select one or more valid staff roles');
     }
-    return roles.includes(0) ? [0] : roles;
+    return roles.includes(Role.Admin) ? [Role.Admin] : roles;
   }
 
   private getUserRoles(user: { role: number; roles?: string | null }): number[] {
-    return user.roles ? String(user.roles).split(',').map(Number) : [Number(user.role)];
+    return getUserRoles(user);
   }
 
   private hasAdminRole(user: { role: number; roles?: string | null }): boolean {
-    return this.getUserRoles(user).includes(0);
+    return this.getUserRoles(user).includes(Role.Admin);
   }
 
   private async hasAnotherActiveAdmin(excludedUserId: string): Promise<boolean> {
@@ -502,7 +503,7 @@ export class UsersService {
         id: { not: excludedUserId },
         isActive: true,
         OR: [
-          { role: 0 },
+          { role: Role.Admin },
           { roles: '0' },
           { roles: { startsWith: '0,' } },
           { roles: { endsWith: ',0' } },
@@ -514,7 +515,7 @@ export class UsersService {
   }
 
   private toSessionProfile(user: any) {
-    const roles = user.roles ? String(user.roles).split(',').map(Number) : [user.role];
+    const roles = getUserRoles(user);
     return {
       id: user.id,
       name: user.fullName,

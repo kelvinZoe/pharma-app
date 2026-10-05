@@ -1,3 +1,4 @@
+import { Role } from '../auth/authorization/permissions';
 import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -1115,8 +1116,8 @@ export class VisitsService {
   }
 
   private departmentCodeForRole(role: number): 'LAB' | 'SCAN' | null {
-    if (role === 2) return 'LAB';
-    if (role === 3) return 'SCAN';
+    if (role === Role.Laboratory) return 'LAB';
+    if (role === Role.Scanning) return 'SCAN';
     return null;
   }
 
