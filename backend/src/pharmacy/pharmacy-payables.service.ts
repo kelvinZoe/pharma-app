@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { assertAccountingDateOpen } from '../common/accounting-period';
 import { getInternetDate } from '../common/clock';
 import * as crypto from 'crypto';
 import { buildDateRange } from '../common/date-range';
@@ -186,6 +187,7 @@ export class PharmacyPayablesService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
+      await assertAccountingDateOpen(tx, paymentDate);
       if (referenceNumber) {
         const duplicateReference = await tx.pharmacySupplierPayment.findFirst({
           where: { referenceNumber },
@@ -296,6 +298,7 @@ export class PharmacyPayablesService {
     const returnNumber = `SRET-${getInternetDate().toISOString().slice(0, 10).replaceAll('-', '')}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 
     return this.prisma.$transaction(async (tx) => {
+      await assertAccountingDateOpen(tx, returnDate);
       const purchaseReturn = await tx.pharmacyPurchaseReturn.create({
         data: {
           tenantId: receipt.tenantId,

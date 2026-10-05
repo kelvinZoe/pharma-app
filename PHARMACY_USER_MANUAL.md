@@ -1,7 +1,9 @@
 # PharmaFlow Pharmacy User Manual
 
-**Version:** 1.4  
-**Last updated:** 19 August 2026  
+**Version:** 1.5
+
+**Last updated:** 5 October 2026
+
 **Audience:** Pharmacy staff, pharmacy managers, administrators, and accounting staff
 
 ## 1. Purpose of the Pharmacy Module
@@ -634,6 +636,14 @@ The system prevents the sale when:
 - A Mobile Money reference has already been used at that location.
 
 After a successful sale, the system allocates the requested quantity automatically using FEFO, deducts the earliest-expiring safe stock first, and records the payment in the open register session. If one batch cannot satisfy the quantity, the system continues into the next safe batch without extra cashier steps.
+
+### Recover a checkout without taking payment again
+
+If checkout loses its connection or no receipt is confirmed, do not start a second sale for the same payment. Select **Recover receipt** in POS Sales. The system uses the original checkout details and request key, returning the original receipt if the sale was already recorded. Stock is not deducted again for a replayed sale. If the original request never committed, recovery can complete that original sale once.
+
+Keep the same browser tab open. You can reload the page and recover while signed in as the original cashier at the original pharmacy location. Do not clear browser storage or collect payment again while the result is unconfirmed. If the tab has closed, check **Transactions** and ask management to reconcile the payment before submitting another checkout.
+
+The same process applies to **Supplier Payables → Recover payment**. Check the supplier payment and invoice balance rather than paying the supplier again. Recovery records or retrieves a system confirmation; it does not send money to the supplier.
 
 ### Sell medicines from a printed clinical prescription
 

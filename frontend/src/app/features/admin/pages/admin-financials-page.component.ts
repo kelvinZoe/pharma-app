@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { A11yModule } from '@angular/cdk/a11y';
 import { ActivatedRoute } from '@angular/router';
 import { EMPTY, Observable, expand, forkJoin, of, reduce, shareReplay } from 'rxjs';
 
@@ -8,12 +9,12 @@ import { SessionService } from '../../../core/auth/session.service';
 import { ApiService } from '../../../core/services/api.service';
 import { getInternetDate } from '../../../core/utils/clock';
 
-type FinancialTab = 'dashboard' | 'clinic' | 'pharmacy' | 'closures' | 'clinic-closures' | 'expenses' | 'inventory' | 'audit-logs';
+type FinancialTab = 'dashboard' | 'clinic' | 'pharmacy' | 'closures' | 'clinic-closures' | 'expenses' | 'inventory' | 'audit-logs' | 'periods' | 'reversals';
 type VoidTarget = { id: string; type: 'clinic' | 'pharmacy' | 'expense'; label: string };
 
 @Component({
   selector: 'app-admin-financials-page',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, A11yModule],
   templateUrl: './admin-financials-page.component.html',
   styleUrl: './admin-financials-page.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -34,6 +35,8 @@ export class AdminFinancialsPageComponent implements OnInit {
     { id: 'expenses', label: 'Expenses', hint: 'Operating costs' },
     { id: 'inventory', label: 'Stock exposure', hint: 'Risk' },
     { id: 'audit-logs', label: 'Audit trail', hint: 'Controls' },
+    { id: 'periods', label: 'Period locks', hint: 'Close books' },
+    { id: 'reversals', label: 'Reversals', hint: 'Approval queue' },
   ];
 
   readonly activeTab = signal<FinancialTab>('dashboard');
@@ -72,11 +75,23 @@ export class AdminFinancialsPageComponent implements OnInit {
   readonly voidTarget = signal<VoidTarget | null>(null);
   readonly voidReason = signal('');
   readonly voidSaving = signal(false);
+  readonly correctionMode = signal<'void' | 'reversal'>('void');
+  readonly periods = signal<any[]>([]);
+  readonly reversals = signal<any[]>([]);
+  readonly periodModalOpen = signal(false);
+  readonly periodSaving = signal(false);
+  readonly periodForm = signal({ startDate: '', endDate: '', reason: '' });
+  readonly reviewTarget = signal<{ record: any; approve: boolean } | null>(null);
+  readonly reviewReason = signal('');
+  readonly reviewSaving = signal(false);
+  readonly successMessage = signal('');
+  readonly yesterday = new Date(getInternetDate().getTime() - 86400000).toISOString().slice(0, 10);
 
   readonly pageTitle = computed(() => ({
     dashboard: 'Financial control centre', clinic: 'Clinic receipt stream', pharmacy: 'Pharmacy sales stream',
     closures: 'Pharmacy shift reconciliation', 'clinic-closures': 'Clinic shift reconciliation',
     expenses: 'Operating expense register', inventory: 'Stock financial exposure', 'audit-logs': 'Financial audit trail',
+    periods: 'Accounting period locks', reversals: 'Financial reversal approvals',
   })[this.activeTab()]);
 
   readonly pageDescription = computed(() => ({
@@ -88,6 +103,8 @@ export class AdminFinancialsPageComponent implements OnInit {
     expenses: 'Maintain an immutable register of posted and voided operating costs with payment evidence.',
     inventory: 'Monitor low stock and expiry exposure by pharmacy location without treating purchases as profit expense.',
     'audit-logs': 'Inspect financial creates, voids, reversals, and other sensitive changes by user.',
+    periods: 'Protect completed periods from backdated postings and changes. Corrections post as approved reversals in the current period.',
+    reversals: 'Review corrections independently while preserving original receipts and closed-shift totals.',
   })[this.activeTab()]);
 
   readonly filteredRows = computed(() => {
@@ -97,7 +114,7 @@ export class AdminFinancialsPageComponent implements OnInit {
     return source.filter((row: any) => String(JSON.stringify(this.rowSearchDocument(row)) ?? '').toLowerCase().includes(query));
   });
 
-  readonly maxTrend = computed(() => Math.max(1, ...(this.summary()?.chartData ?? []).map((point: any) => Number(point.total))));
+  readonly maxTrend = computed(() => Math.max(1, ...(this.summary()?.chartData ?? []).map((point: any) => Math.max(Math.abs(Number(point.clinic)), Math.abs(Number(point.pharmacy))))));
 
   ngOnInit(): void {
     const requestedTab = this.route.snapshot.data['financialTab'] as FinancialTab | undefined;
@@ -145,6 +162,8 @@ export class AdminFinancialsPageComponent implements OnInit {
       case 'clinic-closures': dataRequest = this.api.getClinicCashSessions(start, end); break;
       case 'expenses': dataRequest = this.api.getExpenses(start, end, this.page(), this.pageSize); break;
       case 'audit-logs': dataRequest = this.api.getAuditLogs(this.page(), this.pageSize); break;
+      case 'periods': dataRequest = this.api.getAccountingPeriods(this.page(), this.pageSize); break;
+      case 'reversals': dataRequest = this.api.getFinancialReversals(this.page(), this.pageSize); break;
     }
 
     forkJoin({ summary: summaryRequest, data: dataRequest }).subscribe({
@@ -169,6 +188,8 @@ export class AdminFinancialsPageComponent implements OnInit {
       case 'clinic-closures': this.clinicClosures.set(result ?? []); this.totalRows.set(result?.length ?? 0); break;
       case 'expenses': this.expenses.set(result.data ?? []); this.totalRows.set(result.total ?? 0); break;
       case 'audit-logs': this.auditLogs.set(result.data ?? []); this.totalRows.set(result.total ?? 0); break;
+      case 'periods': this.periods.set(result.data ?? []); this.totalRows.set(result.total ?? 0); break;
+      case 'reversals': this.reversals.set(result.data ?? []); this.totalRows.set(result.total ?? 0); break;
     }
   }
 
@@ -180,6 +201,8 @@ export class AdminFinancialsPageComponent implements OnInit {
       case 'clinic-closures': return this.clinicClosures();
       case 'expenses': return this.expenses();
       case 'audit-logs': return this.auditLogs();
+      case 'periods': return this.periods();
+      case 'reversals': return this.reversals();
       default: return [];
     }
   }
@@ -202,7 +225,7 @@ export class AdminFinancialsPageComponent implements OnInit {
   }
   changePage(nextPage: number): void { this.page.set(nextPage); this.loadData(); }
   totalPages(): number { return Math.max(1, Math.ceil(this.totalRows() / this.pageSize)); }
-  trendHeight(value: number): number { return Math.max(3, Math.round((Number(value) / this.maxTrend()) * 100)); }
+  trendHeight(value: number): number { return Math.max(3, Math.min(100, Math.round((Math.abs(Number(value)) / this.maxTrend()) * 100))); }
 
   openExpenseModal(): void {
     this.expenseForm.set({ title: '', category: 'utilities', amount: 0, expenseDate: getInternetDate().toISOString().slice(0, 10), payee: '', paymentMethod: 'cash', referenceNumber: '', costCenter: '', attachmentUrl: '', notes: '' });
@@ -219,8 +242,9 @@ export class AdminFinancialsPageComponent implements OnInit {
     });
   }
 
-  requestVoid(id: string, type: VoidTarget['type'], label: string): void {
+  requestVoid(id: string, type: VoidTarget['type'], label: string, mode: 'void' | 'reversal' = 'void'): void {
     this.voidTarget.set({ id, type, label });
+    this.correctionMode.set(mode);
     this.voidReason.set('');
   }
   confirmVoid(): void {
@@ -228,14 +252,56 @@ export class AdminFinancialsPageComponent implements OnInit {
     const reason = this.voidReason().trim();
     if (!target || reason.length < 5 || this.voidSaving()) return;
     this.voidSaving.set(true);
-    const request = target.type === 'clinic'
+    const request = this.correctionMode() === 'reversal'
+      ? this.api.requestFinancialReversal({ entityType: target.type, entityId: target.id, reason })
+      : target.type === 'clinic'
       ? this.api.voidClinicPayment(target.id, reason)
       : target.type === 'pharmacy'
         ? this.api.voidPharmacySale(target.id, reason, 'quarantine')
         : this.api.voidExpense(target.id, reason);
     request.subscribe({
-      next: () => { this.voidSaving.set(false); this.voidTarget.set(null); this.loadData(); },
+      next: () => {
+        this.voidSaving.set(false); this.voidTarget.set(null);
+        this.successMessage.set(this.correctionMode() === 'reversal' ? 'Reversal requested. Another authorised staff member must approve it.' : 'Entry voided.');
+        this.loadData();
+      },
       error: (error) => { this.voidSaving.set(false); this.errorMessage.set(error?.error?.message ?? 'The record could not be voided.'); },
+    });
+  }
+
+  updatePeriodField(field: 'startDate' | 'endDate' | 'reason', value: string): void {
+    this.periodForm.update((form) => ({ ...form, [field]: value }));
+  }
+
+  savePeriod(): void {
+    const form = this.periodForm();
+    if (!form.startDate || !form.endDate || form.reason.trim().length < 5 || this.periodSaving()) return;
+    this.periodSaving.set(true);
+    this.api.lockAccountingPeriod(form).subscribe({
+      next: () => {
+        this.periodSaving.set(false); this.periodModalOpen.set(false); this.periodForm.set({ startDate: '', endDate: '', reason: '' });
+        this.successMessage.set('Accounting period locked. Future corrections require an approved reversal.'); this.loadData();
+      },
+      error: (error) => { this.periodSaving.set(false); this.errorMessage.set(error?.error?.message ?? 'The period could not be locked.'); },
+    });
+  }
+
+  canReviewReversal(record: any): boolean {
+    return record.status === 'pending' && record.requestedByUserId !== this.session.currentUser()?.id;
+  }
+
+  openReversalReview(record: any, approve: boolean): void {
+    this.reviewReason.set(''); this.reviewTarget.set({ record, approve });
+  }
+
+  confirmReversalReview(): void {
+    const target = this.reviewTarget();
+    if (!target || this.reviewSaving() || (!target.approve && this.reviewReason().trim().length < 5)) return;
+    this.reviewSaving.set(true);
+    const request = target.approve ? this.api.approveFinancialReversal(target.record.id) : this.api.rejectFinancialReversal(target.record.id, this.reviewReason());
+    request.subscribe({
+      next: () => { this.reviewSaving.set(false); this.reviewTarget.set(null); this.successMessage.set(target.approve ? 'Reversal approved and posted in the current period.' : 'Reversal rejected.'); this.loadData(); },
+      error: (error) => { this.reviewSaving.set(false); this.errorMessage.set(error?.error?.message ?? 'The reversal could not be reviewed.'); },
     });
   }
 
@@ -273,6 +339,8 @@ export class AdminFinancialsPageComponent implements OnInit {
   printView(): void { window.print(); }
 
   private buildCsv(tab: FinancialTab, data: any): string {
+    if (tab === 'periods') return this.rowsToCsv(['From', 'To', 'Reason', 'Locked by', 'Locked at'], data.map((row: any) => [row.startDate, row.endDate, row.reason, row.lockedByUserId, row.createdAt]));
+    if (tab === 'reversals') return this.rowsToCsv(['Entry type', 'Entry ID', 'Original date', 'Amount', 'Reason', 'Status', 'Requested by', 'Reviewed by', 'Posted at', 'Review reason'], data.map((row: any) => [row.entityType, row.entityId, row.sourceDate, row.amount, row.reason, row.status, row.requestedByUserId, row.reviewedByUserId, row.postedAt, row.reviewReason]));
     if (tab === 'clinic') return this.rowsToCsv(['Invoice', 'Patient', 'Date', 'Method', 'Reference', 'Cashier', 'Amount'], data.map((row: any) => [row.invoice?.invoiceNumber, this.patientName(row.invoice?.visit?.patient), row.paidAt, row.paymentMethod, row.referenceNumber, this.userName(row.receivedByUser), row.amount]));
     if (tab === 'pharmacy') return this.rowsToCsv(['Sale', 'Location', 'Customer', 'Date', 'Method', 'Cashier', 'Total'], data.map((row: any) => [row.saleNumber, row.location?.name, row.customerName || this.patientName(row.visit?.patient) || 'Walk-in', row.paidAt, row.paymentMethod, this.userName(row.soldByUser), row.total]));
     if (tab === 'expenses') return this.rowsToCsv(['Date', 'Title', 'Category', 'Payee', 'Method', 'Reference', 'Cost centre', 'Amount', 'Status'], data.map((row: any) => [row.expenseDate, row.title, row.category, row.payee, row.paymentMethod, row.referenceNumber, row.costCenter, row.amount, row.status]));
@@ -307,6 +375,8 @@ export class AdminFinancialsPageComponent implements OnInit {
     if (tab === 'audit-logs') {
       return this.collectExportPages((page, limit) => this.api.getAuditLogs(page, limit), 100);
     }
+    if (tab === 'periods') return this.collectExportPages((page, limit) => this.api.getAccountingPeriods(page, limit), 100);
+    if (tab === 'reversals') return this.collectExportPages((page, limit) => this.api.getFinancialReversals(page, limit), 100);
     if (tab === 'closures' || tab === 'clinic-closures') {
       return of(this.currentRows());
     }

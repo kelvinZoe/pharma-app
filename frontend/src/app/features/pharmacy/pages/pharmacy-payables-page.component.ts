@@ -5,6 +5,7 @@ import { forkJoin } from 'rxjs';
 
 import { SessionService } from '../../../core/auth/session.service';
 import { ApiService } from '../../../core/services/api.service';
+import { PendingPayment } from '../../../core/services/payment-attempt.service';
 import { ToastService } from '../../../core/services/toast.service';
 
 interface PayableInvoice {
@@ -41,6 +42,14 @@ interface PayableInvoice {
           <button type="button" class="button button--secondary" [disabled]="!statementSupplierId()" (click)="openStatement()">Supplier statement</button>
         </div>
       </header>
+
+      @for (pending of pendingSupplierPayments(); track pending.key) {
+        <section class="load-state" role="status">
+          <strong>Supplier payment confirmation needed</strong>
+          <p>GHS {{ pending.payload.amount | number:'1.2-2' }} · Invoice {{ pending.targetId }}. Recover the original payment before recording it again.</p>
+          <button type="button" class="button button--secondary" [disabled]="paymentSaving()" (click)="recoverSupplierPayment(pending)">{{ paymentSaving() ? 'Recovering…' : 'Recover payment' }}</button>
+        </section>
+      }
 
       <section class="summary-strip" aria-label="Supplier payable summary">
         <div><span>Outstanding</span><strong>GHS {{ summary().outstandingBalance | number:'1.2-2' }}</strong><small>{{ summary().unpaidCount }} open invoices</small></div>
@@ -171,6 +180,7 @@ export class PharmacyPayablesPageComponent implements OnInit {
 
   readonly paymentOpen = signal(false);
   readonly paymentSaving = signal(false);
+  readonly pendingSupplierPayments = computed(() => this.api.pendingPayments('supplier'));
   readonly paymentInvoiceName = signal('');
   readonly paymentInvoiceBalance = signal(0);
   readonly returnOpen = signal(false);
@@ -224,6 +234,24 @@ export class PharmacyPayablesPageComponent implements OnInit {
 
   openPayment(invoice: any): void { this.paymentInvoiceName.set(`${invoice.supplier.name} · ${invoice.supplierInvoiceNumber}`); this.paymentInvoiceBalance.set(Number(invoice.balanceDue)); this.paymentForm.reset({ invoiceId: invoice.id, amount: null, paymentDate: new Date().toISOString().slice(0, 10), paymentMethod: 'bank_transfer', referenceNumber: '', notes: '' }); this.paymentOpen.set(true); }
   submitPayment(): void { if (this.paymentForm.invalid || this.paymentSaving()) { this.paymentForm.markAllAsTouched(); return; } this.paymentSaving.set(true); this.api.recordPharmacySupplierPayment(this.paymentForm.getRawValue()).subscribe({ next: () => { this.paymentSaving.set(false); this.paymentOpen.set(false); this.toast.success('Supplier payment recorded and linked to accounting expenses.'); this.loadAll(); if (this.selectedInvoiceId()) this.loadDetail(this.selectedInvoiceId()); }, error: (error) => { this.paymentSaving.set(false); this.toast.error(error?.error?.message ?? 'Supplier payment could not be recorded.'); } }); }
+
+  recoverSupplierPayment(pending: PendingPayment): void {
+    if (this.paymentSaving()) return;
+    this.paymentSaving.set(true);
+    this.api.recordPharmacySupplierPayment(pending.payload).subscribe({
+      next: () => {
+        this.paymentSaving.set(false);
+        this.paymentOpen.set(false);
+        this.toast.success('Original supplier payment confirmed. No additional payment was recorded.');
+        this.loadAll();
+        if (this.selectedInvoiceId()) this.loadDetail(this.selectedInvoiceId());
+      },
+      error: (error) => {
+        this.paymentSaving.set(false);
+        this.toast.error(error?.error?.message ?? 'The payment is still unconfirmed. Try recovery again before recording another payment.');
+      },
+    });
+  }
 
   openReturn(invoice: any): void { const sourceLines = invoice.receipt.lines.filter((line: any) => this.returnableQuantity(line) > 0); this.returnSourceLines.set(sourceLines); this.returnForm.reset({ receiptId: invoice.receipt.id, returnDate: new Date().toISOString().slice(0, 10), reason: '', notes: '', lines: [] as any }); this.returnLines.clear(); for (const line of sourceLines) this.returnLines.push(this.fb.group({ receiptLineId: [line.id, Validators.required], quantity: [0, [Validators.required, Validators.min(0)]], returnReason: [''] })); this.returnOpen.set(true); }
   returnableQuantity(line: any): number { return Math.max(0, Math.min(Number(line.quantityReceived) - Number(line.quantityReturned ?? 0), Number(line.batch.quantityRemaining))); }

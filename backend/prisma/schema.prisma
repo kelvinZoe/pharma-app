@@ -61,6 +61,53 @@ model Tenant {
   expenses                    Expense[]
   notifications               Notification[]
   idempotencyRecords          IdempotencyRecord[]
+  accountingPeriods           AccountingPeriod[]
+  financialReversals          FinancialReversal[]
+}
+
+model AccountingPeriod {
+  id             String   @id @default(uuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  startDate      DateTime
+  endDate        DateTime
+  reason         String
+  lockedByUserId String
+  createdAt      DateTime @default(now())
+
+  @@index([tenantId, startDate, endDate])
+}
+
+model FinancialReversal {
+  id                String         @id @default(uuid())
+  tenantId          String
+  tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  entityType        String
+  entityId          String
+  clinicPaymentId   String?
+  clinicPayment     ClinicPayment? @relation(fields: [clinicPaymentId], references: [id])
+  pharmacySaleId    String?
+  pharmacySale      PharmacySale?  @relation(fields: [pharmacySaleId], references: [id])
+  expenseId         String?
+  expense           Expense?       @relation(fields: [expenseId], references: [id])
+  amount            Decimal
+  costOfGoods       Decimal        @default(0)
+  paymentMethod     String?
+  locationId        String?
+  sourceDate        DateTime
+  reason            String
+  status            String         @default("pending")
+  requestedByUserId String
+  reviewedByUserId  String?
+  reviewReason      String?
+  postedAt          DateTime?
+  reviewedAt        DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, postedAt, locationId])
+  @@index([tenantId, entityType, entityId])
 }
 
 model Department {
@@ -345,6 +392,7 @@ model ClinicPayment {
   invoice             ClinicInvoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   clinicCashSessionId String?
   clinicCashSession   ClinicCashSession? @relation("ClinicCashSessionPayments", fields: [clinicCashSessionId], references: [id])
+  reversals           FinancialReversal[]
 
   @@index([tenantId, referenceNumber])
 }
@@ -1070,6 +1118,7 @@ model PharmacySale {
   prescription    Prescription?         @relation(fields: [prescriptionId], references: [id])
   visit           Visit?                @relation(fields: [visitId], references: [id])
   items           PharmacySaleItem[]
+  reversals       FinancialReversal[]
 
   @@unique([tenantId, saleNumber])
   @@index([tenantId, referenceNumber])
@@ -1191,6 +1240,7 @@ model Expense {
   tenantId        String?
   tenant          Tenant?                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   supplierPayment PharmacySupplierPayment?
+  reversals       FinancialReversal[]
 
   @@index([tenantId, status, expenseDate])
 }

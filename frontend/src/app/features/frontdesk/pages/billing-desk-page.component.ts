@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, signal, computed } 
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../core/services/api.service';
+import { PendingPayment } from '../../../core/services/payment-attempt.service';
+import { switchMap } from 'rxjs';
 import { AppDropdownComponent } from '../../../shared/ui/app-dropdown/app-dropdown.component';
 import { getInternetDate } from '../../../core/utils/clock';
 
@@ -11,6 +13,13 @@ import { getInternetDate } from '../../../core/utils/clock';
   imports: [CommonModule, FormsModule, AppDropdownComponent],
   template: `
     <div class="billing-workspace" style="display: flex; flex-direction: column; gap: 1rem; width: 100%;">
+      @for (pending of pendingClinicPayments(); track pending.key) {
+        <section class="panel full-width" role="status">
+          <h2>Payment confirmation needed</h2>
+          <p class="section-desc">GHS {{ Number(pending.payload.amount).toFixed(2) }} · {{ pending.payload.paymentMethod === 'cash' ? 'Cash' : 'Mobile Money' }}. Recover the original receipt before taking payment again.</p>
+          <button type="button" class="btn btn-primary btn-sm" [disabled]="isSubmitting()" (click)="recoverClinicPayment(pending)">{{ isSubmitting() ? 'Recovering…' : 'Recover receipt' }}</button>
+        </section>
+      }
       <div class="panel full-width" style="border-left: 4px solid var(--app-primary-color);">
         <div class="table-header-filters" style="align-items: center;">
           <div>
@@ -437,7 +446,7 @@ import { getInternetDate } from '../../../core/utils/clock';
 
                     <button
                       class="btn btn-success btn-block"
-                      [disabled]="isSubmitting() || !activeClinicSession() || paymentAmount() <= 0 || paymentAmount() > invoice().balanceDue || (paymentMethod() === 'mobile_money' && !paymentReference().trim())"
+                      [disabled]="isSubmitting() || selectedPaymentPending() || !activeClinicSession() || paymentAmount() <= 0 || paymentAmount() > invoice().balanceDue || (paymentMethod() === 'mobile_money' && !paymentReference().trim())"
                       (click)="recordPayment()"
                       style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.65rem 1rem; font-weight: 700;"
                     >
@@ -628,6 +637,8 @@ import { getInternetDate } from '../../../core/utils/clock';
 })
 export class BillingDeskPageComponent implements OnInit {
   private readonly api = inject(ApiService);
+  readonly pendingClinicPayments = computed(() => this.api.pendingPayments('clinic'));
+  readonly selectedPaymentPending = computed(() => this.pendingClinicPayments().some((pending) => pending.targetId === this.selectedVisit()?.id));
   
   // Make Number available in template
   readonly Number = Number;
@@ -919,7 +930,7 @@ export class BillingDeskPageComponent implements OnInit {
   recordPayment(): void {
     const v = this.selectedVisit();
     const inv = this.invoice();
-    if (!v || !inv) return;
+    if (!v || !inv || this.isSubmitting() || this.selectedPaymentPending()) return;
 
     if (!this.activeClinicSession()) {
       alert('Open a clinic cashier session before collecting clinic payments.');
@@ -931,8 +942,6 @@ export class BillingDeskPageComponent implements OnInit {
       alert('Reference transaction ID is required for Mobile Money payments.');
       return;
     }
-
-    this.isSubmitting.set(true);
 
     const amount = Number(this.paymentAmount());
     if (!Number.isFinite(amount) || amount <= 0 || amount > inv.balanceDue) {
@@ -946,6 +955,7 @@ export class BillingDeskPageComponent implements OnInit {
       referenceNumber: ref
     };
 
+    this.isSubmitting.set(true);
     this.api.payInvoice(v.id, paymentData).subscribe({
       next: (res) => {
         this.isSubmitting.set(false);
@@ -965,6 +975,43 @@ export class BillingDeskPageComponent implements OnInit {
         this.isSubmitting.set(false);
         alert(err?.error?.message ?? 'Failed to process invoice payment.');
       }
+    });
+  }
+
+  recoverClinicPayment(pending: PendingPayment): void {
+    if (this.isSubmitting()) return;
+    this.isSubmitting.set(true);
+    this.showReceipt.set(false);
+    this.api.getInvoice(pending.targetId).pipe(
+      switchMap((details) => {
+        this.selectedVisit.set(details.visit);
+        this.invoice.set({
+          ...details.invoice,
+          services: (details.visit.visitServices ?? []).map((line: any) => ({
+            id: line.id, serviceId: line.service.id, serviceName: line.service.name,
+            departmentName: line.service.department?.name || 'Department',
+            quantity: line.quantity, unitPrice: Number(line.unitPrice),
+            lineTotal: Number(line.lineTotal), status: line.status,
+          })),
+        });
+        return this.api.payInvoice(pending.targetId, pending.payload);
+      }),
+    ).subscribe({
+      next: (response) => {
+        this.isSubmitting.set(false);
+        this.invoice.set({ ...this.invoice(), ...response.invoice, subtotal: Number(response.invoice.subtotal), total: Number(response.invoice.total), discount: Number(response.invoice.discount || 0), amountPaid: Number(response.invoice.amountPaid), balanceDue: Number(response.invoice.balanceDue) });
+        this.lastPaymentAmount.set(Number(pending.payload.amount));
+        this.paymentMethod.set(pending.payload.paymentMethod);
+        this.paymentReference.set(pending.payload.referenceNumber ?? '');
+        this.paymentAmount.set(Number(response.invoice.balanceDue));
+        this.loadClinicCashSession();
+        this.loadVisits();
+        this.viewReceipt();
+      },
+      error: (error) => {
+        this.isSubmitting.set(false);
+        alert(error?.error?.message ?? 'The payment is still unconfirmed. Try recovery again; do not collect another payment.');
+      },
     });
   }
 

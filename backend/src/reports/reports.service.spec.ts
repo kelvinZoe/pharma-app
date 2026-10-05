@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { ReportsService } from './reports.service';
+import { TenantContextService } from '../common/multitenancy/tenant-context.service';
 
 describe('ReportsService financial summary', () => {
   it('uses sold-item cost for profit and keeps inventory purchases separate', async () => {
@@ -19,6 +20,7 @@ describe('ReportsService financial summary', () => {
       pharmacyBatch: { findMany: jest.fn().mockResolvedValue([]) },
       clinicCashSession: { findMany: jest.fn().mockResolvedValue([]) },
       pharmacyDailyClosure: { findMany: jest.fn().mockResolvedValue([]) },
+      financialReversal: { findMany: jest.fn().mockResolvedValue([]) },
     } as any;
     const service = new ReportsService(prisma);
 
@@ -56,15 +58,18 @@ describe('ReportsService void controls', () => {
   it('does not restock when another request already voided a sale', async () => {
     const tx = {
       pharmacySale: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'sale-1', status: 'paid', soldByUserId: 'cashier', closure: { status: 'open' }, items: [] }),
+        findUnique: jest.fn().mockResolvedValue({ id: 'sale-1', status: 'paid', paidAt: new Date(), soldByUserId: 'cashier', closure: { status: 'open' }, items: [] }),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       pharmacyBatch: { update: jest.fn() },
+      accountingPeriod: { findFirst: jest.fn().mockResolvedValue(null) },
+      financialReversal: { findFirst: jest.fn().mockResolvedValue(null) },
+      $queryRaw: jest.fn(),
     };
     const prisma = { $transaction: jest.fn((callback) => callback(tx)) } as any;
     const service = new ReportsService(prisma);
 
-    await expect(service.voidPharmacySale('sale-1', 'reviewer', 'Duplicate transaction')).rejects.toBeInstanceOf(BadRequestException);
+    await expect(TenantContextService.run({ tenantId: 'tenant-1' }, () => service.voidPharmacySale('sale-1', 'reviewer', 'Duplicate transaction'))).rejects.toBeInstanceOf(BadRequestException);
     expect(tx.pharmacyBatch.update).not.toHaveBeenCalled();
   });
 });

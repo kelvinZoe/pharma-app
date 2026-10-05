@@ -6,8 +6,12 @@ import { Pool } from 'pg';
 import * as path from 'path';
 import { TenantContextService } from '../common/multitenancy/tenant-context.service';
 import { getInternetDate } from '../common/clock';
+import { PrismaTransactionContext, PrismaTransactionStore } from '../common/prisma-transaction-context';
 
 const TENANT_MODELS = new Set([
+  'IdempotencyRecord',
+  'AccountingPeriod',
+  'FinancialReversal',
   'User',
   'Patient',
   'Department',
@@ -48,6 +52,7 @@ const TENANT_MODELS = new Set([
 ]);
 
 const MODELS_WITH_CREATED_AT = new Set([
+  'AccountingPeriod', 'FinancialReversal',
   'Tenant', 'Department', 'User', 'Patient', 'Visit', 'Service', 'VisitService',
   'ServiceResultTemplate', 'VisitResult', 'Prescription', 'ClinicInvoice',
   'ClinicPayment', 'ClinicCashSession', 'PharmacyProduct', 'PharmacyBatch', 'PharmacyStockMovement',
@@ -60,9 +65,10 @@ const MODELS_WITH_CREATED_AT = new Set([
 ]);
 
 const MODELS_WITH_UPDATED_AT = new Set([
+  'FinancialReversal',
   'Tenant', 'Department', 'User', 'Patient', 'Visit', 'Service', 'VisitService',
   'ServiceResultTemplate', 'VisitResult', 'Prescription', 'ClinicInvoice',
-  'ClinicPayment', 'ClinicCashSession', 'PharmacyProduct', 'PharmacyBatch',
+  'ClinicCashSession', 'PharmacyProduct', 'PharmacyBatch',
   'PharmacyLocationProduct', 'PharmacySupplier', 'PharmacyPurchaseOrder', 'PharmacyPurchaseOrderLine', 'PharmacyGoodsReceipt',
   'PharmacySupplierInvoice', 'PharmacySupplierPayment', 'PharmacyPurchaseReturn',
   'PharmacyStockCount', 'PharmacyStockCountLine', 'PharmacyStockAdjustment',
@@ -115,7 +121,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       pool.on('error', (err) => {
         this.logger.warn(`[PgPool] Pool client error: ${err.message}`);
       });
-      adapter = new PrismaPg(pool);
+      adapter = new PrismaPg(pool, { disposeExternalPool: true });
     } else {
       const baseDir = process.cwd().endsWith('backend') ? process.cwd() : path.join(process.cwd(), 'backend');
       const dbPath = path.join(baseDir, 'dev.db');
@@ -130,7 +136,6 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       },
     });
 
-    const self = this;
     this.extendedClient = this.$extends({
       query: {
         $allModels: {
@@ -157,16 +162,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
                 anyArgs.where = { ...(anyArgs.where || {}), tenantId };
                 anyArgs.create = { ...(anyArgs.create || {}), tenantId };
               } else if (operation === 'findUnique' || operation === 'findUniqueOrThrow') {
-                const findFirstOperation = operation === 'findUnique' ? 'findFirst' : 'findFirstOrThrow';
-                const currentWhere = anyArgs.where || {};
-                const newArgs = {
-                  ...args,
-                  where: {
-                    ...currentWhere,
-                    tenantId,
-                  },
-                };
-                return (self.extendedClient as any)[model][findFirstOperation](newArgs);
+                anyArgs.where = { ...(anyArgs.where || {}), tenantId };
               } else if (
                 operation === 'findFirst' ||
                 operation === 'findFirstOrThrow' ||
@@ -185,12 +181,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
             } else if (tenantId && RELATION_SCOPED_MODELS.has(model)) {
               const tenantFilter = relationTenantFilter(model, tenantId);
               if (operation === 'findUnique' || operation === 'findUniqueOrThrow') {
-                const findFirstOperation = operation === 'findUnique' ? 'findFirst' : 'findFirstOrThrow';
-                const newArgs = {
-                  ...args,
-                  where: { ...(anyArgs.where || {}), ...tenantFilter },
-                };
-                return (self.extendedClient as any)[model][findFirstOperation](newArgs);
+                anyArgs.where = { ...(anyArgs.where || {}), ...tenantFilter };
               }
               if (
                 operation === 'findFirst' ||
@@ -287,6 +278,33 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     // resolves model delegates (e.g. this.prisma.user) to the extended version transparently.
     return new Proxy(this, {
       get(target, prop, receiver) {
+        const transaction = PrismaTransactionContext.client(target);
+        if (prop === '$transaction') {
+          return async (input: any, options?: any) => {
+            if (transaction) {
+              if (typeof input !== 'function') throw new Error('Use an interactive transaction inside an existing transaction');
+              return input(transaction);
+            }
+            if (typeof input !== 'function') return target.extendedClient.$transaction(input, options);
+            let store: PrismaTransactionStore;
+            const result = await target.extendedClient.$transaction(async (client: any) => {
+              store = { owner: target, client, afterCommit: [] };
+              return PrismaTransactionContext.run(store, async () => await input(client));
+            }, options);
+            for (const afterCommit of store!.afterCommit) {
+              try {
+                await afterCommit();
+              } catch (error: any) {
+                target.logger.warn(`Post-commit notification failed: ${error?.message ?? 'Unknown error'}`);
+              }
+            }
+            return result;
+          };
+        }
+        if (transaction && prop in transaction) {
+          const value = Reflect.get(transaction, prop, transaction);
+          return typeof value === 'function' ? value.bind(transaction) : value;
+        }
         if (prop in target.extendedClient) {
           return Reflect.get(target.extendedClient, prop, receiver);
         }

@@ -1,5 +1,11 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  Injectable,
+} from '@nestjs/common';
 import { createHash } from 'crypto';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from './multitenancy/tenant-context.service';
 
@@ -22,59 +28,82 @@ export class IdempotencyService {
 
     const requestHash = this.hashPayload({ operation, payload });
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
+    let handlerRejected = false;
     try {
-      await (this.prisma as any).idempotencyRecord.deleteMany({
-        where: { tenantId, userId, expiresAt: { lt: new Date() } },
-      });
-      await (this.prisma as any).idempotencyRecord.create({
-        data: {
-          tenantId,
-          userId,
-          idempotencyKey,
-          operation,
-          requestHash,
-          status: 'in_progress',
-          expiresAt,
-        },
+      return await this.prisma.$transaction(async (tx) => {
+        const lockName = JSON.stringify([tenantId, userId, idempotencyKey]);
+        const locks = await tx.$queryRaw<
+          Array<{ acquired: boolean }>
+        >`SELECT pg_try_advisory_xact_lock(hashtextextended(${lockName}, 0)) AS acquired`;
+        if (!locks[0]?.acquired) {
+          throw new ConflictException({
+            code: 'REQUEST_IN_PROGRESS',
+            message:
+              'This request is still processing. Recover the result using the same request.',
+          });
+        }
+        const where = { tenantId, userId, idempotencyKey };
+        const existing = await tx.idempotencyRecord.findFirst({ where });
+        if (existing) {
+          if (existing.requestHash !== requestHash) {
+            throw new ConflictException({
+              code: 'IDEMPOTENCY_PAYLOAD_MISMATCH',
+              message:
+                'This request key was already used for different payment details. Recover the original request first.',
+            });
+          }
+          if (existing.status === 'completed')
+            return existing.responseJson as T;
+          throw new ConflictException({
+            code: 'REQUEST_OUTCOME_UNCONFIRMED',
+            message:
+              'An earlier request has an unconfirmed outcome. Check the transaction register before taking another payment.',
+          });
+        }
+        const record = await tx.idempotencyRecord.create({
+          data: {
+            ...where,
+            operation,
+            requestHash,
+            status: 'in_progress',
+            expiresAt,
+          },
+        });
+        let response: T;
+        try {
+          response = await handler();
+        } catch (error) {
+          handlerRejected = true;
+          throw error;
+        }
+        await tx.idempotencyRecord.update({
+          where: { id: record.id, tenantId },
+          data: {
+            status: 'completed',
+            responseJson:
+              response === undefined || response === null
+                ? Prisma.JsonNull
+                : JSON.parse(JSON.stringify(response)),
+            errorMessage: null,
+          },
+        });
+        return response;
       });
     } catch (error: any) {
-      if (error?.code !== 'P2002') throw error;
-      const existing = await (this.prisma as any).idempotencyRecord.findUnique({
-        where: { tenantId_userId_idempotencyKey: { tenantId, userId, idempotencyKey } },
-      });
-      if (!existing) throw new ConflictException('The request is already being processed. Retry shortly.');
-      if (existing.requestHash !== requestHash) {
-        throw new ConflictException('This idempotency key was already used for a different request.');
+      if (
+        handlerRejected &&
+        error instanceof HttpException &&
+        error.getStatus() < 500
+      ) {
+        const body = error.getResponse();
+        throw new HttpException(
+          {
+            ...(typeof body === 'object' ? body : { message: body }),
+            requestOutcome: 'not_committed',
+          },
+          error.getStatus(),
+        );
       }
-      if (existing.status === 'completed') {
-        return existing.responseJson as T;
-      }
-      if (existing.status === 'failed') {
-        throw new ConflictException('The previous request with this idempotency key failed. Use a new key to retry.');
-      }
-      throw new ConflictException('The request is already being processed. Retry shortly.');
-    }
-
-    try {
-      const response = await handler();
-      await (this.prisma as any).idempotencyRecord.update({
-        where: { tenantId_userId_idempotencyKey: { tenantId, userId, idempotencyKey } },
-        data: {
-          status: 'completed',
-          responseJson: response === undefined ? null : JSON.parse(JSON.stringify(response)),
-          errorMessage: null,
-        },
-      });
-      return response;
-    } catch (error: any) {
-      await (this.prisma as any).idempotencyRecord.update({
-        where: { tenantId_userId_idempotencyKey: { tenantId, userId, idempotencyKey } },
-        data: {
-          status: 'failed',
-          errorMessage: String(error?.message ?? 'Request failed').slice(0, 1000),
-        },
-      }).catch(() => undefined);
       throw error;
     }
   }
@@ -82,25 +111,41 @@ export class IdempotencyService {
   private normalizeKey(rawKey: string | string[] | undefined): string {
     const value = Array.isArray(rawKey) ? rawKey[0] : rawKey;
     const key = String(value ?? '').trim();
-    if (!key) throw new BadRequestException('Idempotency-Key header is required for this operation.');
+    if (!key)
+      throw new BadRequestException(
+        'Idempotency-Key header is required for this operation.',
+      );
     if (key.length < 8 || key.length > 160) {
-      throw new BadRequestException('Idempotency-Key must be between 8 and 160 characters.');
+      throw new BadRequestException(
+        'Idempotency-Key must be between 8 and 160 characters.',
+      );
     }
     if (!/^[A-Za-z0-9._:-]+$/.test(key)) {
-      throw new BadRequestException('Idempotency-Key contains unsupported characters.');
+      throw new BadRequestException(
+        'Idempotency-Key contains unsupported characters.',
+      );
     }
     return key;
   }
 
   private hashPayload(payload: unknown): string {
-    return createHash('sha256').update(this.stableStringify(payload)).digest('hex');
+    return createHash('sha256')
+      .update(this.stableStringify(payload))
+      .digest('hex');
   }
 
   private stableStringify(value: unknown): string {
     if (value === undefined) return '"__undefined__"';
-    if (value === null || typeof value !== 'object') return JSON.stringify(value);
-    if (Array.isArray(value)) return `[${value.map((item) => this.stableStringify(item)).join(',')}]`;
+    if (value === null || typeof value !== 'object')
+      return JSON.stringify(value);
+    if (Array.isArray(value))
+      return `[${value.map((item) => this.stableStringify(item)).join(',')}]`;
     const record = value as Record<string, unknown>;
-    return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${this.stableStringify(record[key])}`).join(',')}}`;
+    return `{${Object.keys(record)
+      .sort()
+      .map(
+        (key) => `${JSON.stringify(key)}:${this.stableStringify(record[key])}`,
+      )
+      .join(',')}}`;
   }
 }

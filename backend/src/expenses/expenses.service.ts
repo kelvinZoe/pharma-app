@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { getInternetDate } from '../common/clock';
 import { buildDateRange } from '../common/date-range';
 import { ensurePositiveMoney, formatMoney } from '../common/money';
+import { assertAccountingDateOpen, assertNoFinancialReversal } from '../common/accounting-period';
 
 @Injectable()
 export class ExpensesService {
@@ -32,6 +33,7 @@ export class ExpensesService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      await assertAccountingDateOpen(tx, expenseDate ? new Date(expenseDate) : getInternetDate());
       const expense = await tx.expense.create({
         data: {
         title: String(title).trim(),
@@ -74,6 +76,7 @@ export class ExpensesService {
       this.prisma.expense.findMany({
         where,
         include: {
+          reversals: { where: { status: { in: ['pending', 'approved'] } }, select: { status: true, postedAt: true } },
           createdByUser: {
             select: { fullName: true, username: true },
           },
@@ -121,6 +124,8 @@ export class ExpensesService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      await assertAccountingDateOpen(tx, expense.expenseDate);
+      await assertNoFinancialReversal(tx, 'expense', id);
       const claim = await tx.expense.updateMany({
         where: { id, status: { not: 'voided' }, createdById: { not: userId } },
         data: {

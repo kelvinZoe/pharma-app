@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { getInternetDate } from '../common/clock';
 import { buildDateRange } from '../common/date-range';
 import { formatMoney, moneyToNumber, optionalMoney, zeroMoney } from '../common/money';
+import { assertAccountingDateOpen, assertNoFinancialReversal } from '../common/accounting-period';
 
 const DEFAULT_REPORT_DAYS = 31;
 const MAX_REPORT_DAYS = 366;
@@ -29,6 +30,7 @@ export class ReportsService {
     const findOptions: any = {
       where: whereClause,
       include: {
+        reversals: { where: { status: { in: ['pending', 'approved'] } }, select: { status: true, postedAt: true } },
         invoice: {
           include: {
             visit: {
@@ -68,6 +70,7 @@ export class ReportsService {
     const findOptions: any = {
       where: whereClause,
       include: {
+        reversals: { where: { status: { in: ['pending', 'approved'] } }, select: { status: true, postedAt: true } },
         soldByUser: {
           select: { fullName: true, username: true },
         },
@@ -95,7 +98,7 @@ export class ReportsService {
 
   async getCombinedSummary(startDate?: string, endDate?: string, locationId?: string) {
     const dateRange = buildDateRange(startDate, endDate, { defaultDays: DEFAULT_REPORT_DAYS, maxDays: MAX_REPORT_DAYS });
-    const [clinicPayments, pharmacySales] = await Promise.all([
+    const [clinicPayments, pharmacySales, reversals] = await Promise.all([
       this.prisma.clinicPayment.findMany({
         where: {
           status: { not: 'voided' },
@@ -117,7 +120,21 @@ export class ReportsService {
           items: { select: { quantity: true, unitCost: true } },
         },
       }),
+      this.prisma.financialReversal.findMany({
+        where: { status: 'approved', postedAt: dateRange, ...(locationId ? { OR: [{ locationId }, { locationId: null }] } : {}) },
+        select: { entityType: true, amount: true, costOfGoods: true, paymentMethod: true, postedAt: true },
+      }),
     ]);
+
+    const clinicPaymentsCount = clinicPayments.length;
+    const pharmacySalesCount = pharmacySales.length;
+    for (const reversal of reversals) {
+      if (reversal.entityType === 'clinic') {
+        clinicPayments.push({ amount: reversal.amount.negated(), paymentMethod: reversal.paymentMethod ?? 'cash', paidAt: reversal.postedAt! });
+      } else if (reversal.entityType === 'pharmacy') {
+        pharmacySales.push({ total: reversal.amount.negated(), paymentMethod: reversal.paymentMethod ?? 'cash', paidAt: reversal.postedAt!, items: [{ quantity: -1, unitCost: reversal.costOfGoods }] });
+      }
+    }
 
     const clinicTotalDecimal = this.sumMoney(clinicPayments, (p) => p.amount);
     const pharmacyTotalDecimal = this.sumMoney(pharmacySales, (s) => s.total);
@@ -214,10 +231,11 @@ export class ReportsService {
       }),
     ]);
     const supplierPaymentsTotalDecimal = this.sumMoney(supplierPayments, (payment) => payment.amount);
+    const expenseReversals = this.sumMoney(reversals.filter((entry) => entry.entityType === 'expense'), (entry) => entry.amount);
     const manualExpensesTotalDecimal = this.sumMoney(
       manualExpenses.filter((expense) => expense.category !== 'supplier_payment'),
       (expense) => expense.amount,
-    );
+    ).minus(expenseReversals);
 
     const grossInventoryPurchasesDecimal = this.sumMoney(receipts, (receipt) => receipt.totalCost);
     const purchaseReturnCreditsDecimal = this.sumMoney(purchaseReturns, (purchaseReturn) => purchaseReturn.totalCredit);
@@ -298,8 +316,10 @@ export class ReportsService {
         cash: clinicCash + pharmacyCash,
         mobileMoney: clinicMomo + pharmacyMomo,
       },
-      clinicPaymentsCount: clinicPayments.length,
-      pharmacySalesCount: pharmacySales.length,
+      clinicPaymentsCount,
+      pharmacySalesCount,
+      reversalsCount: reversals.length,
+      reversalAmount: moneyToNumber(this.sumMoney(reversals, (entry) => entry.amount)),
       lowStockAlertsCount: lowStockAlerts.length,
       expiryAlertsCount: expiryAlerts.length,
       lowStockAlerts: lowStockAlerts.slice(0, 10), // return top 10
@@ -423,7 +443,8 @@ export class ReportsService {
       });
       const clinicRev = this.sumMoney(clinicPaymentsToday, (p) => p.amount);
       const pharmRev = this.sumMoney(pharmacySalesToday, (s) => s.total);
-      const totalRev = clinicRev.plus(pharmRev);
+      const corrections = await this.prisma.financialReversal.findMany({ where: { status: 'approved', postedAt: { gte: startOfToday, lte: endOfToday }, entityType: { in: ['clinic', 'pharmacy'] } }, select: { amount: true } });
+      const totalRev = clinicRev.plus(pharmRev).minus(this.sumMoney(corrections, (entry) => entry.amount));
 
       const pendingReviews = await this.prisma.visitService.count({
         where: { status: 'pending', visit: { status: { not: 'deleted' } } },
@@ -948,8 +969,9 @@ export class ReportsService {
       const reconciliationExceptions = [...clinicClosures, ...pharmacyClosures]
         .filter((closure) => optionalMoney(closure.discrepancy ?? 0).abs().gt(0)).length;
 
-      stats['clinicStream'] = formatMoney(clinicStream);
-      stats['pharmacyStream'] = formatMoney(pharmacyStream);
+      const corrections = await this.prisma.financialReversal.findMany({ where: { status: 'approved', postedAt: { gte: startOfToday, lte: endOfToday } }, select: { amount: true, entityType: true } });
+      stats['clinicStream'] = formatMoney(clinicStream.minus(this.sumMoney(corrections.filter((entry) => entry.entityType === 'clinic'), (entry) => entry.amount)));
+      stats['pharmacyStream'] = formatMoney(pharmacyStream.minus(this.sumMoney(corrections.filter((entry) => entry.entityType === 'pharmacy'), (entry) => entry.amount)));
       stats['reconciliationExceptions'] = String(reconciliationExceptions);
       stats['dailyClosures'] = String(dailyClosures + clinicClosures.length);
 
@@ -1066,6 +1088,9 @@ export class ReportsService {
       if (payment.clinicCashSession?.status === 'closed') {
         throw new BadRequestException('This payment belongs to a closed cashier session and requires a formal reversal');
       }
+
+      await assertAccountingDateOpen(tx, payment.paidAt);
+      await assertNoFinancialReversal(tx, 'clinic', id);
 
       const claim = await tx.clinicPayment.updateMany({
         where: { id, status: { not: 'voided' }, receivedByUserId: { not: userId } },
@@ -1191,6 +1216,9 @@ export class ReportsService {
       if (sale.closure?.status === 'closed') {
         throw new BadRequestException('This sale belongs to a closed register and requires a formal reversal');
       }
+
+      await assertAccountingDateOpen(tx, sale.paidAt);
+      await assertNoFinancialReversal(tx, 'pharmacy', id);
 
       const claim = await tx.pharmacySale.updateMany({
         where: { id, status: { not: 'voided' }, soldByUserId: { not: userId } },

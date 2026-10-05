@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, ConflictException, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { assertAccountingDateOpen } from '../common/accounting-period';
 import { getInternetDate } from '../common/clock';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as crypto from 'crypto';
@@ -721,6 +722,7 @@ export class PharmacyService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
+      await assertAccountingDateOpen(tx, data.receivedAt ? new Date(data.receivedAt) : getInternetDate());
       const receipt = await tx.pharmacyGoodsReceipt.create({
         data: {
           tenantId: location.tenantId,

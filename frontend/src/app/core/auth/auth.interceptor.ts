@@ -17,7 +17,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   if (isApiRequest && token) {
     const pharmacyLocationId = sessionService.activePharmacyLocationId();
     let headers = req.headers.set('Authorization', `Bearer ${token}`);
-    if (pharmacyLocationId) {
+    if (pharmacyLocationId && !headers.has('X-Pharmacy-Location-Id')) {
       headers = headers.set('X-Pharmacy-Location-Id', pharmacyLocationId);
     }
     authReq = req.clone({

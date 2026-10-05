@@ -1,13 +1,13 @@
 # PharmaFlow Security and Financial Remediation TODO
 
-Last reviewed: 2026-08-19
+Last reviewed: 2026-10-05
 
 This checklist tracks the financial, tenant-isolation, pharmacy, and availability risks found during the security review. A task is complete only when the API enforces the rule; hiding a frontend action is not sufficient.
 
 ## Status Summary
 
 - All identified P0 and P1 application controls are implemented and locally verified.
-- The production Postgres patch is prepared but must still be applied and smoke-tested in staging before deployment.
+- The new accounting-period/reversal SQL patch is verified on isolated local Postgres; apply it and smoke-test it in staging before deployment.
 - Unchecked P2 items are larger architecture upgrades and remain explicit follow-up work; they are not being represented as complete.
 
 ## P0 — Authorization and Financial Integrity
@@ -106,9 +106,12 @@ This checklist tracks the financial, tenant-isolation, pharmacy, and availabilit
 
 - [x] Replace floating-point monetary calculations with decimal/minor-unit helpers end to end.
   - Completed: shared backend money helper added; clinic billing/session, visit pricing, expenses, pharmacy POS/register, supplier payables, purchase orders, and financial reporting now use Decimal arithmetic for money paths.
-- [ ] Add configurable accounting period locks and an approved reversal workflow.
+- [x] Add configurable accounting period locks and an approved reversal workflow.
+  - Completed: tenant-wide completed-date ranges can be permanently locked after cashier shifts close. App checks and PostgreSQL triggers block backdated postings and historical mutations. Full clinic-payment, pharmacy-sale, and operating-expense reversals require independent approval, post in the current period, preserve original receipts/closures, and are included in financial summaries. Returned pharmacy stock enters quarantine once; clinic invoice balances reopen atomically. SQL patch: `20261005150000_accounting_period_locks_and_reversals`.
 - [x] Add explicit idempotency keys for all payment and stock-posting commands.
   - Completed: manual Postgres idempotency table patch added; clinic payment/session, pharmacy POS/register, goods receipt, direct batch add, stock count/adjustment, transfer, quarantine, purchase order, supplier payment, and purchase return commands now require/replay idempotency keys.
+- [x] Make payment retry recovery durable and receipt persistence atomic with business posting.
+  - Completed: clinic, POS, and supplier payment attempts retain their original key and payload in scoped same-tab browser storage. Recovery controls use that original request after connection failure or reload; edited unresolved attempts are blocked. Business writes and cached responses share one PostgreSQL transaction with a per-request lock. Completed records are replayed even after their former expiry time; do not purge them solely on `expiresAt`. Uncertain legacy records require register review. Notifications emit only after commit. No additional SQL patch is required beyond the existing idempotency table.
 - [ ] Replace numeric role checks with named permissions and centrally enforced decorators.
 - [ ] Add database row-level security as a second tenant-isolation layer.
 - [x] Require tenant slug or another unambiguous tenant selector for username login.

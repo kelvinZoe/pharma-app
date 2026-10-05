@@ -1,4 +1,7 @@
 :host { display: block; min-width: 0; color: #17221f; font-size: 14px; }
+.notice--success { background: #eff8f5; color: #0c7869; border: 1px solid #c7e5dc; }
+.actions .text-action + .text-action { margin-left: .75rem; }
+.trend-chart .bar--negative { background: #b42318; }
 * { box-sizing: border-box; }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }

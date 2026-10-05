@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsGateway } from './notifications.gateway';
+import { PrismaTransactionContext } from '../common/prisma-transaction-context';
 
 export interface CreateNotificationInput {
   title: string;
@@ -102,7 +103,8 @@ export class NotificationsService {
       },
     });
 
-    this.notificationsGateway.emitNotification(notification);
+    const emit = () => this.notificationsGateway.emitNotification(notification);
+    if (!PrismaTransactionContext.afterCommit(emit)) emit();
     return notification;
   }
 

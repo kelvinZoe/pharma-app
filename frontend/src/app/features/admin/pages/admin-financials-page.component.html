@@ -40,6 +40,10 @@
     </div>
   }
 
+  @if (successMessage()) {
+    <div class="notice notice--success" role="status"><span>{{ successMessage() }}</span><button type="button" (click)="successMessage.set('')" aria-label="Dismiss confirmation">Dismiss</button></div>
+  }
+
   <nav class="section-nav" aria-label="Financial sections">
     @for (tab of tabs; track tab.id) {
       <button type="button" [class.active]="activeTab() === tab.id" (click)="selectTab(tab.id)">
@@ -57,17 +61,19 @@
     @if (summary(); as financial) {
       <section class="metric-ribbon" aria-label="Financial summary">
         <article class="metric metric--lead">
-          <span>Collections</span><strong>{{ money(financial.combinedTotal) }}</strong>
+          <span>Net collections</span><strong>{{ money(financial.combinedTotal) }}</strong>
           <small>{{ financial.clinicPaymentsCount }} clinic payments · {{ financial.pharmacySalesCount }} pharmacy sales</small>
         </article>
         <article class="metric"><span>Pharmacy gross profit</span><strong>{{ money(financial.pharmacyGrossProfit) }}</strong><small>Revenue less recorded item cost</small></article>
-        <article class="metric"><span>Operating expenses</span><strong>{{ money(financial.operatingExpensesTotal) }}</strong><small>Voided and supplier settlements excluded</small></article>
+        <article class="metric"><span>Operating expenses</span><strong>{{ money(financial.operatingExpensesTotal) }}</strong><small>Includes approved expense corrections</small></article>
         <article class="metric" [class.metric--negative]="financial.estimatedOperatingResult < 0"><span>Estimated operating result</span><strong>{{ money(financial.estimatedOperatingResult) }}</strong><small>Before clinic direct costs, tax, and depreciation</small></article>
       </section>
 
       @if (financial.missingCostLines > 0) {
         <div class="notice notice--warning"><span>{{ financial.missingCostLines }} pharmacy sale line(s) have no unit cost. Gross profit is understated until those costs are corrected.</span></div>
       }
+
+      @if (financial.reversalsCount > 0) { <div class="notice"><span>This period includes {{ financial.reversalsCount }} approved reversal(s). Original receipts remain in their original periods.</span></div> }
 
       @if (activeTab() === 'dashboard') {
         <div class="dashboard-grid">
@@ -76,13 +82,13 @@
             <div class="trend-chart" role="img" aria-label="Daily clinic and pharmacy collections">
               @for (point of financial.chartData; track point.date) {
                 <div class="trend-column">
-                  <div class="bars"><i class="bar bar--clinic" [style.height.%]="trendHeight(point.clinic)"></i><i class="bar bar--pharmacy" [style.height.%]="trendHeight(point.pharmacy)"></i></div>
+                  <div class="bars"><i class="bar bar--clinic" [class.bar--negative]="point.clinic < 0" [attr.title]="'Clinic: ' + money(point.clinic)" [style.height.%]="trendHeight(point.clinic)"></i><i class="bar bar--pharmacy" [class.bar--negative]="point.pharmacy < 0" [attr.title]="'Pharmacy: ' + money(point.pharmacy)" [style.height.%]="trendHeight(point.pharmacy)"></i></div>
                   <span>{{ point.label }}</span>
                   <strong>{{ money(point.total) }}</strong>
                 </div>
               }
             </div>
-            <footer class="legend"><span><i class="legend-clinic"></i>Clinic</span><span><i class="legend-pharmacy"></i>Pharmacy</span></footer>
+            <footer class="legend"><span><i class="legend-clinic"></i>Clinic</span><span><i class="legend-pharmacy"></i>Pharmacy</span>@if (financial.reversalsCount > 0) { <span>Red bars: corrections exceed collections</span> }</footer>
           </section>
 
           <aside class="report-panel control-panel">
@@ -124,17 +130,18 @@
             <div class="ledger-tools">
               <label class="search-control"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input type="search" [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" placeholder="Search the loaded register" /></label>
               @if (activeTab() === 'expenses') { <button type="button" class="button button--primary" (click)="openExpenseModal()">Post expense</button> }
+              @if (activeTab() === 'periods') { <button type="button" class="button button--primary" (click)="periodModalOpen.set(true)">Lock completed period</button> }
             </div>
           </header>
 
           <div class="table-wrap">
             @if (activeTab() === 'clinic') {
               <table><thead><tr><th>Patient / invoice</th><th>Paid at</th><th>Method</th><th>Cashier</th><th class="number">Amount</th><th></th></tr></thead><tbody>
-                @for (payment of filteredRows(); track payment.id) { <tr><td><strong>{{ patientName(payment.invoice?.visit?.patient) }}</strong><small>{{ payment.invoice?.invoiceNumber || payment.id }}</small></td><td>{{ payment.paidAt | date:'medium' }}</td><td><span class="status">{{ methodLabel(payment.paymentMethod) }}</span><small>{{ payment.referenceNumber || 'No reference' }}</small></td><td>{{ userName(payment.receivedByUser) }}</td><td class="number money-value">{{ money(payment.amount) }}</td><td class="actions"><button type="button" class="text-action danger" (click)="requestVoid(payment.id, 'clinic', payment.invoice?.invoiceNumber || 'clinic payment')">Void</button></td></tr> }
+                @for (payment of filteredRows(); track payment.id) { <tr><td><strong>{{ patientName(payment.invoice?.visit?.patient) }}</strong><small>{{ payment.invoice?.invoiceNumber || payment.id }}</small></td><td>{{ payment.paidAt | date:'medium' }}</td><td><span class="status">{{ methodLabel(payment.paymentMethod) }}</span><small>{{ payment.referenceNumber || 'No reference' }}</small></td><td>{{ userName(payment.receivedByUser) }}</td><td class="number money-value">{{ money(payment.amount) }}</td><td class="actions">@if (payment.reversals?.length) { <span class="status">Reversal {{ payment.reversals[0].status }}</span> } @else { <button type="button" class="text-action danger" (click)="requestVoid(payment.id, 'clinic', payment.invoice?.invoiceNumber || 'clinic payment')">Void</button><button type="button" class="text-action" (click)="requestVoid(payment.id, 'clinic', payment.invoice?.invoiceNumber || 'clinic payment', 'reversal')">Request reversal</button> }</td></tr> }
               </tbody></table>
             } @else if (activeTab() === 'pharmacy') {
               <table><thead><tr><th>Sale</th><th>Location</th><th>Customer</th><th>Method</th><th>Cashier</th><th class="number">Total</th><th></th></tr></thead><tbody>
-                @for (sale of filteredRows(); track sale.id) { <tr><td><strong>{{ sale.saleNumber }}</strong><small>{{ sale.items?.length || 0 }} line(s) · {{ sale.paidAt | date:'short' }}</small></td><td>{{ sale.location?.name || 'Unassigned' }}</td><td>{{ sale.customerName || patientName(sale.visit?.patient) || 'Walk-in customer' }}</td><td><span class="status">{{ methodLabel(sale.paymentMethod) }}</span><small>{{ sale.referenceNumber || 'No reference' }}</small></td><td>{{ userName(sale.soldByUser) }}</td><td class="number money-value">{{ money(sale.total) }}</td><td class="actions"><button type="button" class="text-action danger" (click)="requestVoid(sale.id, 'pharmacy', sale.saleNumber)">Void</button></td></tr> }
+                @for (sale of filteredRows(); track sale.id) { <tr><td><strong>{{ sale.saleNumber }}</strong><small>{{ sale.items?.length || 0 }} line(s) · {{ sale.paidAt | date:'short' }}</small></td><td>{{ sale.location?.name || 'Unassigned' }}</td><td>{{ sale.customerName || patientName(sale.visit?.patient) || 'Walk-in customer' }}</td><td><span class="status">{{ methodLabel(sale.paymentMethod) }}</span><small>{{ sale.referenceNumber || 'No reference' }}</small></td><td>{{ userName(sale.soldByUser) }}</td><td class="number money-value">{{ money(sale.total) }}</td><td class="actions">@if (sale.reversals?.length) { <span class="status">Reversal {{ sale.reversals[0].status }}</span> } @else { <button type="button" class="text-action danger" (click)="requestVoid(sale.id, 'pharmacy', sale.saleNumber)">Void</button><button type="button" class="text-action" (click)="requestVoid(sale.id, 'pharmacy', sale.saleNumber, 'reversal')">Request reversal</button> }</td></tr> }
               </tbody></table>
             } @else if (activeTab() === 'closures' || activeTab() === 'clinic-closures') {
               <table><thead><tr><th>Shift / cashier</th><th>Closed</th><th class="number">Expected cash</th><th class="number">Expected MoMo</th><th class="number">Counted</th><th>Difference</th><th></th></tr></thead><tbody>
@@ -142,7 +149,15 @@
               </tbody></table>
             } @else if (activeTab() === 'expenses') {
               <table><thead><tr><th>Expense</th><th>Payee / evidence</th><th>Cost centre</th><th>Recorded by</th><th>Status</th><th class="number">Amount</th><th></th></tr></thead><tbody>
-                @for (expense of filteredRows(); track expense.id) { <tr [class.voided-row]="expense.status === 'voided'"><td><strong>{{ expense.title }}</strong><small>{{ expense.expenseDate | date:'mediumDate' }} · {{ statusLabel(expense.category) }}</small></td><td>{{ expense.payee || 'Not specified' }}<small>{{ methodLabel(expense.paymentMethod) }} · {{ expense.referenceNumber || 'No reference' }}</small></td><td>{{ expense.costCenter || 'General operations' }}</td><td>{{ userName(expense.createdByUser) }}</td><td><span class="status" [class.status--voided]="expense.status === 'voided'">{{ statusLabel(expense.status) }}</span><small>{{ expense.voidReason }}</small></td><td class="number money-value">{{ money(expense.amount) }}</td><td class="actions">@if (expenseCanVoid(expense)) { <button type="button" class="text-action danger" (click)="requestVoid(expense.id, 'expense', expense.title)">Void</button> }</td></tr> }
+                @for (expense of filteredRows(); track expense.id) { <tr [class.voided-row]="expense.status === 'voided'"><td><strong>{{ expense.title }}</strong><small>{{ expense.expenseDate | date:'mediumDate' }} · {{ statusLabel(expense.category) }}</small></td><td>{{ expense.payee || 'Not specified' }}<small>{{ methodLabel(expense.paymentMethod) }} · {{ expense.referenceNumber || 'No reference' }}</small></td><td>{{ expense.costCenter || 'General operations' }}</td><td>{{ userName(expense.createdByUser) }}</td><td><span class="status" [class.status--voided]="expense.status === 'voided'">{{ statusLabel(expense.status) }}</span><small>{{ expense.voidReason }}</small></td><td class="number money-value">{{ money(expense.amount) }}</td><td class="actions">@if (expense.reversals?.length) { <span class="status">Reversal {{ expense.reversals[0].status }}</span> } @else { @if (expenseCanVoid(expense)) { <button type="button" class="text-action danger" (click)="requestVoid(expense.id, 'expense', expense.title)">Void</button><button type="button" class="text-action" (click)="requestVoid(expense.id, 'expense', expense.title, 'reversal')">Request reversal</button> } }</td></tr> }
+              </tbody></table>
+            } @else if (activeTab() === 'periods') {
+              <table><thead><tr><th>Locked period</th><th>Reason</th><th>Locked by</th><th>Locked at</th><th>Status</th></tr></thead><tbody>
+                @for (period of filteredRows(); track period.id) { <tr><td><strong>{{ period.startDate | date:'mediumDate':'UTC' }} — {{ period.endDate | date:'mediumDate':'UTC' }}</strong></td><td>{{ period.reason }}</td><td>{{ userName(period.lockedByUser) }}</td><td>{{ period.createdAt | date:'medium' }}</td><td><span class="status">Locked</span></td></tr> }
+              </tbody></table>
+            } @else if (activeTab() === 'reversals') {
+              <table><thead><tr><th>Original entry</th><th>Reason</th><th>Requested / reviewed by</th><th>Posted date</th><th>Status</th><th class="number">Amount</th><th>Review</th></tr></thead><tbody>
+                @for (reversal of filteredRows(); track reversal.id) { <tr><td><strong>{{ statusLabel(reversal.entityType) }}</strong><small>{{ reversal.entityId }}</small><small>{{ reversal.sourceDate | date:'mediumDate' }}</small></td><td>{{ reversal.reason }}<small>{{ reversal.reviewReason }}</small></td><td>{{ userName(reversal.requestedByUser) }}<small>{{ reversal.reviewedByUser ? userName(reversal.reviewedByUser) : 'Awaiting independent review' }}</small></td><td>{{ reversal.postedAt ? (reversal.postedAt | date:'medium') : 'Not posted' }}</td><td><span class="status" [class.status--voided]="reversal.status === 'rejected'">{{ statusLabel(reversal.status) }}</span></td><td class="number money-value">{{ money(reversal.amount) }}</td><td class="actions">@if (canReviewReversal(reversal)) { <button type="button" class="text-action" (click)="openReversalReview(reversal, true)">Review approval</button><button type="button" class="text-action danger" (click)="openReversalReview(reversal, false)">Reject</button> }</td></tr> }
               </tbody></table>
             } @else if (activeTab() === 'audit-logs') {
               <table><thead><tr><th>Action</th><th>Entity</th><th>Performed by</th><th>Timestamp</th><th>Evidence</th></tr></thead><tbody>
@@ -182,11 +197,12 @@
 @if (voidTarget(); as target) {
   <div class="modal-backdrop" (click)="voidTarget.set(null)"></div>
   <section class="modal modal--compact" role="dialog" aria-modal="true" aria-labelledby="void-title">
-    <header><div><span class="eyebrow danger-text">Controlled reversal</span><h2 id="void-title">Void {{ target.label }}</h2></div><button type="button" class="icon-button" (click)="voidTarget.set(null)" aria-label="Close void dialog">×</button></header>
+    <header><div><span class="eyebrow danger-text">Controlled reversal</span><h2 id="void-title">{{ correctionMode() === 'reversal' ? 'Request reversal for' : 'Void' }} {{ target.label }}</h2></div><button type="button" class="icon-button" (click)="voidTarget.set(null)" aria-label="Close void dialog">×</button></header>
     <div class="form-grid"><label class="wide"><span>Detailed reason *</span><textarea rows="4" [ngModel]="voidReason()" (ngModelChange)="voidReason.set($event)" placeholder="Explain why this record must be reversed"></textarea></label>
       @if (target.type === 'pharmacy') { <p class="wide void-note">Returned stock is quarantined automatically and must be inspected before release.</p> }
+      @if (correctionMode() === 'reversal') { <p class="wide void-note">For closed shifts or locked periods, another authorised user must approve this correction. The original receipt and closure remain unchanged. Handle any refund separately.</p> }
     </div>
-    <footer><button type="button" class="button button--quiet" (click)="voidTarget.set(null)">Cancel</button><button type="button" class="button button--danger" [disabled]="voidReason().trim().length < 5 || voidSaving()" (click)="confirmVoid()">{{ voidSaving() ? 'Voiding…' : 'Confirm void' }}</button></footer>
+    <footer><button type="button" class="button button--quiet" (click)="voidTarget.set(null)">Cancel</button><button type="button" class="button button--danger" [disabled]="voidReason().trim().length < 5 || voidSaving()" (click)="confirmVoid()">{{ voidSaving() ? 'Saving…' : correctionMode() === 'reversal' ? 'Submit request' : 'Confirm void' }}</button></footer>
   </section>
 }
 
@@ -205,4 +221,33 @@
       </div>
     }
   </aside>
+}
+
+@if (periodModalOpen()) {
+  <div class="modal-backdrop"></div>
+  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="period-title" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" (keydown.escape)="!periodSaving() && periodModalOpen.set(false)">
+    <header><div><span class="eyebrow">Close the books</span><h2 id="period-title">Lock accounting period</h2></div><button type="button" class="icon-button" [disabled]="periodSaving()" (click)="periodModalOpen.set(false)" aria-label="Close period form">×</button></header>
+    <div class="form-grid">
+      @if (errorMessage()) { <div class="notice notice--error wide" role="alert">{{ errorMessage() }}</div> }
+      <label><span>From *</span><input type="date" [max]="yesterday" [ngModel]="periodForm().startDate" (ngModelChange)="updatePeriodField('startDate', $event)" /></label>
+      <label><span>To *</span><input type="date" [max]="yesterday" [ngModel]="periodForm().endDate" (ngModelChange)="updatePeriodField('endDate', $event)" /></label>
+      <label class="wide"><span>Closing note *</span><textarea rows="3" maxlength="1000" [ngModel]="periodForm().reason" (ngModelChange)="updatePeriodField('reason', $event)"></textarea></label>
+      <p class="wide void-note">Close and reconcile all shifts first. Locking is permanent. Backdated postings and edits are blocked. Corrections require independent approval in the current period.</p>
+    </div>
+    <footer><button type="button" class="button button--quiet" [disabled]="periodSaving()" (click)="periodModalOpen.set(false)">Cancel</button><button type="button" class="button button--primary" [disabled]="!periodForm().startDate || !periodForm().endDate || periodForm().reason.trim().length < 5 || periodSaving()" (click)="savePeriod()">{{ periodSaving() ? 'Locking…' : 'Lock period' }}</button></footer>
+  </section>
+}
+
+@if (reviewTarget(); as target) {
+  <div class="modal-backdrop"></div>
+  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="review-title" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" (keydown.escape)="!reviewSaving() && reviewTarget.set(null)">
+    <header><div><span class="eyebrow">Independent review</span><h2 id="review-title">{{ target.approve ? 'Approve' : 'Reject' }} reversal</h2></div><button type="button" class="icon-button" [disabled]="reviewSaving()" (click)="reviewTarget.set(null)" aria-label="Close reversal review">×</button></header>
+    <div class="form-grid">@if (errorMessage()) { <div class="notice notice--error wide" role="alert">{{ errorMessage() }}</div> }<p class="wide">{{ statusLabel(target.record.entityType) }} · {{ money(target.record.amount) }}<br />{{ target.record.reason }}</p>
+      @if (target.approve) {
+        <p class="wide void-note">Approval posts the correction today and preserves the original entry and closure. Confirm any refund or reimbursement has been handled separately.</p>
+        @if (target.record.entityType === 'pharmacy') { <p class="wide void-note">Confirm the full quantity has physically returned. All returned items will enter quarantine.</p> }
+      } @else { <label class="wide"><span>Rejection reason *</span><textarea rows="3" maxlength="1000" [ngModel]="reviewReason()" (ngModelChange)="reviewReason.set($event)"></textarea></label> }
+    </div>
+    <footer><button type="button" class="button button--quiet" [disabled]="reviewSaving()" (click)="reviewTarget.set(null)">Cancel</button><button type="button" class="button button--primary" [disabled]="reviewSaving() || (!target.approve && reviewReason().trim().length < 5)" (click)="confirmReversalReview()">{{ reviewSaving() ? 'Saving…' : target.approve ? 'Approve and post' : 'Reject request' }}</button></footer>
+  </section>
 }

@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { PaymentAttemptService, PaymentOperation, PendingPayment } from './payment-attempt.service';
 
 const getApiUrl = () => {
   if (typeof window !== 'undefined') {
@@ -18,6 +19,11 @@ const API_URL = getApiUrl();
 })
 export class ApiService {
   private readonly http = inject(HttpClient);
+  private readonly paymentAttempts = inject(PaymentAttemptService);
+
+  pendingPayments(operation: PaymentOperation, targetId?: string): PendingPayment[] {
+    return this.paymentAttempts.pending(operation, targetId);
+  }
 
   private idempotencyOptions(): { headers: Record<string, string> } {
     return { headers: { 'Idempotency-Key': this.createIdempotencyKey() } };
@@ -242,7 +248,9 @@ export class ApiService {
   }
 
   payInvoice(visitId: string, data: any): Observable<any> {
-    return this.http.post<any>(`${API_URL}/visits/${visitId}/invoice/pay`, data, this.idempotencyOptions());
+    return this.paymentAttempts.perform('clinic', visitId, data,
+      (key, payload) => this.http.post<any>(`${API_URL}/visits/${visitId}/invoice/pay`, payload, { headers: { 'Idempotency-Key': key } }),
+      (response) => Boolean(response?.payment?.id && response?.invoice?.id));
   }
 
   getActiveClinicCashSession(): Observable<any> {
@@ -344,7 +352,9 @@ export class ApiService {
   }
 
   recordPharmacySupplierPayment(data: any): Observable<any> {
-    return this.http.post<any>(`${API_URL}/pharmacy/supplier-payments`, data, this.idempotencyOptions());
+    return this.paymentAttempts.perform('supplier', String(data.invoiceId ?? ''), data,
+      (key, payload, locationId) => this.http.post<any>(`${API_URL}/pharmacy/supplier-payments`, payload, { headers: { 'Idempotency-Key': key, 'X-Pharmacy-Location-Id': locationId } }),
+      (response) => Boolean(response?.id));
   }
 
   getPharmacyPurchaseReturns(supplierId = ''): Observable<any[]> {
@@ -444,7 +454,9 @@ export class ApiService {
   }
 
   processPharmacySale(data: any): Observable<any> {
-    return this.http.post<any>(`${API_URL}/pharmacy/sales`, data, this.idempotencyOptions());
+    return this.paymentAttempts.perform('pharmacy', '', data,
+      (key, payload, locationId) => this.http.post<any>(`${API_URL}/pharmacy/sales`, payload, { headers: { 'Idempotency-Key': key, 'X-Pharmacy-Location-Id': locationId } }),
+      (response) => Boolean(response?.id));
   }
 
   getRecentPharmacySales(limit = 30): Observable<any[]> {
@@ -570,6 +582,30 @@ export class ApiService {
 
   voidExpense(id: string, reason: string): Observable<any> {
     return this.http.post<any>(`${API_URL}/expenses/${id}/void`, { reason });
+  }
+
+  getAccountingPeriods(page = 1, limit = 50): Observable<any> {
+    return this.http.get<any>(`${API_URL}/accounting/periods`, { params: { page, limit } });
+  }
+
+  lockAccountingPeriod(data: { startDate: string; endDate: string; reason: string }): Observable<any> {
+    return this.http.post<any>(`${API_URL}/accounting/periods/lock`, data, this.idempotencyOptions());
+  }
+
+  getFinancialReversals(page = 1, limit = 50): Observable<any> {
+    return this.http.get<any>(`${API_URL}/accounting/reversals`, { params: { page, limit } });
+  }
+
+  requestFinancialReversal(data: { entityType: string; entityId: string; reason: string }): Observable<any> {
+    return this.http.post<any>(`${API_URL}/accounting/reversals`, data, this.idempotencyOptions());
+  }
+
+  approveFinancialReversal(id: string): Observable<any> {
+    return this.http.post<any>(`${API_URL}/accounting/reversals/${id}/approve`, {}, this.idempotencyOptions());
+  }
+
+  rejectFinancialReversal(id: string, reason: string): Observable<any> {
+    return this.http.post<any>(`${API_URL}/accounting/reversals/${id}/reject`, { reason }, this.idempotencyOptions());
   }
 
   // --- Financial Integrity / Voids ---

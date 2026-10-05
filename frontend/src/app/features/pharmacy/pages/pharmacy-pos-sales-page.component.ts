@@ -67,6 +67,14 @@ interface CartItem {
         }
       </nav>
 
+      @if (pendingCheckout(); as pending) {
+        <section class="state error" role="status">
+          <strong>Payment confirmation needed</strong>
+          <p>A previous checkout has no confirmed receipt. Recover its original result before starting another sale. Do not collect payment again.</p>
+          <button type="button" class="button" [disabled]="checkoutLoading()" (click)="recoverCheckout()">{{ checkoutLoading() ? 'Recovering…' : 'Recover receipt' }}</button>
+        </section>
+      }
+
       @if (activeTab() === 'sale') {
         <section class="sale-workspace">
           <section class="catalogue-pane">
@@ -228,6 +236,7 @@ export class PharmacyPosSalesPageComponent implements OnInit {
   readonly mobileMoneyReference = signal('');
   readonly cashTendered = signal<number | null>(null);
   readonly checkoutLoading = signal(false);
+  readonly pendingCheckout = computed(() => this.api.pendingPayments('pharmacy')[0] ?? null);
   readonly receiptSale = signal<any | null>(null);
   readonly receiptFromCheckout = signal(false);
   readonly receiptWidth = signal<'58mm' | '80mm'>('80mm');
@@ -261,7 +270,7 @@ export class PharmacyPosSalesPageComponent implements OnInit {
   readonly countedTotal = computed(() => Number(this.cashCounted() ?? 0) + Number(this.momoCounted() ?? 0));
   readonly discrepancy = computed(() => this.countedTotal() - this.expectedTotal());
   readonly canCheckout = computed(() => {
-    if (this.checkoutLoading() || !this.activeSession() || !this.cart().length) return false;
+    if (this.checkoutLoading() || this.pendingCheckout() || !this.activeSession() || !this.cart().length) return false;
     if (this.paymentMethod() === 'mobile_money') return this.mobileMoneyReference().trim().length > 0;
     return this.cashTendered() !== null && Number(this.cashTendered()) >= this.cartTotal();
   });
@@ -405,6 +414,7 @@ export class PharmacyPosSalesPageComponent implements OnInit {
       customerName: this.customerName().trim() || null,
       paymentMethod: this.paymentMethod(),
       referenceNumber: this.mobileMoneyReference().trim() || null,
+      cashTendered: cashTendered ?? null,
       items: this.cart().map((item) => ({ productId: item.productId, quantity: item.quantity })),
     }).subscribe({
       next: (sale) => {
@@ -416,6 +426,19 @@ export class PharmacyPosSalesPageComponent implements OnInit {
         this.toast.error('The server did not return a receipt. Check Transactions before attempting another payment.');
       },
       error: (error) => { this.checkoutLoading.set(false); this.toast.error(error?.error?.message ?? 'Unable to complete sale.'); },
+    });
+  }
+
+  recoverCheckout(): void {
+    const pending = this.pendingCheckout();
+    if (!pending || this.checkoutLoading()) return;
+    this.checkoutLoading.set(true);
+    this.api.processPharmacySale(pending.payload).subscribe({
+      next: (sale) => this.completeCheckout(sale, pending.payload.cashTendered ?? undefined),
+      error: (error) => {
+        this.checkoutLoading.set(false);
+        this.toast.error(error?.error?.message ?? 'The payment is still unconfirmed. Try recovery again; do not collect another payment.');
+      },
     });
   }
 

@@ -15,6 +15,7 @@ import { EmailModule } from './common/email/email.module';
 import { TenantMiddleware } from './common/multitenancy/tenant.middleware';
 import { ExpensesModule } from './expenses/expenses.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { AccountingModule } from './accounting/accounting.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     EmailModule,
     ExpensesModule,
     NotificationsModule,
+    AccountingModule,
   ],
   controllers: [AppController],
   providers: [AppService],
