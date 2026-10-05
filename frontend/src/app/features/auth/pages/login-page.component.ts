@@ -4,10 +4,11 @@ import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { SessionService } from '../../../core/auth/session.service';
+import { AuthShellComponent } from '../ui/auth-shell.component';
 
 @Component({
   selector: 'app-login-page',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, AuthShellComponent],
   templateUrl: './login-page.component.html',
   styleUrl: './login-page.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -21,10 +22,12 @@ export class LoginPageComponent {
   readonly isSubmitting = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly successMessage = signal<string | null>(null);
+  readonly showLoginPassword = signal(false);
+  readonly showRegisterPassword = signal(false);
 
   readonly loginForm = this.formBuilder.nonNullable.group({
     email: ['', [Validators.required]],
-    password: ['', [Validators.required, Validators.minLength(4)]]
+    password: ['', [Validators.required, Validators.minLength(6)]]
   });
 
   readonly registerForm = this.formBuilder.nonNullable.group({
@@ -48,15 +51,22 @@ export class LoginPageComponent {
     }
   }
 
-  // Auto-generate slug when clinic name changes
   onClinicNameChange(name: string): void {
     const slug = name
       .toLowerCase()
       .trim()
-      .replace(/[^a-z0-9\s-]/g, '') // remove special characters
-      .replace(/\s+/g, '-')          // replace spaces with hyphens
-      .replace(/-+/g, '-');          // remove consecutive hyphens
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-');
     this.registerForm.patchValue({ clinicSlug: slug });
+  }
+
+  toggleLoginPassword(): void {
+    this.showLoginPassword.update((visible) => !visible);
+  }
+
+  toggleRegisterPassword(): void {
+    this.showRegisterPassword.update((visible) => !visible);
   }
 
   async submitLogin(): Promise<void> {
@@ -78,11 +88,10 @@ export class LoginPageComponent {
         })
       );
 
-      // Redirect to designated dashboard
       await this.router.navigateByUrl(this.session.getDefaultRoute(sessionUser.role));
     } catch (err: any) {
       console.error('Login error:', err);
-      const msg = err?.error?.message ?? 'Failed to authenticate clinician credentials.';
+      const msg = err?.error?.message ?? 'We could not sign you in. Check your details and try again.';
       this.errorMessage.set(Array.isArray(msg) ? msg[0] : msg);
     } finally {
       this.isSubmitting.set(false);
@@ -112,10 +121,9 @@ export class LoginPageComponent {
         })
       );
 
-      // Pre-populate login email and toggle back to login screen
       this.loginForm.patchValue({ email: formValue.adminEmail });
       this.mode.set('login');
-      this.successMessage.set(`New clinic "${formValue.clinicName}" registered successfully! Please log in below.`);
+      this.successMessage.set(`${formValue.clinicName} is ready. Sign in with your administrator account.`);
     } catch (err: any) {
       console.error('Clinic registration error:', err);
       const msg = err?.error?.message ?? 'Failed to complete clinic registration.';

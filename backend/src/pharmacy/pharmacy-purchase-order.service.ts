@@ -1,7 +1,9 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { getInternetDate } from '../common/clock';
 import * as crypto from 'crypto';
+import { ensureNonNegativeMoney, ensurePositiveMoney, formatMoney, zeroMoney } from '../common/money';
 
 @Injectable()
 export class PharmacyPurchaseOrderService {
@@ -122,8 +124,8 @@ export class PharmacyPurchaseOrderService {
           actionType: 'update',
           entityType: 'pharmacy_purchase_order',
           entityId: orderId,
-          beforeData: JSON.stringify({ supplierId: order.supplierId, total: Number(order.total), status: order.status }),
-          afterData: JSON.stringify({ supplierId: supplier.id, total: normalized.total, status: 'draft' }),
+          beforeData: JSON.stringify({ supplierId: order.supplierId, total: formatMoney(order.total), status: order.status }),
+          afterData: JSON.stringify({ supplierId: supplier.id, total: formatMoney(normalized.total), status: 'draft' }),
           actorUserId: userId,
         },
       });
@@ -200,13 +202,12 @@ export class PharmacyPurchaseOrderService {
     const lines = sourceLines.map((line: any, index: number) => {
       const orderedPacks = Number(line.orderedPacks);
       const unitsPerPack = Number(line.unitsPerPack);
-      const unitCostPerPack = Number(line.unitCostPerPack);
-      const discountAmount = Number(line.discountAmount ?? 0);
-      const taxAmount = Number(line.taxAmount ?? 0);
       if (!Number.isFinite(orderedPacks) || !Number.isFinite(unitsPerPack) || orderedPacks <= 0 || unitsPerPack <= 0) throw new BadRequestException(`Line ${index + 1}: pack quantities must be greater than zero`);
-      if (![unitCostPerPack, discountAmount, taxAmount].every(Number.isFinite) || unitCostPerPack <= 0 || discountAmount < 0 || taxAmount < 0) throw new BadRequestException(`Line ${index + 1}: cost must be positive and adjustments cannot be negative`);
-      const subtotal = orderedPacks * unitCostPerPack;
-      if (discountAmount > subtotal) throw new BadRequestException(`Line ${index + 1}: discount cannot exceed the line subtotal`);
+      const unitCostPerPack = ensurePositiveMoney(line.unitCostPerPack, `Line ${index + 1} pack cost`);
+      const discountAmount = ensureNonNegativeMoney(line.discountAmount ?? 0, `Line ${index + 1} discount`);
+      const taxAmount = ensureNonNegativeMoney(line.taxAmount ?? 0, `Line ${index + 1} tax`);
+      const subtotal = unitCostPerPack.times(orderedPacks).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+      if (discountAmount.gt(subtotal)) throw new BadRequestException(`Line ${index + 1}: discount cannot exceed the line subtotal`);
       return {
         productId: productIds[index],
         purchaseUnit: String(line.purchaseUnit ?? 'box').trim().toLowerCase() || 'box',
@@ -216,7 +217,7 @@ export class PharmacyPurchaseOrderService {
         unitCostPerPack,
         discountAmount,
         taxAmount,
-        lineTotal: subtotal - discountAmount + taxAmount,
+        lineTotal: subtotal.minus(discountAmount).plus(taxAmount).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP),
       };
     });
     const orderDate = data.orderDate ? new Date(data.orderDate) : getInternetDate();
@@ -229,10 +230,10 @@ export class PharmacyPurchaseOrderService {
       expectedDeliveryDate,
       notes: data.notes ? String(data.notes).trim() : null,
       lines,
-      subtotal: lines.reduce((sum, line) => sum + line.orderedPacks * line.unitCostPerPack, 0),
-      discountTotal: lines.reduce((sum, line) => sum + line.discountAmount, 0),
-      taxTotal: lines.reduce((sum, line) => sum + line.taxAmount, 0),
-      total: lines.reduce((sum, line) => sum + line.lineTotal, 0),
+      subtotal: lines.reduce((sum, line) => sum.plus(line.unitCostPerPack.times(line.orderedPacks)), zeroMoney()),
+      discountTotal: lines.reduce((sum, line) => sum.plus(line.discountAmount), zeroMoney()),
+      taxTotal: lines.reduce((sum, line) => sum.plus(line.taxAmount), zeroMoney()),
+      total: lines.reduce((sum, line) => sum.plus(line.lineTotal), zeroMoney()),
     };
   }
 

@@ -4,10 +4,11 @@ import { BillingController, BillingSessionsController } from './billing.controll
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { IdempotencyService } from '../common/idempotency.service';
 
 @Module({
   imports: [PrismaModule, AuthModule, NotificationsModule],
-  providers: [BillingService],
+  providers: [BillingService, IdempotencyService],
   controllers: [BillingController, BillingSessionsController],
   exports: [BillingService],
 })

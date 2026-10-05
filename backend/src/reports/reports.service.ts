@@ -1,7 +1,9 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { getInternetDate } from '../common/clock';
 import { buildDateRange } from '../common/date-range';
+import { formatMoney, moneyToNumber, optionalMoney, zeroMoney } from '../common/money';
 
 const DEFAULT_REPORT_DAYS = 31;
 const MAX_REPORT_DAYS = 366;
@@ -117,28 +119,28 @@ export class ReportsService {
       }),
     ]);
 
-    const clinicTotal = clinicPayments.reduce((sum, p) => sum + Number(p.amount), 0);
-    const pharmacyTotal = pharmacySales.reduce((sum, s) => sum + Number(s.total), 0);
-    const combinedTotal = clinicTotal + pharmacyTotal;
+    const clinicTotalDecimal = this.sumMoney(clinicPayments, (p) => p.amount);
+    const pharmacyTotalDecimal = this.sumMoney(pharmacySales, (s) => s.total);
+    const combinedTotalDecimal = clinicTotalDecimal.plus(pharmacyTotalDecimal);
     let missingCostLines = 0;
-    const pharmacyCogs = pharmacySales.reduce((saleSum, sale) => saleSum + (sale.items ?? []).reduce((itemSum: number, item: any) => {
+    const pharmacyCogsDecimal = pharmacySales.reduce((saleSum: Prisma.Decimal, sale) => saleSum.plus((sale.items ?? []).reduce((itemSum: Prisma.Decimal, item: any) => {
       if (item.unitCost === null || item.unitCost === undefined) missingCostLines += 1;
-      return itemSum + Number(item.unitCost ?? 0) * Number(item.quantity ?? 0);
-    }, 0), 0);
-    const pharmacyGrossProfit = pharmacyTotal - pharmacyCogs;
+      return itemSum.plus(optionalMoney(item.unitCost ?? 0).times(Number(item.quantity ?? 0)));
+    }, zeroMoney())), zeroMoney());
+    const pharmacyGrossProfitDecimal = pharmacyTotalDecimal.minus(pharmacyCogsDecimal);
 
-    let clinicCash = 0;
-    let clinicMomo = 0;
+    let clinicCashDecimal = zeroMoney();
+    let clinicMomoDecimal = zeroMoney();
     clinicPayments.forEach((p) => {
-      if (p.paymentMethod === 'cash') clinicCash += Number(p.amount);
-      else clinicMomo += Number(p.amount);
+      if (p.paymentMethod === 'cash') clinicCashDecimal = clinicCashDecimal.plus(optionalMoney(p.amount));
+      else clinicMomoDecimal = clinicMomoDecimal.plus(optionalMoney(p.amount));
     });
 
-    let pharmacyCash = 0;
-    let pharmacyMomo = 0;
+    let pharmacyCashDecimal = zeroMoney();
+    let pharmacyMomoDecimal = zeroMoney();
     pharmacySales.forEach((s) => {
-      if (s.paymentMethod === 'cash') pharmacyCash += Number(s.total);
-      else pharmacyMomo += Number(s.total);
+      if (s.paymentMethod === 'cash') pharmacyCashDecimal = pharmacyCashDecimal.plus(optionalMoney(s.total));
+      else pharmacyMomoDecimal = pharmacyMomoDecimal.plus(optionalMoney(s.total));
     });
 
     const chartData = this.buildRevenueTrend(clinicPayments, pharmacySales, dateRange);
@@ -211,17 +213,18 @@ export class ReportsService {
         select: { discrepancy: true },
       }),
     ]);
-    const supplierPaymentsTotal = supplierPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
-    const manualExpensesTotal = manualExpenses
-      .filter((expense) => expense.category !== 'supplier_payment')
-      .reduce((sum, expense) => sum + Number(expense.amount), 0);
+    const supplierPaymentsTotalDecimal = this.sumMoney(supplierPayments, (payment) => payment.amount);
+    const manualExpensesTotalDecimal = this.sumMoney(
+      manualExpenses.filter((expense) => expense.category !== 'supplier_payment'),
+      (expense) => expense.amount,
+    );
 
-    const grossInventoryPurchases = receipts.reduce((sum, receipt) => sum + Number(receipt.totalCost), 0);
-    const purchaseReturnCredits = purchaseReturns.reduce((sum, purchaseReturn) => sum + Number(purchaseReturn.totalCredit), 0);
-    const netInventoryPurchases = grossInventoryPurchases - purchaseReturnCredits;
-    const operatingExpensesTotal = manualExpensesTotal;
-    const estimatedOperatingResult = clinicTotal + pharmacyGrossProfit - operatingExpensesTotal;
-    const cashOutflowsTotal = manualExpensesTotal + supplierPaymentsTotal;
+    const grossInventoryPurchasesDecimal = this.sumMoney(receipts, (receipt) => receipt.totalCost);
+    const purchaseReturnCreditsDecimal = this.sumMoney(purchaseReturns, (purchaseReturn) => purchaseReturn.totalCredit);
+    const netInventoryPurchasesDecimal = grossInventoryPurchasesDecimal.minus(purchaseReturnCreditsDecimal);
+    const operatingExpensesTotalDecimal = manualExpensesTotalDecimal;
+    const estimatedOperatingResultDecimal = clinicTotalDecimal.plus(pharmacyGrossProfitDecimal).minus(operatingExpensesTotalDecimal);
+    const cashOutflowsTotalDecimal = manualExpensesTotalDecimal.plus(supplierPaymentsTotalDecimal);
 
     const lowStockAlerts: any[] = [];
     const expiryAlerts: any[] = [];
@@ -267,7 +270,25 @@ export class ReportsService {
     });
 
     const discrepancyCount = [...clinicClosures, ...pharmacyClosures]
-      .filter((closure) => Math.abs(Number(closure.discrepancy ?? 0)) > 0.01).length;
+      .filter((closure) => optionalMoney(closure.discrepancy ?? 0).abs().gt(0)).length;
+
+    const clinicTotal = moneyToNumber(clinicTotalDecimal);
+    const pharmacyTotal = moneyToNumber(pharmacyTotalDecimal);
+    const combinedTotal = moneyToNumber(combinedTotalDecimal);
+    const pharmacyCogs = moneyToNumber(pharmacyCogsDecimal);
+    const pharmacyGrossProfit = moneyToNumber(pharmacyGrossProfitDecimal);
+    const clinicCash = moneyToNumber(clinicCashDecimal);
+    const clinicMomo = moneyToNumber(clinicMomoDecimal);
+    const pharmacyCash = moneyToNumber(pharmacyCashDecimal);
+    const pharmacyMomo = moneyToNumber(pharmacyMomoDecimal);
+    const supplierPaymentsTotal = moneyToNumber(supplierPaymentsTotalDecimal);
+    const manualExpensesTotal = moneyToNumber(manualExpensesTotalDecimal);
+    const grossInventoryPurchases = moneyToNumber(grossInventoryPurchasesDecimal);
+    const purchaseReturnCredits = moneyToNumber(purchaseReturnCreditsDecimal);
+    const netInventoryPurchases = moneyToNumber(netInventoryPurchasesDecimal);
+    const operatingExpensesTotal = moneyToNumber(operatingExpensesTotalDecimal);
+    const estimatedOperatingResult = moneyToNumber(estimatedOperatingResultDecimal);
+    const cashOutflowsTotal = moneyToNumber(cashOutflowsTotalDecimal);
 
     return {
       clinicTotal,
@@ -313,17 +334,17 @@ export class ReportsService {
     const defaultStart = new Date(end);
     defaultStart.setUTCDate(defaultStart.getUTCDate() - 6);
     const start = requestedStart && end.getTime() - requestedStart.getTime() <= 13 * 86_400_000 ? requestedStart : defaultStart;
-    const totalsByDay = new Map<string, { clinic: number; pharmacy: number }>();
+    const totalsByDay = new Map<string, { clinic: Prisma.Decimal; pharmacy: Prisma.Decimal }>();
     clinicPayments.forEach((payment) => {
       const key = new Date(payment.paidAt).toISOString().slice(0, 10);
-      const totals = totalsByDay.get(key) ?? { clinic: 0, pharmacy: 0 };
-      totals.clinic += Number(payment.amount);
+      const totals = totalsByDay.get(key) ?? { clinic: zeroMoney(), pharmacy: zeroMoney() };
+      totals.clinic = totals.clinic.plus(optionalMoney(payment.amount));
       totalsByDay.set(key, totals);
     });
     pharmacySales.forEach((sale) => {
       const key = new Date(sale.paidAt).toISOString().slice(0, 10);
-      const totals = totalsByDay.get(key) ?? { clinic: 0, pharmacy: 0 };
-      totals.pharmacy += Number(sale.total);
+      const totals = totalsByDay.get(key) ?? { clinic: zeroMoney(), pharmacy: zeroMoney() };
+      totals.pharmacy = totals.pharmacy.plus(optionalMoney(sale.total));
       totalsByDay.set(key, totals);
     });
     const points: any[] = [];
@@ -333,9 +354,9 @@ export class ReportsService {
     finalDay.setUTCHours(23, 59, 59, 999);
     while (cursor <= finalDay && points.length < 14) {
       const dayStart = new Date(cursor);
-      const totals = totalsByDay.get(dayStart.toISOString().slice(0, 10)) ?? { clinic: 0, pharmacy: 0 };
-      const clinic = totals.clinic;
-      const pharmacy = totals.pharmacy;
+      const totals = totalsByDay.get(dayStart.toISOString().slice(0, 10)) ?? { clinic: zeroMoney(), pharmacy: zeroMoney() };
+      const clinic = moneyToNumber(totals.clinic);
+      const pharmacy = moneyToNumber(totals.pharmacy);
       points.push({
         label: dayStart.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' }),
         date: dayStart.toISOString().slice(0, 10),
@@ -400,9 +421,9 @@ export class ReportsService {
       const pharmacySalesToday = await this.prisma.pharmacySale.findMany({
         where: { status: 'paid', paidAt: { gte: startOfToday, lte: endOfToday } },
       });
-      const clinicRev = clinicPaymentsToday.reduce((sum, p) => sum + Number(p.amount), 0);
-      const pharmRev = pharmacySalesToday.reduce((sum, s) => sum + Number(s.total), 0);
-      const totalRev = clinicRev + pharmRev;
+      const clinicRev = this.sumMoney(clinicPaymentsToday, (p) => p.amount);
+      const pharmRev = this.sumMoney(pharmacySalesToday, (s) => s.total);
+      const totalRev = clinicRev.plus(pharmRev);
 
       const pendingReviews = await this.prisma.visitService.count({
         where: { status: 'pending', visit: { status: { not: 'deleted' } } },
@@ -410,7 +431,7 @@ export class ReportsService {
 
       stats['activeStaff'] = String(staffCount);
       stats['configuredServices'] = String(servicesCount);
-      stats['todayRevenue'] = totalRev.toFixed(2);
+      stats['todayRevenue'] = formatMoney(totalRev);
       stats['pendingReviews'] = String(pendingReviews);
 
       const clinicPaymentsWeek = await this.prisma.clinicPayment.findMany({
@@ -468,7 +489,7 @@ export class ReportsService {
       });
       recentServices.forEach((s) => {
         activities.push({
-          title: `Price config modified for "${s.name}" (₵${Number(s.price).toFixed(2)})`,
+          title: `Price config modified for "${s.name}" (₵${formatMoney(s.price)})`,
           time: this.getRelativeTime(s.updatedAt),
           status: 'success',
           statusLabel: 'Done',
@@ -570,7 +591,7 @@ export class ReportsService {
       recentPayments.forEach((p) => {
         if (p.invoice?.visit?.patient) {
           activities.push({
-            title: `Invoice #${p.invoice.invoiceNumber?.slice(-6)?.toUpperCase() || '10492'} payment processed via ${p.paymentMethod === 'cash' ? 'Cash' : 'MoMo'} (₵${Number(p.amount).toFixed(2)})`,
+            title: `Invoice #${p.invoice.invoiceNumber?.slice(-6)?.toUpperCase() || '10492'} payment processed via ${p.paymentMethod === 'cash' ? 'Cash' : 'MoMo'} (₵${formatMoney(p.amount)})`,
             time: this.getRelativeTime(p.paidAt),
             status: 'success',
             statusLabel: 'Paid',
@@ -883,7 +904,7 @@ export class ReportsService {
       recentSales.forEach((s) => {
         const itemName = s.items?.[0]?.itemName || 'Paracetamol 500mg';
         activities.push({
-          title: `POS Walk-in sale complete (${itemName} - ₵${Number(s.total).toFixed(2)})`,
+          title: `POS Walk-in sale complete (${itemName} - ₵${formatMoney(s.total)})`,
           time: this.getRelativeTime(s.paidAt),
           status: 'success',
           statusLabel: 'Sold',
@@ -906,12 +927,12 @@ export class ReportsService {
       const clinicPaymentsToday = await this.prisma.clinicPayment.findMany({
         where: { status: { not: 'voided' }, paidAt: { gte: startOfToday, lte: endOfToday } },
       });
-      const clinicStream = clinicPaymentsToday.reduce((sum, p) => sum + Number(p.amount), 0);
+      const clinicStream = this.sumMoney(clinicPaymentsToday, (p) => p.amount);
 
       const pharmacySalesToday = await this.prisma.pharmacySale.findMany({
         where: { status: 'paid', paidAt: { gte: startOfToday, lte: endOfToday } },
       });
-      const pharmacyStream = pharmacySalesToday.reduce((sum, s) => sum + Number(s.total), 0);
+      const pharmacyStream = this.sumMoney(pharmacySalesToday, (s) => s.total);
 
       const dailyClosures = await this.prisma.pharmacyDailyClosure.count({
         where: { status: 'closed', closureDate: { gte: startOfToday, lte: endOfToday } },
@@ -925,10 +946,10 @@ export class ReportsService {
         select: { discrepancy: true },
       });
       const reconciliationExceptions = [...clinicClosures, ...pharmacyClosures]
-        .filter((closure) => Math.abs(Number(closure.discrepancy ?? 0)) > 0.01).length;
+        .filter((closure) => optionalMoney(closure.discrepancy ?? 0).abs().gt(0)).length;
 
-      stats['clinicStream'] = clinicStream.toFixed(2);
-      stats['pharmacyStream'] = pharmacyStream.toFixed(2);
+      stats['clinicStream'] = formatMoney(clinicStream);
+      stats['pharmacyStream'] = formatMoney(pharmacyStream);
       stats['reconciliationExceptions'] = String(reconciliationExceptions);
       stats['dailyClosures'] = String(dailyClosures + clinicClosures.length);
 
@@ -975,7 +996,7 @@ export class ReportsService {
       recentClinicPayments.forEach((p) => {
         if (p.invoice?.visit?.patient) {
           activities.push({
-            title: `Clinic payment received for ${p.invoice.visit.patient.firstName} ${p.invoice.visit.patient.surname} (GHS ${Number(p.amount).toFixed(2)})`,
+            title: `Clinic payment received for ${p.invoice.visit.patient.firstName} ${p.invoice.visit.patient.surname} (GHS ${formatMoney(p.amount)})`,
             time: this.getRelativeTime(p.paidAt),
             status: 'success',
             statusLabel: 'Paid',
@@ -985,7 +1006,7 @@ export class ReportsService {
       });
       recentPharmSales.forEach((s) => {
         activities.push({
-          title: `Pharmacy sale ${s.saleNumber} posted (GHS ${Number(s.total).toFixed(2)})`,
+          title: `Pharmacy sale ${s.saleNumber} posted (GHS ${formatMoney(s.total)})`,
           time: this.getRelativeTime(s.paidAt),
           status: 'success',
           statusLabel: 'Posted',
@@ -994,10 +1015,10 @@ export class ReportsService {
       });
       recentClosures.forEach((c) => {
         activities.push({
-          title: `Pharmacy register closed with discrepancy GHS ${Number(c.discrepancy ?? 0).toFixed(2)}`,
+          title: `Pharmacy register closed with discrepancy GHS ${formatMoney(c.discrepancy ?? 0)}`,
           time: this.getRelativeTime(c.createdAt),
-          status: Math.abs(Number(c.discrepancy ?? 0)) > 0.01 ? 'warning' : 'success',
-          statusLabel: Math.abs(Number(c.discrepancy ?? 0)) > 0.01 ? 'Review' : 'Balanced',
+          status: optionalMoney(c.discrepancy ?? 0).abs().gt(0) ? 'warning' : 'success',
+          statusLabel: optionalMoney(c.discrepancy ?? 0).abs().gt(0) ? 'Review' : 'Balanced',
           timestamp: c.createdAt,
         });
       });
@@ -1060,9 +1081,9 @@ export class ReportsService {
       }
       const updatedPayment = await tx.clinicPayment.findUniqueOrThrow({ where: { id } });
 
-      const newPaid = Math.max(0, Number(payment.invoice.amountPaid) - Number(payment.amount));
-      const newDue = Number(payment.invoice.balanceDue) + Number(payment.amount);
-      const newStatus = newPaid <= 0 ? 'unpaid' : 'partially_paid';
+      const newPaid = Prisma.Decimal.max(zeroMoney(), optionalMoney(payment.invoice.amountPaid).minus(optionalMoney(payment.amount)));
+      const newDue = optionalMoney(payment.invoice.balanceDue).plus(optionalMoney(payment.amount));
+      const newStatus = newPaid.lte(0) ? 'unpaid' : 'partially_paid';
 
       const invoiceUpdate = await tx.clinicInvoice.updateMany({
         where: {
@@ -1093,7 +1114,7 @@ export class ReportsService {
           actionType: 'void',
           entityType: 'clinic_payment_void',
           entityId: id,
-          beforeData: JSON.stringify({ status: payment.status, amount: Number(payment.amount), invoiceId: payment.invoiceId }),
+          beforeData: JSON.stringify({ status: payment.status, amount: formatMoney(payment.amount), invoiceId: payment.invoiceId }),
           afterData: JSON.stringify({ voidReason: normalizedReason, voidedByUserId: userId }),
           actorUserId: userId,
         },
@@ -1118,17 +1139,17 @@ export class ReportsService {
     }
 
     const cashPaymentsTotal = session.payments.reduce(
-      (sum: number, p: any) => p.paymentMethod === 'cash' ? sum + Number(p.amount) : sum,
-      0,
+      (sum: Prisma.Decimal, p: any) => p.paymentMethod === 'cash' ? sum.plus(optionalMoney(p.amount)) : sum,
+      zeroMoney(),
     );
     const momoPaymentsTotal = session.payments.reduce(
-      (sum: number, p: any) => p.paymentMethod === 'mobile_money' ? sum + Number(p.amount) : sum,
-      0,
+      (sum: Prisma.Decimal, p: any) => p.paymentMethod === 'mobile_money' ? sum.plus(optionalMoney(p.amount)) : sum,
+      zeroMoney(),
     );
-    const expectedCash = Number(session.openingFloat ?? 0) + cashPaymentsTotal;
+    const expectedCash = optionalMoney(session.openingFloat ?? 0).plus(cashPaymentsTotal);
     const expectedMomo = momoPaymentsTotal;
-    const totalCounted = Number(session.cashCounted ?? 0) + Number(session.momoCounted ?? 0);
-    const discrepancy = totalCounted - (expectedCash + expectedMomo);
+    const totalCounted = optionalMoney(session.cashCounted ?? 0).plus(optionalMoney(session.momoCounted ?? 0));
+    const discrepancy = totalCounted.minus(expectedCash.plus(expectedMomo));
 
     await tx.clinicCashSession.update({
       where: { id: sessionId },
@@ -1235,7 +1256,7 @@ export class ReportsService {
           actionType: 'void',
           entityType: 'pharmacy_sale_void',
           entityId: id,
-          beforeData: JSON.stringify({ status: sale.status, total: Number(sale.total), closureId: sale.closureId }),
+          beforeData: JSON.stringify({ status: sale.status, total: formatMoney(sale.total), closureId: sale.closureId }),
           afterData: JSON.stringify({ voidReason: normalizedReason, stockDisposition: 'quarantine', voidedByUserId: userId }),
           actorUserId: userId,
         },
@@ -1253,29 +1274,33 @@ export class ReportsService {
     if (!session) return;
 
     const cashSales = session.sales.reduce(
-      (sum: number, sale: any) => sale.paymentMethod === 'cash' ? sum + Number(sale.total) : sum,
-      0,
+      (sum: Prisma.Decimal, sale: any) => sale.paymentMethod === 'cash' ? sum.plus(optionalMoney(sale.total)) : sum,
+      zeroMoney(),
     );
     const momoSales = session.sales.reduce(
-      (sum: number, sale: any) => sale.paymentMethod === 'mobile_money' ? sum + Number(sale.total) : sum,
-      0,
+      (sum: Prisma.Decimal, sale: any) => sale.paymentMethod === 'mobile_money' ? sum.plus(optionalMoney(sale.total)) : sum,
+      zeroMoney(),
     );
-    const expectedCash = Number(session.openingFloat ?? 0) + cashSales;
+    const expectedCash = optionalMoney(session.openingFloat ?? 0).plus(cashSales);
     const expectedMomo = momoSales;
-    const totalCounted = Number(session.cashCounted ?? 0) + Number(session.momoCounted ?? 0);
+    const totalCounted = optionalMoney(session.cashCounted ?? 0).plus(optionalMoney(session.momoCounted ?? 0));
 
     await tx.pharmacyDailyClosure.update({
       where: { id: closureId },
       data: {
         totalSalesCount: session.sales.length,
-        totalSalesAmount: cashSales + momoSales,
+        totalSalesAmount: cashSales.plus(momoSales),
         expectedCash,
         expectedMomo,
         ...(session.status === 'closed'
-          ? { totalCounted, discrepancy: totalCounted - expectedCash - expectedMomo }
+          ? { totalCounted, discrepancy: totalCounted.minus(expectedCash.plus(expectedMomo)) }
           : {}),
       },
     });
+  }
+
+  private sumMoney<T>(items: T[], selector: (item: T) => unknown): Prisma.Decimal {
+    return items.reduce((sum, item) => sum.plus(optionalMoney(selector(item) as any)), zeroMoney());
   }
 
   async getAuditLogs(page: number, limit: number) {

@@ -19,6 +19,17 @@ const API_URL = getApiUrl();
 export class ApiService {
   private readonly http = inject(HttpClient);
 
+  private idempotencyOptions(): { headers: Record<string, string> } {
+    return { headers: { 'Idempotency-Key': this.createIdempotencyKey() } };
+  }
+
+  private createIdempotencyKey(): string {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+      return crypto.randomUUID();
+    }
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  }
+
   // --- Users & Roles ---
   getUsers(page?: number, limit?: number, search?: string): Observable<any> {
     let url = `${API_URL}/users`;
@@ -231,7 +242,7 @@ export class ApiService {
   }
 
   payInvoice(visitId: string, data: any): Observable<any> {
-    return this.http.post<any>(`${API_URL}/visits/${visitId}/invoice/pay`, data);
+    return this.http.post<any>(`${API_URL}/visits/${visitId}/invoice/pay`, data, this.idempotencyOptions());
   }
 
   getActiveClinicCashSession(): Observable<any> {
@@ -239,11 +250,11 @@ export class ApiService {
   }
 
   openClinicCashSession(openingFloat: number): Observable<any> {
-    return this.http.post<any>(`${API_URL}/billing/sessions/open`, { openingFloat });
+    return this.http.post<any>(`${API_URL}/billing/sessions/open`, { openingFloat }, this.idempotencyOptions());
   }
 
   closeClinicCashSession(data: any): Observable<any> {
-    return this.http.post<any>(`${API_URL}/billing/sessions/close`, data);
+    return this.http.post<any>(`${API_URL}/billing/sessions/close`, data, this.idempotencyOptions());
   }
 
   getClinicCashSessions(startDate?: string, endDate?: string): Observable<any[]> {
@@ -289,23 +300,23 @@ export class ApiService {
   }
 
   createPharmacyPurchaseOrder(data: any): Observable<any> {
-    return this.http.post<any>(`${API_URL}/pharmacy/purchase-orders`, data);
+    return this.http.post<any>(`${API_URL}/pharmacy/purchase-orders`, data, this.idempotencyOptions());
   }
 
   updatePharmacyPurchaseOrder(orderId: string, data: any): Observable<any> {
-    return this.http.patch<any>(`${API_URL}/pharmacy/purchase-orders/${orderId}`, data);
+    return this.http.patch<any>(`${API_URL}/pharmacy/purchase-orders/${orderId}`, data, this.idempotencyOptions());
   }
 
   submitPharmacyPurchaseOrder(orderId: string): Observable<any> {
-    return this.http.post<any>(`${API_URL}/pharmacy/purchase-orders/${orderId}/submit`, {});
+    return this.http.post<any>(`${API_URL}/pharmacy/purchase-orders/${orderId}/submit`, {}, this.idempotencyOptions());
   }
 
   approvePharmacyPurchaseOrder(orderId: string): Observable<any> {
-    return this.http.post<any>(`${API_URL}/pharmacy/purchase-orders/${orderId}/approve`, {});
+    return this.http.post<any>(`${API_URL}/pharmacy/purchase-orders/${orderId}/approve`, {}, this.idempotencyOptions());
   }
 
   cancelPharmacyPurchaseOrder(orderId: string): Observable<any> {
-    return this.http.post<any>(`${API_URL}/pharmacy/purchase-orders/${orderId}/cancel`, {});
+    return this.http.post<any>(`${API_URL}/pharmacy/purchase-orders/${orderId}/cancel`, {}, this.idempotencyOptions());
   }
 
   getPharmacyPayablesSummary(): Observable<any> {
@@ -333,7 +344,7 @@ export class ApiService {
   }
 
   recordPharmacySupplierPayment(data: any): Observable<any> {
-    return this.http.post<any>(`${API_URL}/pharmacy/supplier-payments`, data);
+    return this.http.post<any>(`${API_URL}/pharmacy/supplier-payments`, data, this.idempotencyOptions());
   }
 
   getPharmacyPurchaseReturns(supplierId = ''): Observable<any[]> {
@@ -341,7 +352,7 @@ export class ApiService {
   }
 
   recordPharmacyPurchaseReturn(data: any): Observable<any> {
-    return this.http.post<any>(`${API_URL}/pharmacy/purchase-returns`, data);
+    return this.http.post<any>(`${API_URL}/pharmacy/purchase-returns`, data, this.idempotencyOptions());
   }
 
   getPharmacySupplierStatement(supplierId: string, startDate = '', endDate = ''): Observable<any> {
@@ -356,29 +367,29 @@ export class ApiService {
   getPharmacyStockLedger(params: Record<string, string> = {}): Observable<any[]> { const query = new URLSearchParams(params).toString(); return this.http.get<any[]>(`${API_URL}/pharmacy/stock-ledger${query ? `?${query}` : ''}`); }
   getPharmacyStockCounts(): Observable<any[]> { return this.http.get<any[]>(`${API_URL}/pharmacy/stock-counts`); }
   getPharmacyStockCount(id: string): Observable<any> { return this.http.get<any>(`${API_URL}/pharmacy/stock-counts/${id}`); }
-  createPharmacyStockCount(data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/stock-counts`, data); }
+  createPharmacyStockCount(data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/stock-counts`, data, this.idempotencyOptions()); }
   savePharmacyStockCount(id: string, data: any): Observable<any> { return this.http.patch<any>(`${API_URL}/pharmacy/stock-counts/${id}`, data); }
-  submitPharmacyStockCount(id: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/stock-counts/${id}/submit`, {}); }
-  approvePharmacyStockCount(id: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/stock-counts/${id}/approve`, {}); }
+  submitPharmacyStockCount(id: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/stock-counts/${id}/submit`, {}, this.idempotencyOptions()); }
+  approvePharmacyStockCount(id: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/stock-counts/${id}/approve`, {}, this.idempotencyOptions()); }
   getPharmacyStockAdjustments(): Observable<any[]> { return this.http.get<any[]>(`${API_URL}/pharmacy/stock-adjustments`); }
-  requestPharmacyStockAdjustment(data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/stock-adjustments`, data); }
-  approvePharmacyStockAdjustment(id: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/stock-adjustments/${id}/approve`, {}); }
-  rejectPharmacyStockAdjustment(id: string, reason: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/stock-adjustments/${id}/reject`, { reason }); }
+  requestPharmacyStockAdjustment(data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/stock-adjustments`, data, this.idempotencyOptions()); }
+  approvePharmacyStockAdjustment(id: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/stock-adjustments/${id}/approve`, {}, this.idempotencyOptions()); }
+  rejectPharmacyStockAdjustment(id: string, reason: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/stock-adjustments/${id}/reject`, { reason }, this.idempotencyOptions()); }
   getPharmacyTransferSummary(): Observable<any> { return this.http.get<any>(`${API_URL}/pharmacy/transfers/summary`); }
   getPharmacyTransfers(params: Record<string, string> = {}): Observable<any[]> { const query = new URLSearchParams(params).toString(); return this.http.get<any[]>(`${API_URL}/pharmacy/transfers${query ? `?${query}` : ''}`); }
   getPharmacyTransfer(id: string): Observable<any> { return this.http.get<any>(`${API_URL}/pharmacy/transfers/${id}`); }
-  createPharmacyTransfer(data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers`, data); }
-  submitPharmacyTransfer(id: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/submit`, {}); }
-  approvePharmacyTransfer(id: string, data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/approve`, data); }
-  rejectPharmacyTransfer(id: string, reason: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/reject`, { reason }); }
-  dispatchPharmacyTransfer(id: string, data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/dispatch`, data); }
-  receivePharmacyTransfer(id: string, data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/receive`, data); }
-  resolvePharmacyTransfer(id: string, data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/resolve`, data); }
-  cancelPharmacyTransfer(id: string, reason: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/cancel`, { reason }); }
+  createPharmacyTransfer(data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers`, data, this.idempotencyOptions()); }
+  submitPharmacyTransfer(id: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/submit`, {}, this.idempotencyOptions()); }
+  approvePharmacyTransfer(id: string, data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/approve`, data, this.idempotencyOptions()); }
+  rejectPharmacyTransfer(id: string, reason: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/reject`, { reason }, this.idempotencyOptions()); }
+  dispatchPharmacyTransfer(id: string, data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/dispatch`, data, this.idempotencyOptions()); }
+  receivePharmacyTransfer(id: string, data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/receive`, data, this.idempotencyOptions()); }
+  resolvePharmacyTransfer(id: string, data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/resolve`, data, this.idempotencyOptions()); }
+  cancelPharmacyTransfer(id: string, reason: string): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/transfers/${id}/cancel`, { reason }, this.idempotencyOptions()); }
   getPharmacyNetworkStock(search = ''): Observable<any> { return this.http.get<any>(`${API_URL}/pharmacy/network-stock${search ? `?search=${encodeURIComponent(search)}` : ''}`); }
   updatePharmacyInventoryPolicy(locationId: string, productId: string, data: any): Observable<any> { return this.http.patch<any>(`${API_URL}/pharmacy/locations/${locationId}/products/${productId}/inventory-policy`, data); }
   getPharmacyQuarantinedStock(): Observable<any[]> { return this.http.get<any[]>(`${API_URL}/pharmacy/quarantine`); }
-  resolvePharmacyQuarantine(batchId: string, data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/quarantine/${batchId}/resolve`, data); }
+  resolvePharmacyQuarantine(batchId: string, data: any): Observable<any> { return this.http.post<any>(`${API_URL}/pharmacy/quarantine/${batchId}/resolve`, data, this.idempotencyOptions()); }
 
   createPharmacyLocation(data: any): Observable<any> {
     return this.http.post<any>(`${API_URL}/pharmacy/locations`, data);
@@ -425,15 +436,15 @@ export class ApiService {
   }
 
   receivePharmacyStock(data: any): Observable<any> {
-    return this.http.post<any>(`${API_URL}/pharmacy/goods-receipts`, data);
+    return this.http.post<any>(`${API_URL}/pharmacy/goods-receipts`, data, this.idempotencyOptions());
   }
 
   addPharmacyBatch(productId: string, data: any): Observable<any> {
-    return this.http.post<any>(`${API_URL}/pharmacy/products/${productId}/batches`, data);
+    return this.http.post<any>(`${API_URL}/pharmacy/products/${productId}/batches`, data, this.idempotencyOptions());
   }
 
   processPharmacySale(data: any): Observable<any> {
-    return this.http.post<any>(`${API_URL}/pharmacy/sales`, data);
+    return this.http.post<any>(`${API_URL}/pharmacy/sales`, data, this.idempotencyOptions());
   }
 
   getRecentPharmacySales(limit = 30): Observable<any[]> {
@@ -491,7 +502,7 @@ export class ApiService {
   }
 
   closePharmacySales(data: any): Observable<any> {
-    return this.http.post<any>(`${API_URL}/pharmacy/sales/close`, data);
+    return this.http.post<any>(`${API_URL}/pharmacy/sales/close`, data, this.idempotencyOptions());
   }
 
   getPharmacyClosures(startDate?: string, endDate?: string): Observable<any[]> {
@@ -593,7 +604,7 @@ export class ApiService {
   }
 
   openSession(openingFloat: number): Observable<any> {
-    return this.http.post<any>(`${API_URL}/pharmacy/sessions/open`, { openingFloat });
+    return this.http.post<any>(`${API_URL}/pharmacy/sessions/open`, { openingFloat }, this.idempotencyOptions());
   }
 
   deleteVisit(id: string): Observable<any> {

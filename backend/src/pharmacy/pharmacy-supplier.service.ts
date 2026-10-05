@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../common/multitenancy/tenant-context.service';
 import * as crypto from 'crypto';
+import { moneyToNumber, optionalMoney, zeroMoney } from '../common/money';
 
 @Injectable()
 export class PharmacySupplierService {
@@ -25,12 +26,12 @@ export class PharmacySupplierService {
       }),
     ]);
     const totalsBySupplier = new Map(totals.map((total) => [total.supplierId, total]));
-    const balancesBySupplier = new Map<string, { outstanding: number; credit: number }>();
+    const balancesBySupplier = new Map<string, { outstanding: ReturnType<typeof zeroMoney>; credit: ReturnType<typeof zeroMoney> }>();
     for (const invoice of invoices) {
-      const current = balancesBySupplier.get(invoice.supplierId) ?? { outstanding: 0, credit: 0 };
-      const balance = Number(invoice.balanceDue);
-      current.outstanding += Math.max(0, balance);
-      current.credit += Math.max(0, -balance);
+      const current = balancesBySupplier.get(invoice.supplierId) ?? { outstanding: zeroMoney(), credit: zeroMoney() };
+      const balance = optionalMoney(invoice.balanceDue);
+      if (balance.gt(0)) current.outstanding = current.outstanding.plus(balance);
+      if (balance.lt(0)) current.credit = current.credit.plus(balance.negated());
       balancesBySupplier.set(invoice.supplierId, current);
     }
 
@@ -39,10 +40,10 @@ export class PharmacySupplierService {
       return {
         ...supplier,
         receiptCount: summary?._count.id ?? 0,
-        totalPurchases: Number(summary?._sum.totalCost ?? 0),
+        totalPurchases: moneyToNumber(summary?._sum.totalCost ?? 0),
         latestDeliveryAt: summary?._max.receivedAt ?? null,
-        outstandingBalance: balancesBySupplier.get(supplier.id)?.outstanding ?? 0,
-        supplierCredit: balancesBySupplier.get(supplier.id)?.credit ?? 0,
+        outstandingBalance: moneyToNumber(balancesBySupplier.get(supplier.id)?.outstanding ?? 0),
+        supplierCredit: moneyToNumber(balancesBySupplier.get(supplier.id)?.credit ?? 0),
       };
     });
   }
@@ -77,7 +78,7 @@ export class PharmacySupplierService {
       this.prisma.pharmacyGoodsReceipt.aggregate({ where: { supplierId, ...(locationId ? { locationId } : {}) }, _sum: { totalCost: true }, _count: { id: true }, _max: { receivedAt: true } }),
     ]);
 
-    const totalPurchases = Number(purchaseTotal._sum.totalCost ?? 0);
+    const totalPurchases = moneyToNumber(purchaseTotal._sum.totalCost ?? 0);
     const suppliedMedicines = new Map<string, { id: string; productCode: string | null; name: string; receiptCount: number }>();
     for (const receipt of supplier.goodsReceipts) {
       for (const line of receipt.lines) {
@@ -96,10 +97,16 @@ export class PharmacySupplierService {
         totalPurchases,
         latestDeliveryAt: purchaseTotal._max.receivedAt ?? null,
         suppliedMedicineCount: suppliedMedicines.size,
-        outstandingBalance: allInvoiceBalances.reduce((sum, invoice) => sum + Math.max(0, Number(invoice.balanceDue)), 0),
-        supplierCredit: allInvoiceBalances.reduce((sum, invoice) => sum + Math.max(0, -Number(invoice.balanceDue)), 0),
-        paidAmount: Number(paymentTotal._sum.amount ?? 0),
-        returnedValue: Number(returnTotal._sum.totalCredit ?? 0),
+        outstandingBalance: moneyToNumber(allInvoiceBalances.reduce((sum, invoice) => {
+          const balance = optionalMoney(invoice.balanceDue);
+          return balance.gt(0) ? sum.plus(balance) : sum;
+        }, zeroMoney())),
+        supplierCredit: moneyToNumber(allInvoiceBalances.reduce((sum, invoice) => {
+          const balance = optionalMoney(invoice.balanceDue);
+          return balance.lt(0) ? sum.plus(balance.negated()) : sum;
+        }, zeroMoney())),
+        paidAmount: moneyToNumber(paymentTotal._sum.amount ?? 0),
+        returnedValue: moneyToNumber(returnTotal._sum.totalCredit ?? 0),
       },
       suppliedMedicines: [...suppliedMedicines.values()].sort((first, second) => first.name.localeCompare(second.name)),
     };

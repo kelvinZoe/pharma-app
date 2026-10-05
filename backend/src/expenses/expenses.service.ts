@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { getInternetDate } from '../common/clock';
 import { buildDateRange } from '../common/date-range';
+import { ensurePositiveMoney, formatMoney } from '../common/money';
 
 @Injectable()
 export class ExpensesService {
@@ -14,10 +15,7 @@ export class ExpensesService {
       throw new BadRequestException('Title, category, and amount are required');
     }
 
-    const numAmount = Number(amount);
-    if (!Number.isFinite(numAmount) || numAmount <= 0) {
-      throw new BadRequestException('Amount must be a valid positive number');
-    }
+    const expenseAmount = ensurePositiveMoney(amount, 'Expense amount');
 
     const validCategories = ['rent', 'utilities', 'salaries', 'maintenance', 'transport', 'professional_fees', 'inventory', 'other'];
     if (!validCategories.includes(category)) {
@@ -38,7 +36,7 @@ export class ExpensesService {
         data: {
         title: String(title).trim(),
         category,
-        amount: numAmount,
+        amount: expenseAmount,
         payee: data.payee ? String(data.payee).trim() : null,
         paymentMethod,
         referenceNumber,
@@ -55,7 +53,7 @@ export class ExpensesService {
           actionType: 'create',
           entityType: 'expense',
           entityId: expense.id,
-          afterData: JSON.stringify({ title: expense.title, category: expense.category, amount: Number(expense.amount) }),
+          afterData: JSON.stringify({ title: expense.title, category: expense.category, amount: formatMoney(expense.amount) }),
           actorUserId: userId,
         },
       });
@@ -141,7 +139,7 @@ export class ExpensesService {
           actionType: 'void',
           entityType: 'expense',
           entityId: id,
-          beforeData: JSON.stringify({ status: expense.status, amount: Number(expense.amount) }),
+          beforeData: JSON.stringify({ status: expense.status, amount: formatMoney(expense.amount) }),
           afterData: JSON.stringify({ status: 'voided', reason: normalizedReason }),
           actorUserId: userId,
         },

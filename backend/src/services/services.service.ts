@@ -1,5 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ensurePositiveMoney, formatMoney } from '../common/money';
 
 @Injectable()
 export class ServicesService {
@@ -134,8 +136,8 @@ export class ServicesService {
           actionType: 'update',
           entityType: 'clinic_service',
           entityId: id,
-          beforeData: JSON.stringify({ name: service.name, price: Number(service.price), departmentId: service.departmentId, isActive: service.isActive }),
-          afterData: JSON.stringify({ name: updated.name, price: Number(updated.price), departmentId: updated.departmentId, isActive: updated.isActive }),
+          beforeData: JSON.stringify({ name: service.name, price: formatMoney(service.price), departmentId: service.departmentId, isActive: service.isActive }),
+          afterData: JSON.stringify({ name: updated.name, price: formatMoney(updated.price), departmentId: updated.departmentId, isActive: updated.isActive }),
           actorUserId: userId,
         },
       });
@@ -390,12 +392,8 @@ export class ServicesService {
     });
   }
 
-  private requirePositivePrice(value: unknown): number {
-    const price = Number(value);
-    if (!Number.isFinite(price) || price <= 0) {
-      throw new BadRequestException('Service price must be a valid amount greater than zero');
-    }
-    return price;
+  private requirePositivePrice(value: unknown): Prisma.Decimal {
+    return ensurePositiveMoney(value as any, 'Service price');
   }
 
   private async validateServiceIds(values: unknown[]): Promise<string[]> {

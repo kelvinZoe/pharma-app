@@ -1,11 +1,15 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Req, Query, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Req, Query, ForbiddenException, Headers } from '@nestjs/common';
 import { BillingService } from './billing.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { IdempotencyService } from '../common/idempotency.service';
 
 @Controller('visits/:id')
 @UseGuards(JwtAuthGuard)
 export class BillingController {
-  constructor(private readonly billingService: BillingService) {}
+  constructor(
+    private readonly billingService: BillingService,
+    private readonly idempotency: IdempotencyService,
+  ) {}
 
   @Get('invoice')
   async getInvoice(@Req() req: any, @Param('id') visitId: string) {
@@ -18,9 +22,17 @@ export class BillingController {
     @Req() req: any,
     @Param('id') visitId: string,
     @Body() body: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
+    @Headers('x-idempotency-key') legacyIdempotencyKey?: string,
   ) {
     this.ensureClinicCashier(req.user);
-    return this.billingService.recordPayment(visitId, body, req.user.id);
+    return this.idempotency.run(
+      idempotencyKey ?? legacyIdempotencyKey,
+      'clinic_invoice_payment',
+      req.user.id,
+      { visitId, body },
+      () => this.billingService.recordPayment(visitId, body, req.user.id),
+    );
   }
 
   private ensureClinicCashier(user: any) {
@@ -37,7 +49,10 @@ export class BillingController {
 @Controller('billing/sessions')
 @UseGuards(JwtAuthGuard)
 export class BillingSessionsController {
-  constructor(private readonly billingService: BillingService) {}
+  constructor(
+    private readonly billingService: BillingService,
+    private readonly idempotency: IdempotencyService,
+  ) {}
 
   @Get('active')
   async getActiveSession(@Req() req: any) {
@@ -46,15 +61,37 @@ export class BillingSessionsController {
   }
 
   @Post('open')
-  async openSession(@Req() req: any, @Body('openingFloat') openingFloat: number) {
+  async openSession(
+    @Req() req: any,
+    @Body('openingFloat') openingFloat: number,
+    @Headers('idempotency-key') idempotencyKey?: string,
+    @Headers('x-idempotency-key') legacyIdempotencyKey?: string,
+  ) {
     this.ensureClinicCashier(req.user);
-    return this.billingService.openClinicSession(req.user.id, openingFloat);
+    return this.idempotency.run(
+      idempotencyKey ?? legacyIdempotencyKey,
+      'clinic_cash_session_open',
+      req.user.id,
+      { openingFloat },
+      () => this.billingService.openClinicSession(req.user.id, openingFloat),
+    );
   }
 
   @Post('close')
-  async closeSession(@Req() req: any, @Body() body: any) {
+  async closeSession(
+    @Req() req: any,
+    @Body() body: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
+    @Headers('x-idempotency-key') legacyIdempotencyKey?: string,
+  ) {
     this.ensureClinicCashier(req.user);
-    return this.billingService.closeClinicSession(req.user.id, body);
+    return this.idempotency.run(
+      idempotencyKey ?? legacyIdempotencyKey,
+      'clinic_cash_session_close',
+      req.user.id,
+      { body },
+      () => this.billingService.closeClinicSession(req.user.id, body),
+    );
   }
 
   @Get()

@@ -66,12 +66,13 @@ const MENUS: Record<string, readonly SidebarItem[]> = {
 };
 
 import { AppToastComponent } from '../../shared/ui/app-toast/app-toast.component';
+import { BrandComponent } from '../../shared/ui/brand/brand.component';
 
 const NOTIFICATION_SOUND_KEY = 'pharma.notifications.sound';
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, AppToastComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, AppToastComponent, BrandComponent],
   templateUrl: './app-shell.component.html',
   styleUrl: './app-shell.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

@@ -1,0 +1,83 @@
+<main class="auth-shell">
+  <aside class="auth-story" aria-label="About Pharma UCI">
+    <div class="auth-story__frame" aria-hidden="true">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+
+    <div class="health-motifs" aria-hidden="true">
+      <svg class="health-motif health-motif--pill" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="7" y="15" width="34" height="18" rx="9" />
+        <path d="M24 15v18" />
+      </svg>
+      <svg class="health-motif health-motif--microscope" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="m20 7 10 10-6 6-10-10 6-6Z" />
+        <path d="M19 23a11 11 0 0 0 11 15h3M12 40h27M27 14l4-4M16 33h12" />
+      </svg>
+      <svg class="health-motif health-motif--tube" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M16 7h16M19 7v14L10 36a4 4 0 0 0 3.5 6h21a4 4 0 0 0 3.5-6L29 21V7" />
+        <path d="M15 32h18" />
+      </svg>
+      <svg class="health-motif health-motif--stethoscope" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M10 8v9a9 9 0 0 0 18 0V8M8 8h4M26 8h4M19 26v4a9 9 0 0 0 18 0v-3" />
+        <circle cx="37" cy="23" r="4" />
+      </svg>
+    </div>
+
+    <header class="auth-story__header">
+      <app-brand [inverse]="true" size="lg" />
+    </header>
+
+    <div class="auth-story__copy">
+      <p class="auth-story__eyebrow">Unified Clinic Intelligence</p>
+      <h1>One clinic.<br /><span>Every care team.</span></h1>
+      <p>{{ brand.description }}</p>
+    </div>
+
+    <ol class="care-path" aria-label="Connected care workflow">
+      <li>
+        <span class="care-path__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3" /><path d="M3.5 19a5.5 5.5 0 0 1 11 0M17 8h4M19 6v4" /></svg>
+        </span>
+        <div><strong>Front desk</strong><small>Patients, visits and billing</small></div>
+      </li>
+      <li>
+        <span class="care-path__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 3 5 5-3 3-5-5 3-3ZM9 12a6 6 0 0 0 6 8h2M4 21h16M13 6l2-2" /></svg>
+        </span>
+        <div><strong>Diagnostics</strong><small>Laboratory, scans and results</small></div>
+      </li>
+      <li>
+        <span class="care-path__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="7" width="18" height="10" rx="5" /><path d="M12 7v10" /></svg>
+        </span>
+        <div><strong>Pharmacy</strong><small>Stock control and point of sale</small></div>
+      </li>
+      <li>
+        <span class="care-path__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 10h18M7 15h3" /></svg>
+        </span>
+        <div><strong>Finance</strong><small>Payments and reconciliation</small></div>
+      </li>
+    </ol>
+
+    <footer class="auth-story__footer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+        <path d="M12 22s8-3.7 8-10V5l-8-3-8 3v7c0 6.3 8 10 8 10Z" />
+        <path d="m9 12 2 2 4-4" />
+      </svg>
+      <span>Role-based access · Tenant-separated records · Audit trails</span>
+    </footer>
+  </aside>
+
+  <section class="auth-stage">
+    <div class="auth-stage__mobile-brand">
+      <app-brand size="sm" />
+    </div>
+    <div class="auth-stage__content">
+      <ng-content />
+    </div>
+    <p class="auth-stage__footer">Secure access for authorised clinic staff.</p>
+  </section>
+</main>

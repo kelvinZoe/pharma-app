@@ -4,6 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { SessionService } from '../../../core/auth/session.service';
+import { AuthShellComponent } from '../ui/auth-shell.component';
 
 export const passwordMatchValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
   const password = control.get('password');
@@ -13,7 +14,7 @@ export const passwordMatchValidator: ValidatorFn = (control: AbstractControl): V
 
 @Component({
   selector: 'app-verify-invite',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, AuthShellComponent],
   templateUrl: './verify-invite.component.html',
   styleUrl: './login-page.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -29,6 +30,7 @@ export class VerifyInviteComponent implements OnInit {
   readonly errorState = signal(false);
   readonly isSubmitting = signal(false);
   readonly errorMessage = signal<string | null>(null);
+  readonly showPasswords = signal(false);
 
   readonly inviteeName = signal('');
   readonly inviteeEmail = signal('');
@@ -44,7 +46,7 @@ export class VerifyInviteComponent implements OnInit {
     
     if (!inviteToken) {
       this.errorState.set(true);
-      this.errorMessage.set('Security handshake failed: Invitation token is missing.');
+      this.errorMessage.set('This invitation link is incomplete. Ask an administrator to resend your invitation.');
       this.isLoading.set(false);
       return;
     }
@@ -65,6 +67,10 @@ export class VerifyInviteComponent implements OnInit {
     }
   }
 
+  togglePasswords(): void {
+    this.showPasswords.update((visible) => !visible);
+  }
+
   async submitInvite(): Promise<void> {
     if (this.inviteForm.invalid || !this.token()) {
       this.inviteForm.markAllAsTouched();
@@ -83,11 +89,10 @@ export class VerifyInviteComponent implements OnInit {
         })
       );
 
-      // Redirect to designated dashboard
       await this.router.navigateByUrl(this.session.getDefaultRoute(sessionUser.role));
     } catch (err: any) {
       console.error('Complete invite error:', err);
-      const msg = err?.error?.message ?? 'Failed to activate clinician credentials.';
+      const msg = err?.error?.message ?? 'We could not activate your account. Please try again.';
       this.errorMessage.set(Array.isArray(msg) ? msg[0] : msg);
     } finally {
       this.isSubmitting.set(false);

@@ -1,9 +1,11 @@
 import { Injectable, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { getInternetDate } from '../common/clock';
 import { TenantContextService } from '../common/multitenancy/tenant-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { buildDateRange } from '../common/date-range';
+import { ensureNonNegativeMoney, ensurePositiveMoney, formatMoney, moneyToNumber, optionalMoney, zeroMoney } from '../common/money';
 
 @Injectable()
 export class BillingService {
@@ -38,10 +40,7 @@ export class BillingService {
   }
 
   async openClinicSession(userId: string, openingFloat: number) {
-    const floatVal = Number(openingFloat);
-    if (!Number.isFinite(floatVal) || floatVal < 0) {
-      throw new BadRequestException('Opening float must be a valid positive number');
-    }
+    const floatVal = ensureNonNegativeMoney(openingFloat, 'Opening float');
     const tenantId = TenantContextService.getTenantId();
     if (!tenantId) throw new BadRequestException('Tenant context is required');
 
@@ -59,7 +58,7 @@ export class BillingService {
             actionType: 'open',
             entityType: 'clinic_cash_session',
             entityId: session.id,
-            afterData: JSON.stringify({ openingFloat: floatVal }),
+            afterData: JSON.stringify({ openingFloat: formatMoney(floatVal) }),
             actorUserId: userId,
           },
         });
@@ -72,13 +71,10 @@ export class BillingService {
   }
 
   async closeClinicSession(userId: string, data: any) {
-    const cashCounted = Number(data.cashCounted ?? 0);
-    const momoCounted = Number(data.momoCounted ?? 0);
+    const cashCounted = ensureNonNegativeMoney(data.cashCounted ?? 0, 'Counted cash');
+    const momoCounted = ensureNonNegativeMoney(data.momoCounted ?? 0, 'Counted mobile money');
     const notes = data.notes ?? null;
 
-    if (!Number.isFinite(cashCounted) || !Number.isFinite(momoCounted) || cashCounted < 0 || momoCounted < 0) {
-      throw new BadRequestException('Counted cash and mobile money must be valid positive numbers');
-    }
     const closedSession = await this.prisma.$transaction(async (tx) => {
       const active = await (tx as any).clinicCashSession.findFirst({
         where: { openedByUserId: userId, status: 'open' },
@@ -96,8 +92,8 @@ export class BillingService {
         include: { payments: { where: { status: { not: 'voided' } } } },
       });
       const summary = this.calculateClinicSessionSummary(activeSession);
-      const totalCounted = cashCounted + momoCounted;
-      const discrepancy = totalCounted - (summary.expectedCash + summary.expectedMomo);
+      const totalCounted = cashCounted.plus(momoCounted);
+      const discrepancy = totalCounted.minus(summary.expectedCash.plus(summary.expectedMomo));
       const closed = await (tx as any).clinicCashSession.update({
         where: { id: active.id },
         data: {
@@ -123,18 +119,24 @@ export class BillingService {
           actionType: 'close',
           entityType: 'clinic_cash_session',
           entityId: active.id,
-          afterData: JSON.stringify({ cashCounted, momoCounted, expectedCash: summary.expectedCash, expectedMomo: summary.expectedMomo, discrepancy }),
+          afterData: JSON.stringify({
+            cashCounted: formatMoney(cashCounted),
+            momoCounted: formatMoney(momoCounted),
+            expectedCash: formatMoney(summary.expectedCash),
+            expectedMomo: formatMoney(summary.expectedMomo),
+            discrepancy: formatMoney(discrepancy),
+          }),
           actorUserId: userId,
         },
       });
       return closed;
     });
 
-    const discrepancy = Number(closedSession.discrepancy ?? 0);
+    const discrepancy = moneyToNumber(closedSession.discrepancy ?? 0);
     if (Math.abs(discrepancy) > 0.01) {
       await this.notificationsService.create({
         title: 'Clinic cashier discrepancy',
-        message: `A clinic cashier session closed with a discrepancy of GHS ${discrepancy.toFixed(2)}.`,
+        message: `A clinic cashier session closed with a discrepancy of GHS ${formatMoney(closedSession.discrepancy)}.`,
         type: 'danger',
         module: 'accounting',
         targetRoles: [0, 5],
@@ -222,14 +224,14 @@ export class BillingService {
     // Dynamic compilation to guarantee accuracy:
     // Only charge for lines that are NOT marked 'not_done'
     const billableLines = visit.visitServices.filter((s) => s.status !== 'not_done' && s.approvedByPatient !== false);
-    const computedSubtotal = billableLines.reduce((sum, s) => sum + Number(s.lineTotal), 0);
+    const computedSubtotal = billableLines.reduce((sum, s) => sum.plus(optionalMoney(s.lineTotal)), zeroMoney());
 
     // If invoice data in DB differs from dynamically computed totals (e.g. from service status changes),
     // we update the database value.
-    if (Number(visit.invoice.subtotal) !== computedSubtotal) {
-      const amountPaid = Number(visit.invoice.amountPaid);
-      const balanceDue = Math.max(0, computedSubtotal - amountPaid);
-      const status = balanceDue <= 0.01 ? 'paid' : amountPaid > 0 ? 'partially_paid' : 'unpaid';
+    if (!optionalMoney(visit.invoice.subtotal).equals(computedSubtotal)) {
+      const amountPaid = optionalMoney(visit.invoice.amountPaid);
+      const balanceDue = Prisma.Decimal.max(zeroMoney(), computedSubtotal.minus(amountPaid));
+      const status = balanceDue.lte(0) ? 'paid' : amountPaid.gt(0) ? 'partially_paid' : 'unpaid';
       const updatedInv = await this.prisma.clinicInvoice.update({
         where: { id: visit.invoice.id },
         data: {
@@ -272,14 +274,11 @@ export class BillingService {
 
     const { invoice } = await this.getVisitInvoice(visitId);
 
-    const balanceDue = Number(invoice.balanceDue);
-    const paymentAmount = Number(amount);
+    const balanceDue = optionalMoney(invoice.balanceDue, 0, 'Outstanding balance');
+    const paymentAmount = ensurePositiveMoney(amount, 'Payment amount');
 
-    if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
-      throw new BadRequestException('Payment amount must be greater than zero');
-    }
-    if (paymentAmount > balanceDue + 0.01) {
-      throw new BadRequestException(`Payment cannot exceed the outstanding balance of GHS ${balanceDue.toFixed(2)}.`);
+    if (paymentAmount.gt(balanceDue)) {
+      throw new BadRequestException(`Payment cannot exceed the outstanding balance of GHS ${formatMoney(balanceDue)}.`);
     }
 
     try {
@@ -300,9 +299,9 @@ export class BillingService {
         });
         if (duplicateReference) throw new ConflictException('This mobile money reference has already been used');
       }
-      const newAmountPaid = Number(invoice.amountPaid) + paymentAmount;
-      const newBalanceDue = Math.max(0, balanceDue - paymentAmount);
-      const newStatus = newBalanceDue <= 0.01 ? 'paid' : 'partially_paid';
+      const newAmountPaid = optionalMoney(invoice.amountPaid).plus(paymentAmount);
+      const newBalanceDue = Prisma.Decimal.max(zeroMoney(), balanceDue.minus(paymentAmount));
+      const newStatus = newBalanceDue.lte(0) ? 'paid' : 'partially_paid';
       // 1. Create payment entry
       const payment = await tx.clinicPayment.create({
         data: {
@@ -343,7 +342,7 @@ export class BillingService {
           actionType: 'payment',
           entityType: 'invoice',
           entityId: invoice.id,
-          afterData: JSON.stringify({ paymentId: payment.id, amount: paymentAmount, method: paymentMethod, balanceDue: newBalanceDue }),
+          afterData: JSON.stringify({ paymentId: payment.id, amount: formatMoney(paymentAmount), method: paymentMethod, balanceDue: formatMoney(newBalanceDue) }),
           actorUserId: userId,
         },
       });
@@ -362,20 +361,20 @@ export class BillingService {
   private calculateClinicSessionSummary(session: any) {
     const payments = (session.payments ?? []).filter((p: any) => p.status !== 'voided');
     const cashPaymentsTotal = payments.reduce(
-      (sum: number, p: any) => p.paymentMethod === 'cash' ? sum + Number(p.amount) : sum,
-      0,
+      (sum: Prisma.Decimal, p: any) => p.paymentMethod === 'cash' ? sum.plus(optionalMoney(p.amount)) : sum,
+      zeroMoney(),
     );
     const momoPaymentsTotal = payments.reduce(
-      (sum: number, p: any) => p.paymentMethod === 'mobile_money' ? sum + Number(p.amount) : sum,
-      0,
+      (sum: Prisma.Decimal, p: any) => p.paymentMethod === 'mobile_money' ? sum.plus(optionalMoney(p.amount)) : sum,
+      zeroMoney(),
     );
 
     return {
       paymentsCount: payments.length,
-      paymentsTotal: cashPaymentsTotal + momoPaymentsTotal,
+      paymentsTotal: cashPaymentsTotal.plus(momoPaymentsTotal),
       cashPaymentsTotal,
       momoPaymentsTotal,
-      expectedCash: Number(session.openingFloat ?? 0) + cashPaymentsTotal,
+      expectedCash: optionalMoney(session.openingFloat ?? 0).plus(cashPaymentsTotal),
       expectedMomo: momoPaymentsTotal,
     };
   }

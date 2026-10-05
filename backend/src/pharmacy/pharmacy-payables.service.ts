@@ -1,8 +1,10 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { getInternetDate } from '../common/clock';
 import * as crypto from 'crypto';
 import { buildDateRange } from '../common/date-range';
+import { ensurePositiveMoney, formatMoney, moneyToNumber, optionalMoney, zeroMoney } from '../common/money';
 
 @Injectable()
 export class PharmacyPayablesService {
@@ -17,6 +19,7 @@ export class PharmacyPayablesService {
     if (Number.isNaN(dueDate.getTime())) throw new BadRequestException('Supplier invoice due date is invalid');
     if (dueDate < invoiceDate) throw new BadRequestException('Supplier invoice due date cannot be before its invoice date');
 
+    const totalCost = optionalMoney(receipt.totalCost, 0, 'Receipt total cost');
     return tx.pharmacySupplierInvoice.create({
       data: {
         tenantId: receipt.tenantId,
@@ -28,8 +31,8 @@ export class PharmacyPayablesService {
         supplierInvoiceNumber: data.supplierInvoiceNumber ? String(data.supplierInvoiceNumber).trim().toUpperCase() : `GRN-${receipt.receiptNumber}`,
         invoiceDate,
         dueDate,
-        totalAmount: Number(receipt.totalCost),
-        balanceDue: Number(receipt.totalCost),
+        totalAmount: totalCost,
+        balanceDue: totalCost,
         status: 'unpaid',
         notes: data.invoiceNotes ? String(data.invoiceNotes).trim() : null,
       },
@@ -42,13 +45,16 @@ export class PharmacyPayablesService {
       select: { balanceDue: true, dueDate: true, status: true },
     });
     const today = this.todayStart();
+    const outstandingBalance = invoices.reduce((sum, invoice) => Prisma.Decimal.max(zeroMoney(), optionalMoney(invoice.balanceDue)).plus(sum), zeroMoney());
+    const overdueBalance = invoices.reduce((sum, invoice) => invoice.dueDate < today ? sum.plus(Prisma.Decimal.max(zeroMoney(), optionalMoney(invoice.balanceDue))) : sum, zeroMoney());
+    const supplierCredit = invoices.reduce((sum, invoice) => sum.plus(Prisma.Decimal.max(zeroMoney(), optionalMoney(invoice.balanceDue).negated())), zeroMoney());
     return {
       invoiceCount: invoices.length,
-      outstandingBalance: invoices.reduce((sum, invoice) => sum + Math.max(0, Number(invoice.balanceDue)), 0),
-      overdueBalance: invoices.reduce((sum, invoice) => sum + (invoice.dueDate < today ? Math.max(0, Number(invoice.balanceDue)) : 0), 0),
-      supplierCredit: invoices.reduce((sum, invoice) => sum + Math.max(0, -Number(invoice.balanceDue)), 0),
-      unpaidCount: invoices.filter((invoice) => Number(invoice.balanceDue) > 0).length,
-      overdueCount: invoices.filter((invoice) => invoice.dueDate < today && Number(invoice.balanceDue) > 0).length,
+      outstandingBalance: moneyToNumber(outstandingBalance),
+      overdueBalance: moneyToNumber(overdueBalance),
+      supplierCredit: moneyToNumber(supplierCredit),
+      unpaidCount: invoices.filter((invoice) => optionalMoney(invoice.balanceDue).gt(0)).length,
+      overdueCount: invoices.filter((invoice) => invoice.dueDate < today && optionalMoney(invoice.balanceDue).gt(0)).length,
     };
   }
 
@@ -84,7 +90,7 @@ export class PharmacyPayablesService {
       orderBy: [{ dueDate: 'asc' }, { invoiceDate: 'desc' }],
       take: 250,
     });
-    return invoices.map((invoice) => ({ ...invoice, isOverdue: Number(invoice.balanceDue) > 0 && invoice.dueDate < today }));
+    return invoices.map((invoice) => ({ ...invoice, isOverdue: optionalMoney(invoice.balanceDue).gt(0) && invoice.dueDate < today }));
   }
 
   async findInvoiceDetail(invoiceId: string, locationId: string) {
@@ -113,7 +119,7 @@ export class PharmacyPayablesService {
       },
     });
     if (!invoice) throw new NotFoundException('Supplier invoice not found');
-    return { ...invoice, isOverdue: Number(invoice.balanceDue) > 0 && invoice.dueDate < this.todayStart() };
+    return { ...invoice, isOverdue: optionalMoney(invoice.balanceDue).gt(0) && invoice.dueDate < this.todayStart() };
   }
 
   async updateInvoice(invoiceId: string, locationId: string, data: any, userId: string) {
@@ -165,9 +171,9 @@ export class PharmacyPayablesService {
     if (invoice.createdByUserId === userId) {
       throw new BadRequestException('The supplier invoice recorder cannot approve their own payment');
     }
-    const amount = Number(data.amount);
-    if (!Number.isFinite(amount) || amount <= 0) throw new BadRequestException('Payment amount must be greater than zero');
-    if (amount > Number(invoice.balanceDue) + 0.000001) throw new BadRequestException('Payment cannot exceed the invoice balance');
+    const amount = ensurePositiveMoney(data.amount, 'Payment amount');
+    const invoiceBalanceDue = optionalMoney(invoice.balanceDue, 0, 'Invoice balance');
+    if (amount.gt(invoiceBalanceDue)) throw new BadRequestException('Payment cannot exceed the invoice balance');
     const paymentMethod = String(data.paymentMethod ?? '').trim().toLowerCase();
     if (!['cash', 'mobile_money', 'bank_transfer', 'cheque', 'other'].includes(paymentMethod)) {
       throw new BadRequestException('Select a valid supplier payment method');
@@ -237,8 +243,8 @@ export class PharmacyPayablesService {
           actionType: 'payment',
           entityType: 'pharmacy_supplier_invoice',
           entityId: invoice.id,
-          beforeData: JSON.stringify({ balanceDue: Number(invoice.balanceDue) }),
-          afterData: JSON.stringify({ paymentId: payment.id, paymentNumber, amount, paymentMethod, referenceNumber }),
+          beforeData: JSON.stringify({ balanceDue: formatMoney(invoice.balanceDue) }),
+          afterData: JSON.stringify({ paymentId: payment.id, paymentNumber, amount: formatMoney(amount), paymentMethod, referenceNumber }),
           actorUserId: userId,
         },
       });
@@ -282,9 +288,11 @@ export class PharmacyPayablesService {
       const availableStock = Math.max(0, Number(receiptLine.batch.quantityRemaining) - Number(receiptLine.batch.quantityReserved ?? 0) - Number(receiptLine.batch.quantityQuarantined ?? 0));
       if (quantity > availableStock + 0.000001) throw new BadRequestException(`Return line ${index + 1} exceeds the ${availableStock} units not reserved for transfer`);
       const returnReason = line.returnReason ? String(line.returnReason).trim() : reason;
-      return { receiptLine, quantity, returnReason, unitCost: Number(receiptLine.unitCost), lineTotal: quantity * Number(receiptLine.unitCost) };
+      const unitCost = optionalMoney(receiptLine.unitCost, 0, `Return line ${index + 1} unit cost`);
+      const lineTotal = unitCost.times(quantity).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+      return { receiptLine, quantity, returnReason, unitCost, lineTotal };
     });
-    const totalCredit = normalizedLines.reduce((sum, line) => sum + line.lineTotal, 0);
+    const totalCredit = normalizedLines.reduce((sum, line) => sum.plus(line.lineTotal), zeroMoney());
     const returnNumber = `SRET-${getInternetDate().toISOString().slice(0, 10).replaceAll('-', '')}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 
     return this.prisma.$transaction(async (tx) => {
@@ -376,7 +384,7 @@ export class PharmacyPayablesService {
           entityType: 'pharmacy_purchase_return',
           entityId: purchaseReturn.id,
           beforeData: JSON.stringify({ receiptId: receipt.id, supplierInvoiceId: receipt.supplierInvoice?.id ?? null }),
-          afterData: JSON.stringify({ returnNumber, totalCredit, reason }),
+          afterData: JSON.stringify({ returnNumber, totalCredit: formatMoney(totalCredit), reason }),
           actorUserId: userId,
         },
       });
@@ -420,11 +428,13 @@ export class PharmacyPayablesService {
       start ? this.prisma.pharmacySupplierPayment.aggregate({ where: { supplierId, ...locationFilter, paymentDate: { lt: start } }, _sum: { amount: true } }) : Promise.resolve({ _sum: { amount: 0 } }),
       start ? this.prisma.pharmacyPurchaseReturn.aggregate({ where: { supplierId, ...locationFilter, returnDate: { lt: start } }, _sum: { totalCredit: true } }) : Promise.resolve({ _sum: { totalCredit: 0 } }),
     ]);
-    const openingBalance = Number(priorInvoices._sum.totalAmount ?? 0) - Number(priorPayments._sum.amount ?? 0) - Number(priorReturns._sum.totalCredit ?? 0);
+    const openingBalance = optionalMoney(priorInvoices._sum.totalAmount ?? 0)
+      .minus(optionalMoney(priorPayments._sum.amount ?? 0))
+      .minus(optionalMoney(priorReturns._sum.totalCredit ?? 0));
     const periodEntries = [
-      ...invoices.map((invoice) => ({ id: invoice.id, date: invoice.invoiceDate, type: 'invoice', reference: invoice.supplierInvoiceNumber, description: `Supplier invoice ${invoice.supplierInvoiceNumber}`, debit: Number(invoice.totalAmount), credit: 0, location: invoice.location })),
-      ...payments.map((payment) => ({ id: payment.id, date: payment.paymentDate, type: 'payment', reference: payment.paymentNumber, description: `Payment for ${payment.invoice.supplierInvoiceNumber}`, debit: 0, credit: Number(payment.amount), location: payment.location })),
-      ...returns.map((purchaseReturn) => ({ id: purchaseReturn.id, date: purchaseReturn.returnDate, type: 'return', reference: purchaseReturn.returnNumber, description: `Supplier return from ${purchaseReturn.receipt.receiptNumber}`, debit: 0, credit: Number(purchaseReturn.totalCredit), location: purchaseReturn.location })),
+      ...invoices.map((invoice) => ({ id: invoice.id, date: invoice.invoiceDate, type: 'invoice', reference: invoice.supplierInvoiceNumber, description: `Supplier invoice ${invoice.supplierInvoiceNumber}`, debit: moneyToNumber(invoice.totalAmount), credit: 0, location: invoice.location })),
+      ...payments.map((payment) => ({ id: payment.id, date: payment.paymentDate, type: 'payment', reference: payment.paymentNumber, description: `Payment for ${payment.invoice.supplierInvoiceNumber}`, debit: 0, credit: moneyToNumber(payment.amount), location: payment.location })),
+      ...returns.map((purchaseReturn) => ({ id: purchaseReturn.id, date: purchaseReturn.returnDate, type: 'return', reference: purchaseReturn.returnNumber, description: `Supplier return from ${purchaseReturn.receipt.receiptNumber}`, debit: 0, credit: moneyToNumber(purchaseReturn.totalCredit), location: purchaseReturn.location })),
     ].sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
     const entries = start
       ? [{ id: 'opening', date: start, type: 'opening', reference: 'OPENING', description: 'Balance before selected period', debit: 0, credit: 0, location: { code: 'ALL', name: 'All locations' } }, ...periodEntries]
@@ -433,16 +443,16 @@ export class PharmacyPayablesService {
     return {
       supplier,
       entries: entries.map((entry, index) => {
-        if (entry.type === 'opening') return { ...entry, balance: openingBalance };
-        runningBalance += entry.debit - entry.credit;
-        return { ...entry, balance: runningBalance };
+        if (entry.type === 'opening') return { ...entry, balance: moneyToNumber(openingBalance) };
+        runningBalance = runningBalance.plus(optionalMoney(entry.debit)).minus(optionalMoney(entry.credit));
+        return { ...entry, balance: moneyToNumber(runningBalance) };
       }),
       totals: {
-        openingBalance,
+        openingBalance: moneyToNumber(openingBalance),
         invoiced: periodEntries.reduce((sum, entry) => sum + entry.debit, 0),
-        paid: payments.reduce((sum, payment) => sum + Number(payment.amount), 0),
-        returned: returns.reduce((sum, purchaseReturn) => sum + Number(purchaseReturn.totalCredit), 0),
-        balance: runningBalance,
+        paid: moneyToNumber(payments.reduce((sum, payment) => sum.plus(optionalMoney(payment.amount)), zeroMoney())),
+        returned: moneyToNumber(returns.reduce((sum, purchaseReturn) => sum.plus(optionalMoney(purchaseReturn.totalCredit)), zeroMoney())),
+        balance: moneyToNumber(runningBalance),
       },
     };
   }

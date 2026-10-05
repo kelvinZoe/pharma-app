@@ -60,6 +60,7 @@ model Tenant {
   generalTemplates            GeneralTemplate[]
   expenses                    Expense[]
   notifications               Notification[]
+  idempotencyRecords          IdempotencyRecord[]
 }
 
 model Department {
@@ -153,6 +154,26 @@ model Notification {
   @@index([tenantId, targetRole, isRead])
   @@index([tenantId, targetUserId, isRead])
   @@index([tenantId, createdAt])
+}
+
+model IdempotencyRecord {
+  id             String   @id @default(uuid())
+  tenantId       String
+  userId         String
+  idempotencyKey String
+  operation      String
+  requestHash    String
+  status         String   @default("in_progress")
+  responseJson   Json?
+  errorMessage   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  expiresAt      DateTime
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, idempotencyKey])
+  @@index([tenantId, operation, createdAt])
+  @@index([expiresAt])
 }
 
 model Patient {

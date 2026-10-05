@@ -104,9 +104,11 @@ This checklist tracks the financial, tenant-isolation, pharmacy, and availabilit
 
 ## P2 — Follow-up Hardening
 
-- [ ] Replace floating-point monetary calculations with decimal/minor-unit helpers end to end.
+- [x] Replace floating-point monetary calculations with decimal/minor-unit helpers end to end.
+  - Completed: shared backend money helper added; clinic billing/session, visit pricing, expenses, pharmacy POS/register, supplier payables, purchase orders, and financial reporting now use Decimal arithmetic for money paths.
 - [ ] Add configurable accounting period locks and an approved reversal workflow.
-- [ ] Add explicit idempotency keys for all payment and stock-posting commands.
+- [x] Add explicit idempotency keys for all payment and stock-posting commands.
+  - Completed: manual Postgres idempotency table patch added; clinic payment/session, pharmacy POS/register, goods receipt, direct batch add, stock count/adjustment, transfer, quarantine, purchase order, supplier payment, and purchase return commands now require/replay idempotency keys.
 - [ ] Replace numeric role checks with named permissions and centrally enforced decorators.
 - [ ] Add database row-level security as a second tenant-isolation layer.
 - [x] Require tenant slug or another unambiguous tenant selector for username login.

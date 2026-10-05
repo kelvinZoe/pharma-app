@@ -1,0 +1,361 @@
+:host {
+  display: block;
+  min-height: 100dvh;
+  color: #17322d;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+}
+
+.auth-shell {
+  display: grid;
+  grid-template-columns: minmax(24rem, 0.9fr) minmax(32rem, 1.1fr);
+  min-height: 100dvh;
+  padding: 0.75rem;
+  background: #eef2ef;
+}
+
+.auth-story,
+.auth-stage {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.auth-story {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 1.5rem);
+  padding: clamp(2rem, 4vw, 4.5rem);
+  border-radius: 1.25rem 0.35rem 0.35rem 1.25rem;
+  background: #103f37;
+  color: #ffffff;
+  isolation: isolate;
+}
+
+.auth-story__frame {
+  position: absolute;
+  inset: 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.9rem;
+  pointer-events: none;
+}
+
+.health-motifs {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.health-motif {
+  position: absolute;
+  color: #9bd7c8;
+  opacity: 0.14;
+}
+
+.health-motif--pill {
+  top: 15%;
+  right: 8%;
+  width: clamp(4.5rem, 7vw, 7.5rem);
+  color: #f0b76e;
+  transform: rotate(-28deg);
+}
+
+.health-motif--microscope {
+  top: 41%;
+  right: 2.5%;
+  width: clamp(5.5rem, 9vw, 9rem);
+  transform: rotate(7deg);
+}
+
+.health-motif--tube {
+  bottom: 18%;
+  left: 2.5%;
+  width: clamp(4.5rem, 7vw, 7rem);
+  color: #f0b76e;
+  opacity: 0.11;
+  transform: rotate(-12deg);
+}
+
+.health-motif--stethoscope {
+  right: 7%;
+  bottom: 5%;
+  width: clamp(5rem, 8vw, 8rem);
+  opacity: 0.1;
+  transform: rotate(8deg);
+}
+
+.auth-story__frame span {
+  position: absolute;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: #e7a858;
+}
+
+.auth-story__frame span:nth-child(1) {
+  top: 1.5rem;
+  right: 1.5rem;
+}
+
+.auth-story__frame span:nth-child(2) {
+  top: 48%;
+  left: -0.25rem;
+  background: #8fd8c4;
+}
+
+.auth-story__frame span:nth-child(3) {
+  right: -0.25rem;
+  bottom: 22%;
+  background: #8fd8c4;
+}
+
+.auth-story__header,
+.auth-story__copy,
+.care-path,
+.auth-story__footer {
+  position: relative;
+  z-index: 1;
+}
+
+.auth-story__copy {
+  max-width: 35rem;
+  margin-top: auto;
+  padding-top: clamp(3rem, 8vh, 7rem);
+}
+
+.auth-story__eyebrow {
+  margin: 0 0 1rem;
+  color: #9bd7c8 !important;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.auth-story__copy h1 {
+  max-width: 34rem;
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(2.8rem, 4.7vw, 4.9rem);
+  font-weight: 600;
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+}
+
+.auth-story__copy h1 span {
+  color: #f0b76e;
+}
+
+.auth-story__copy > p:last-child {
+  max-width: 31rem;
+  margin: 1.5rem 0 0;
+  color: #c4d9d3;
+  font-size: clamp(1rem, 1.4vw, 1.15rem);
+  font-weight: 400;
+  line-height: 1.75;
+}
+
+.care-path {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  max-width: 39rem;
+  margin: clamp(2.5rem, 6vh, 4.5rem) 0 0;
+  padding: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.13);
+  border-left: 1px solid rgba(255, 255, 255, 0.13);
+  list-style: none;
+}
+
+.care-path li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.8rem;
+  min-height: 5.5rem;
+  padding: 1.1rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.13);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.13);
+}
+
+.care-path__icon {
+  display: grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  place-items: center;
+  border: 1px solid rgba(240, 183, 110, 0.38);
+  border-radius: 0.5rem;
+  color: #f0b76e;
+}
+
+.care-path__icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.care-path div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.care-path strong {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.care-path small {
+  color: #a9c4bd;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.auth-story__footer {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: auto;
+  padding-top: 2.5rem;
+  color: #a9c4bd;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.auth-story__footer svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+  color: #8fd8c4;
+}
+
+.auth-stage {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 1.5rem);
+  border-radius: 0.35rem 1.25rem 1.25rem 0.35rem;
+  background: #fbfaf7;
+}
+
+.auth-stage__mobile-brand {
+  display: none;
+}
+
+.auth-stage__content {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  width: 100%;
+  padding: clamp(2rem, 7vw, 6.5rem);
+}
+
+.auth-stage__footer {
+  margin: 0;
+  padding: 0 2rem 1.5rem;
+  color: #788b85;
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 1000px) {
+  .auth-shell {
+    grid-template-columns: minmax(20rem, 0.8fr) minmax(28rem, 1.2fr);
+  }
+
+  .auth-story {
+    padding: 2.5rem;
+  }
+
+  .care-path {
+    grid-template-columns: 1fr;
+  }
+
+  .care-path li:nth-child(4) {
+    display: none;
+  }
+}
+
+@media (max-width: 800px) {
+  .auth-shell {
+    display: block;
+    padding: 0;
+    background: #fbfaf7;
+  }
+
+  .auth-story {
+    min-height: 18rem;
+    padding: 2rem;
+    border-radius: 0 0 1.5rem 1.5rem;
+  }
+
+  .auth-story__copy {
+    margin-top: 3rem;
+    padding: 0;
+  }
+
+  .auth-story__copy h1 {
+    max-width: 28rem;
+    font-size: clamp(2.5rem, 11vw, 4.2rem);
+  }
+
+  .auth-story__copy > p:last-child,
+  .health-motif--microscope,
+  .health-motif--tube,
+  .health-motif--stethoscope,
+  .care-path,
+  .auth-story__footer {
+    display: none;
+  }
+
+  .health-motif--pill {
+    top: 38%;
+    right: 7%;
+    width: 5.5rem;
+    opacity: 0.12;
+  }
+
+  .auth-stage {
+    min-height: auto;
+    overflow: visible;
+    border-radius: 0;
+  }
+
+  .auth-stage__content {
+    min-height: 31rem;
+    padding: 3rem 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-story {
+    min-height: 14rem;
+    padding: 1.5rem;
+    border-radius: 0 0 1rem 1rem;
+  }
+
+  .auth-story__frame {
+    inset: 0.75rem;
+  }
+
+  .auth-story__copy {
+    margin-top: 2.4rem;
+  }
+
+  .auth-story__copy h1 {
+    font-size: 2.35rem;
+  }
+
+  .auth-stage__content {
+    display: block;
+    min-height: 0;
+    padding: 2.5rem 1.25rem 2rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

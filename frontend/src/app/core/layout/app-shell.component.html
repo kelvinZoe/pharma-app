@@ -1,17 +1,8 @@
 <div class="shell-container" [class.mobile-sidebar-active]="mobileSidebarOpen()" [attr.data-module]="activeModuleKey()">
   <!-- LEFT SIDEBAR -->
   <aside class="sidebar">
-    <!-- Brand Branding Header -->
     <div class="sidebar__brand">
-      <div class="brand-logo">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-        </svg>
-      </div>
-      <div>
-        <h1>PharmaFlow</h1>
-        <span class="brand-version">v2.0 PRO</span>
-      </div>
+      <app-brand size="sm" />
     </div>
 
     <!-- Active Workspace Module Switcher (Admins Only) -->
@@ -184,7 +175,7 @@
             <svg class="clinic-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 21h18M3 10h18M5 6h14a2 2 0 0 1 2 2v13H3V8a2 2 0 0 1 2-2zm5 9v6h4v-6h-4z"/>
             </svg>
-            <span class="clinic-name">{{ user.tenantName || 'PharmaFlow Clinic' }}</span>
+            <span class="clinic-name">{{ user.tenantName || 'Clinic Workspace' }}</span>
           </div>
         }
       </div>

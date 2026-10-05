@@ -20,7 +20,7 @@ import { ToastService } from '../../../core/services/toast.service';
         </div>
         <div class="profile-meta-card">
           <span>Workspace</span>
-          <strong>{{ currentUser()?.tenantName || 'PharmaFlow Clinic' }}</strong>
+          <strong>{{ currentUser()?.tenantName || 'Clinic Workspace' }}</strong>
         </div>
       </header>
 

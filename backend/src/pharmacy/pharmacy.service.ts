@@ -1,10 +1,12 @@
 import { Injectable, BadRequestException, ConflictException, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { getInternetDate } from '../common/clock';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as crypto from 'crypto';
 import { PharmacyPayablesService } from './pharmacy-payables.service';
 import { buildDateRange } from '../common/date-range';
+import { ensureNonNegativeMoney, ensurePositiveMoney, formatMoney, moneyToNumber, optionalMoney, zeroMoney } from '../common/money';
 
 @Injectable()
 export class PharmacyService {
@@ -927,7 +929,7 @@ export class PharmacyService {
         }
       }
 
-      let subtotal = 0;
+      let subtotal = zeroMoney();
       const saleItemsToCreate: any[] = [];
       const productIdsSold = new Set<string>();
 
@@ -958,9 +960,10 @@ export class PharmacyService {
         if (locationPolicy?.isAvailableForSale === false) {
           throw new BadRequestException(`${product.name} is not available for sale at this pharmacy`);
         }
-        if (locationPrice === null || locationPrice === undefined || !Number.isFinite(Number(locationPrice)) || Number(locationPrice) <= 0) {
+        if (locationPrice === null || locationPrice === undefined) {
           throw new BadRequestException(`Set the current selling price for ${product.name} before selling it`);
         }
+        const sellingPrice = ensurePositiveMoney(locationPrice, `${product.name} selling price`);
 
         const qtyToSell = Number(quantity);
         const allowLooseSale = locationPolicy?.allowLooseSale ?? product.allowLooseSale;
@@ -1020,14 +1023,14 @@ export class PharmacyService {
               referenceType: 'pharmacy_sale',
             },
           });
-          const allocationTotal = Number(locationPrice) * allocatedQuantity;
-          subtotal += allocationTotal;
+          const allocationTotal = sellingPrice.times(allocatedQuantity).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+          subtotal = subtotal.plus(allocationTotal);
           saleItemsToCreate.push({
             productId,
             batchId: batch.id,
             itemName: product.name,
             quantity: allocatedQuantity,
-            unitPrice: locationPrice,
+            unitPrice: sellingPrice,
             unitCost: batch.purchasePrice,
             lineTotal: allocationTotal,
           });
@@ -1077,7 +1080,7 @@ export class PharmacyService {
           actionType: 'create',
           entityType: 'sale',
           entityId: sale.id,
-          afterData: JSON.stringify({ saleNumber, total: subtotal }),
+          afterData: JSON.stringify({ saleNumber, total: formatMoney(subtotal) }),
           actorUserId: userId,
         },
       });
@@ -1193,10 +1196,7 @@ export class PharmacyService {
   }
 
   async openSession(userId: string, openingFloat: number, locationId: string) {
-    const floatVal = Number(openingFloat);
-    if (!Number.isFinite(floatVal) || floatVal < 0) {
-      throw new BadRequestException('Opening float must be a valid positive number');
-    }
+    const floatVal = ensureNonNegativeMoney(openingFloat, 'Opening float');
 
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -1212,7 +1212,7 @@ export class PharmacyService {
             actionType: 'open',
             entityType: 'pharmacy_register_session',
             entityId: session.id,
-            afterData: JSON.stringify({ locationId, openingFloat: floatVal }),
+            afterData: JSON.stringify({ locationId, openingFloat: formatMoney(floatVal) }),
             actorUserId: userId,
           },
         });
@@ -1239,28 +1239,25 @@ export class PharmacyService {
 
     const sales = activeSession.sales;
     const salesCount = sales.length;
-    const salesTotal = sales.reduce((sum, s) => sum + Number(s.total), 0);
-    const cashTotal = sales.reduce((sum, s) => s.paymentMethod === 'cash' ? sum + Number(s.total) : sum, 0);
-    const momoTotal = sales.reduce((sum, s) => s.paymentMethod === 'mobile_money' ? sum + Number(s.total) : sum, 0);
+    const salesTotal = sales.reduce((sum, s) => sum.plus(optionalMoney(s.total)), zeroMoney());
+    const cashTotal = sales.reduce((sum, s) => s.paymentMethod === 'cash' ? sum.plus(optionalMoney(s.total)) : sum, zeroMoney());
+    const momoTotal = sales.reduce((sum, s) => s.paymentMethod === 'mobile_money' ? sum.plus(optionalMoney(s.total)) : sum, zeroMoney());
 
     return {
       salesCount,
-      salesTotal,
-      cashTotal,
-      momoTotal,
+      salesTotal: moneyToNumber(salesTotal),
+      cashTotal: moneyToNumber(cashTotal),
+      momoTotal: moneyToNumber(momoTotal),
       sales,
-      openingFloat: Number(activeSession.openingFloat),
+      openingFloat: moneyToNumber(activeSession.openingFloat),
     };
   }
 
   async closeSession(userId: string, data: any, locationId: string) {
-    const cashCounted = Number(data.cashCounted ?? 0);
-    const momoCounted = Number(data.momoCounted ?? 0);
+    const cashCounted = ensureNonNegativeMoney(data.cashCounted ?? 0, 'Counted cash');
+    const momoCounted = ensureNonNegativeMoney(data.momoCounted ?? 0, 'Counted mobile money');
     const notes = data.notes ?? null;
 
-    if (!Number.isFinite(cashCounted) || !Number.isFinite(momoCounted) || cashCounted < 0 || momoCounted < 0) {
-      throw new BadRequestException('Counted cash and mobile money must be valid positive numbers');
-    }
     const closedSession = await this.prisma.$transaction(async (tx) => {
       const active = await tx.pharmacyDailyClosure.findFirst({
         where: { openedByUserId: userId, locationId, status: 'open' },
@@ -1278,13 +1275,13 @@ export class PharmacyService {
         include: { sales: { where: { status: { not: 'voided' } } } },
       });
       const totalSalesCount = activeSession.sales.length;
-      const totalSalesAmount = activeSession.sales.reduce((sum, sale) => sum + Number(sale.total), 0);
-      const cashSales = activeSession.sales.reduce((sum, sale) => sale.paymentMethod === 'cash' ? sum + Number(sale.total) : sum, 0);
-      const momoSales = activeSession.sales.reduce((sum, sale) => sale.paymentMethod === 'mobile_money' ? sum + Number(sale.total) : sum, 0);
-      const totalCounted = cashCounted + momoCounted;
-      const expectedCash = cashSales + Number(activeSession.openingFloat);
+      const totalSalesAmount = activeSession.sales.reduce((sum, sale) => sum.plus(optionalMoney(sale.total)), zeroMoney());
+      const cashSales = activeSession.sales.reduce((sum, sale) => sale.paymentMethod === 'cash' ? sum.plus(optionalMoney(sale.total)) : sum, zeroMoney());
+      const momoSales = activeSession.sales.reduce((sum, sale) => sale.paymentMethod === 'mobile_money' ? sum.plus(optionalMoney(sale.total)) : sum, zeroMoney());
+      const totalCounted = cashCounted.plus(momoCounted);
+      const expectedCash = optionalMoney(activeSession.openingFloat).plus(cashSales);
       const expectedMomo = momoSales;
-      const discrepancy = totalCounted - expectedCash - expectedMomo;
+      const discrepancy = totalCounted.minus(expectedCash.plus(expectedMomo));
 
       const closed = await tx.pharmacyDailyClosure.update({
         where: { id: active.id },
@@ -1314,18 +1311,27 @@ export class PharmacyService {
           actionType: 'close',
           entityType: 'pharmacy_register_session',
           entityId: active.id,
-          afterData: JSON.stringify({ locationId, totalSalesCount, totalSalesAmount, expectedCash, expectedMomo, cashCounted, momoCounted, discrepancy }),
+          afterData: JSON.stringify({
+            locationId,
+            totalSalesCount,
+            totalSalesAmount: formatMoney(totalSalesAmount),
+            expectedCash: formatMoney(expectedCash),
+            expectedMomo: formatMoney(expectedMomo),
+            cashCounted: formatMoney(cashCounted),
+            momoCounted: formatMoney(momoCounted),
+            discrepancy: formatMoney(discrepancy),
+          }),
           actorUserId: userId,
         },
       });
       return closed;
     });
 
-    const discrepancy = Number(closedSession.discrepancy ?? 0);
+    const discrepancy = moneyToNumber(closedSession.discrepancy ?? 0);
     if (Math.abs(discrepancy) > 0.01) {
       await this.notificationsService.create({
         title: 'Pharmacy register discrepancy',
-        message: `${closedSession.location?.name ?? 'A pharmacy register'} closed with a discrepancy of GHS ${discrepancy.toFixed(2)}.`,
+        message: `${closedSession.location?.name ?? 'A pharmacy register'} closed with a discrepancy of GHS ${formatMoney(closedSession.discrepancy)}.`,
         type: 'danger',
         module: 'accounting',
         targetRoles: [0, 5],

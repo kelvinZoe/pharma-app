@@ -11,10 +11,11 @@ import { PharmacyPayablesService } from './pharmacy-payables.service';
 import { PharmacyInventoryControlService } from './pharmacy-inventory-control.service';
 import { PharmacyTransferService } from './pharmacy-transfer.service';
 import { PharmacyNetworkStockService } from './pharmacy-network-stock.service';
+import { IdempotencyService } from '../common/idempotency.service';
 
 @Module({
   imports: [PrismaModule, AuthModule, NotificationsModule],
-  providers: [PharmacyService, PharmacyLocationService, PharmacySupplierService, PharmacyPurchaseOrderService, PharmacyPayablesService, PharmacyInventoryControlService, PharmacyTransferService, PharmacyNetworkStockService],
+  providers: [PharmacyService, PharmacyLocationService, PharmacySupplierService, PharmacyPurchaseOrderService, PharmacyPayablesService, PharmacyInventoryControlService, PharmacyTransferService, PharmacyNetworkStockService, IdempotencyService],
   controllers: [PharmacyController],
   exports: [PharmacyService, PharmacyLocationService, PharmacySupplierService, PharmacyPurchaseOrderService, PharmacyPayablesService, PharmacyInventoryControlService, PharmacyTransferService, PharmacyNetworkStockService],
 })

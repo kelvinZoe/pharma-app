@@ -1,7 +1,9 @@
 import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { getInternetDate } from '../common/clock';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ensurePositiveMoney, formatMoney, optionalMoney, zeroMoney } from '../common/money';
 
 @Injectable()
 export class VisitsService {
@@ -265,12 +267,12 @@ export class VisitsService {
       });
 
       // Add visit services
-      let subtotal = 0;
+      let subtotal = zeroMoney();
       for (const svcId of serviceIds) {
         const svc = services.find((s) => s.id === svcId);
         if (!svc) continue;
 
-        subtotal += Number(svc.price);
+        subtotal = subtotal.plus(optionalMoney(svc.price));
 
         await tx.visitService.create({
           data: {
@@ -382,6 +384,7 @@ export class VisitsService {
 
     const line = await this.prisma.$transaction(async (tx) => {
       const approvedByPatient = data.approvedByPatient === true;
+      const lineTotal = optionalMoney(service.price).times(quantity).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
       // Create visit service line
       const line = await tx.visitService.create({
         data: {
@@ -390,7 +393,7 @@ export class VisitsService {
           source: 'department_added',
           unitPrice: service.price,
           quantity,
-          lineTotal: Number(service.price) * quantity,
+          lineTotal,
           status: 'pending',
           approvedByPatient,
         },
@@ -402,17 +405,15 @@ export class VisitsService {
           where: { visitId, status: { not: 'not_done' }, approvedByPatient: true },
         });
 
-        const newSubtotal = allVisitServices.reduce(
-          (sum, s) => sum + Number(s.lineTotal),
-          0,
-        );
+        const newSubtotal = this.sumVisitServiceLines(allVisitServices);
+        const newBalanceDue = newSubtotal.minus(optionalMoney(visit.invoice.amountPaid));
 
         await tx.clinicInvoice.update({
           where: { id: visit.invoice.id },
           data: {
             subtotal: newSubtotal,
             total: newSubtotal,
-            balanceDue: newSubtotal - Number(visit.invoice.amountPaid),
+            balanceDue: newBalanceDue,
           },
         });
       }
@@ -482,18 +483,16 @@ export class VisitsService {
         const allBillableServices = await tx.visitService.findMany({
           where: { visitId, status: { not: 'not_done' }, approvedByPatient: true },
         });
-        const newSubtotal = allBillableServices.reduce(
-          (sum, s) => sum + Number(s.lineTotal),
-          0,
-        );
+        const newSubtotal = this.sumVisitServiceLines(allBillableServices);
+        const newBalanceDue = newSubtotal.minus(optionalMoney(visit.invoice.amountPaid));
 
         await tx.clinicInvoice.update({
           where: { id: visit.invoice.id },
           data: {
             subtotal: newSubtotal,
             total: newSubtotal,
-            balanceDue: newSubtotal - Number(visit.invoice.amountPaid),
-            status: newSubtotal - Number(visit.invoice.amountPaid) > 0 ? 'draft' : visit.invoice.status,
+            balanceDue: newBalanceDue,
+            status: newBalanceDue.gt(0) ? 'draft' : visit.invoice.status,
           },
         });
       }
@@ -503,10 +502,7 @@ export class VisitsService {
   }
 
   async requestServicePriceAdjustment(visitId: string, visitServiceId: string, data: any, userId: string, actorRole: number) {
-    const requestedLineTotal = Number(data.requestedLineTotal ?? data.totalAmount ?? data.lineTotal);
-    if (!Number.isFinite(requestedLineTotal) || requestedLineTotal <= 0) {
-      throw new BadRequestException('A valid adjusted total amount is required');
-    }
+    const requestedLineTotal = ensurePositiveMoney(data.requestedLineTotal ?? data.totalAmount ?? data.lineTotal, 'Adjusted total amount');
 
     const line = await this.prisma.visitService.findUnique({
       where: { id: visitServiceId },
@@ -523,8 +519,8 @@ export class VisitsService {
     }
     this.assertInvoiceMutable(line.visit.invoice, 'request a price adjustment');
 
-    const currentLineTotal = Number(line.lineTotal);
-    if (requestedLineTotal <= currentLineTotal + 0.000001) {
+    const currentLineTotal = optionalMoney(line.lineTotal);
+    if (requestedLineTotal.lte(currentLineTotal)) {
       throw new BadRequestException('A complexity adjustment must increase the current service charge');
     }
 
@@ -567,8 +563,8 @@ export class VisitsService {
           actionType: 'request_price_adjustment',
           entityType: 'visit_service',
           entityId: visitServiceId,
-          beforeData: JSON.stringify({ lineTotal: currentLineTotal }),
-          afterData: JSON.stringify({ requestedLineTotal, reason, visitId }),
+          beforeData: JSON.stringify({ lineTotal: formatMoney(currentLineTotal) }),
+          afterData: JSON.stringify({ requestedLineTotal: formatMoney(requestedLineTotal), reason, visitId }),
           actorUserId: userId,
         },
       });
@@ -577,7 +573,7 @@ export class VisitsService {
 
     await this.notificationsService.create({
       title: 'Price adjustment requested',
-      message: `${updatedLine.service?.name ?? 'A service'} was adjusted from GHS ${Number(line.lineTotal).toFixed(2)} to GHS ${requestedLineTotal.toFixed(2)}.`,
+      message: `${updatedLine.service?.name ?? 'A service'} was adjusted from GHS ${formatMoney(line.lineTotal)} to GHS ${formatMoney(requestedLineTotal)}.`,
       type: 'warning',
       module: 'frontdesk',
       targetRole: 1,
@@ -617,7 +613,7 @@ export class VisitsService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      const requestedLineTotal = Number(line.requestedLineTotal);
+      const requestedLineTotal = optionalMoney(line.requestedLineTotal);
       const claim = await tx.visitService.updateMany({
         where: {
           id: visitServiceId,
@@ -651,11 +647,8 @@ export class VisitsService {
         const allBillableServices = await tx.visitService.findMany({
           where: { visitId, status: { not: 'not_done' }, approvedByPatient: true },
         });
-        const newSubtotal = allBillableServices.reduce(
-          (sum, serviceLine) => sum + Number(serviceLine.lineTotal),
-          0,
-        );
-        const newBalanceDue = newSubtotal - Number(visit.invoice.amountPaid);
+        const newSubtotal = this.sumVisitServiceLines(allBillableServices);
+        const newBalanceDue = newSubtotal.minus(optionalMoney(visit.invoice.amountPaid));
 
         await tx.clinicInvoice.update({
           where: { id: visit.invoice.id },
@@ -663,7 +656,7 @@ export class VisitsService {
             subtotal: newSubtotal,
             total: newSubtotal,
             balanceDue: newBalanceDue,
-            status: newBalanceDue > 0 ? 'draft' : visit.invoice.status,
+            status: newBalanceDue.gt(0) ? 'draft' : visit.invoice.status,
           },
         });
       }
@@ -673,8 +666,8 @@ export class VisitsService {
           actionType: approved ? 'approve_price_adjustment' : 'reject_price_adjustment',
           entityType: 'visit_service',
           entityId: visitServiceId,
-          beforeData: JSON.stringify({ lineTotal: Number(line.lineTotal), requestedLineTotal }),
-          afterData: JSON.stringify({ approved, lineTotal: Number(updatedLine.lineTotal), visitId }),
+          beforeData: JSON.stringify({ lineTotal: formatMoney(line.lineTotal), requestedLineTotal: formatMoney(requestedLineTotal) }),
+          afterData: JSON.stringify({ approved, lineTotal: formatMoney(updatedLine.lineTotal), visitId }),
           actorUserId: userId,
         },
       });
@@ -715,17 +708,15 @@ export class VisitsService {
           where: { visitId, id: { not: visitServiceId }, status: { not: 'not_done' }, approvedByPatient: true },
         });
 
-        const newSubtotal = allRemainingServices.reduce(
-          (sum, s) => sum + Number(s.lineTotal),
-          0,
-        );
+        const newSubtotal = this.sumVisitServiceLines(allRemainingServices);
+        const newBalanceDue = newSubtotal.minus(optionalMoney(visit.invoice.amountPaid));
 
         await tx.clinicInvoice.update({
           where: { id: visit.invoice.id },
           data: {
             subtotal: newSubtotal,
             total: newSubtotal,
-            balanceDue: newSubtotal - Number(visit.invoice.amountPaid),
+            balanceDue: newBalanceDue,
           },
         });
       }
@@ -774,17 +765,15 @@ export class VisitsService {
           where: { visitId, status: { not: 'not_done' }, approvedByPatient: true },
         });
 
-        const newSubtotal = allBillableServices.reduce(
-          (sum, s) => sum + Number(s.lineTotal),
-          0,
-        );
+        const newSubtotal = this.sumVisitServiceLines(allBillableServices);
+        const newBalanceDue = newSubtotal.minus(optionalMoney(visit.invoice.amountPaid));
 
         await tx.clinicInvoice.update({
           where: { id: visit.invoice.id },
           data: {
             subtotal: newSubtotal,
             total: newSubtotal,
-            balanceDue: newSubtotal - Number(visit.invoice.amountPaid),
+            balanceDue: newBalanceDue,
           },
         });
       }
@@ -1085,7 +1074,7 @@ export class VisitsService {
       }
 
       if (visit.invoice && (
-        Number(visit.invoice.amountPaid) > 0.000001 ||
+        optionalMoney(visit.invoice.amountPaid).gt(0) ||
         visit.invoice.payments.length > 0
       )) {
         throw new BadRequestException('A visit with payment history cannot be deleted. Use an approved financial reversal instead.');
@@ -1140,9 +1129,13 @@ export class VisitsService {
 
   private assertInvoiceMutable(invoice: any, action: string): void {
     if (!invoice) return;
-    const amountPaid = Number(invoice.amountPaid ?? 0);
-    if (amountPaid > 0.000001 || ['partially_paid', 'paid', 'voided'].includes(String(invoice.status))) {
+    const amountPaid = optionalMoney(invoice.amountPaid ?? 0);
+    if (amountPaid.gt(0) || ['partially_paid', 'paid', 'voided'].includes(String(invoice.status))) {
       throw new BadRequestException(`Cannot ${action} after a payment has been posted`);
     }
+  }
+
+  private sumVisitServiceLines(lines: Array<{ lineTotal: unknown }>): Prisma.Decimal {
+    return lines.reduce((sum, line) => sum.plus(optionalMoney(line.lineTotal as any)), zeroMoney());
   }
 }
